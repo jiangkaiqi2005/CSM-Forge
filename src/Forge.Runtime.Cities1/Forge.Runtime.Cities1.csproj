@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <AssemblyName>CSM.Forge.Runtime.Cities1</AssemblyName>
+    <RootNamespace>CsmForge.Runtime.Cities1</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Forge.Core/Forge.Core.csproj" />
+    <Reference Include="ICities">
+      <HintPath>$(CitiesManagedPath)/ICities.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(CitiesManagedPath)/UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="RequireLegalGameReferences" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(CitiesManagedPath)' == '' Or !Exists('$(CitiesManagedPath)/ICities.dll') Or !Exists('$(CitiesManagedPath)/UnityEngine.dll')"
+      Text="Set CitiesManagedPath to your legally installed Cities: Skylines 1 Cities_Data/Managed directory. Game DLLs are neither downloaded nor replaced by build stubs." />
+  </Target>
+</Project>

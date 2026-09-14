@@ -48,6 +48,7 @@ namespace CsmForge.Core
         private bool busy;
         public SessionStamp Stamp { get; private set; }
         public ulong Revision { get; private set; }
+        public Hash256 StateHash { get; private set; }
         public bool IsFenced { get; private set; }
         public int JournalCount { get { owner.AssertCurrent(); return journal.Count; } }
         public int PeerCount { get { owner.AssertCurrent(); return peers.Count; } }
@@ -57,6 +58,8 @@ namespace CsmForge.Core
             Check.Stamp(stamp);
             if (world == null || diagnostics == null) throw new ArgumentNullException("world");
             Stamp = stamp; this.world = world; this.diagnostics = diagnostics;
+            StateHash = world.StateHash;
+            if (StateHash == null) throw new ArgumentException("World must expose its initial canonical digest.", "world");
         }
 
         private void Enter()
@@ -84,12 +87,30 @@ namespace CsmForge.Core
             busy = true;
             try
             {
-                if (!world.StateHash.Equals(hash)) return false;
+                AssertCommittedWorld();
+                if (!StateHash.Equals(hash)) return false;
                 peer.Ready = true;
                 return true;
             }
             catch (Exception) { Fence(connection, 0); return false; }
             finally { busy = false; }
+        }
+
+        // A coordinator schedules this at safe, coherent domain boundaries, not on network threads.
+        public bool VerifyWorld()
+        {
+            Enter();
+            if (IsFenced) return false;
+            busy = true;
+            try { AssertCommittedWorld(); return true; }
+            catch (Exception) { Fence(Guid.Empty, 0); return false; }
+            finally { busy = false; }
+        }
+
+        private void AssertCommittedWorld()
+        {
+            if (!StateHash.Equals(world.StateHash))
+                throw new InvalidOperationException("World changed outside the committed authority path.");
         }
 
         public void SuspendPeer(Guid connection)
@@ -152,7 +173,8 @@ namespace CsmForge.Core
 
             try
             {
-                Hash256 before = world.StateHash;
+                AssertCommittedWorld();
+                Hash256 before = StateHash;
                 WorldExecution execution = world.Execute(intent.Payload);
                 if (execution == null) throw new InvalidOperationException("Adapter returned no outcome.");
                 Hash256 after = world.StateHash;
@@ -162,18 +184,18 @@ namespace CsmForge.Core
                     diagnostics.Record(DiagnosticCode.Rejected, Stamp, connection, Revision, intent.RequestId);
                     return Remember(peer, intent, Result(SubmitDecision.DomainRejected));
                 }
-                if (!after.Equals(execution.AfterHash)) throw new InvalidOperationException("Adapter outcome digest mismatch.");
+                if (after == null || !after.Equals(execution.AfterHash)) throw new InvalidOperationException("Adapter outcome digest mismatch.");
                 Commit commit = new Commit(Stamp, Revision + 1, connection, intent.RequestId, before, after, execution.Delta);
                 journal.Enqueue(commit);
                 if (journal.Count > Limits.JournalEntries) journal.Dequeue();
                 Revision = commit.Revision;
+                StateHash = after;
                 diagnostics.Record(DiagnosticCode.Committed, Stamp, connection, Revision, intent.RequestId);
                 return Remember(peer, intent, new SubmitResult(SubmitDecision.Committed, commit, false));
             }
             catch (Exception)
             {
-                // The adapter may have already changed game state. Do not acknowledge success,
-                // allocate another revision, auto-retry, or publish a snapshot of this world.
+                // The adapter may have changed game state. Do not retry or claim rollback.
                 Fence(connection, intent.RequestId);
                 return Remember(peer, intent, Result(SubmitDecision.Faulted));
             }
@@ -187,7 +209,8 @@ namespace CsmForge.Core
             busy = true;
             try
             {
-                Hash256 before = world.StateHash;
+                AssertCommittedWorld();
+                Hash256 before = StateHash;
                 WorldImage image = world.Capture();
                 if (image == null || !image.HasValidContent() || !before.Equals(image.StateHash) || !before.Equals(world.StateHash))
                     throw new InvalidOperationException("The snapshot is not a coherent committed cut.");

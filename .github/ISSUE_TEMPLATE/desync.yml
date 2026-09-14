@@ -1,0 +1,35 @@
+name: Consistency or recovery defect
+description: Report a reproducible kernel or game-integration inconsistency.
+title: '[consistency] '
+body:
+  - type: markdown
+    attributes:
+      value: 'Do not upload room tokens, credentials, private cities or unredacted personal logs. Mark kernel-only vs real-game evidence explicitly.'
+  - type: input
+    id: revision
+    attributes:
+      label: Forge commit and environment
+      description: Exact commit, runtime/OS, and game build only when tested in the actual game.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Where did this occur?
+      options:
+        - Production kernel test or reference-domain harness
+        - Actual Cities Skylines 1 runtime
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction and expected result
+      description: Include seed or operation order, roles, faults injected and recovery actions.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Relevant session/epoch/revisions, first comparable state mismatch, event codes and CI link. No secrets or full save uploads.

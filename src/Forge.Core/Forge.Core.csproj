@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net35;net8.0</TargetFrameworks>
+    <AssemblyName>CSM.Forge.Core</AssemblyName>
+    <RootNamespace>CsmForge.Core</RootNamespace>
+  </PropertyGroup>
+</Project>

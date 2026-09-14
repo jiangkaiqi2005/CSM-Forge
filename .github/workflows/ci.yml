@@ -1,0 +1,37 @@
+name: kernel-ci
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kernel-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  kernel:
+    name: kernel-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9
+        with:
+          dotnet-version: '8.0.x'
+      - name: Compile production libraries and tests for net35 and net8
+        run: dotnet build tests/Forge.Tests/Forge.Tests.csproj -c Release --nologo
+      - name: Run production-kernel tests on modern runtime
+        run: dotnet run --project tests/Forge.Tests/Forge.Tests.csproj -c Release -f net8.0 --no-build
+      - name: Install Mono test runtime
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y mono-runtime
+      - name: Run the actual net35 build on Mono
+        if: runner.os == 'Linux'
+        run: mono tests/Forge.Tests/bin/Release/net35/CSM.Forge.Tests.exe

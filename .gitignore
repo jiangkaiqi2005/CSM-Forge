@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+artifacts/
+.local/
+.vs/
+*.user
+*.suo
+*.crp
+*.dll
+*.exe
+*.pdb
+*.log
+.env

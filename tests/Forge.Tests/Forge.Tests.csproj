@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net35;net8.0</TargetFrameworks>
+    <AssemblyName>CSM.Forge.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Forge.Core/Forge.Core.csproj" />
+    <ProjectReference Include="../../src/Forge.Protocol/Forge.Protocol.csproj" />
+  </ItemGroup>
+</Project>

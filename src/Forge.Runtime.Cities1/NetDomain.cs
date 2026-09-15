@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace CsmForge.Runtime.Cities1
 {
-    internal sealed class NetNativeNodeRecord
+    public sealed class NetNativeNodeRecord
     {
         public EntityIdentityV2 Entity;
         public ushort NativeId;
@@ -17,7 +17,7 @@ namespace CsmForge.Runtime.Cities1
         public NetNodeStateV2 State;
     }
 
-    internal sealed class NetNativeSegmentRecord
+    public sealed class NetNativeSegmentRecord
     {
         public EntityIdentityV2 Entity;
         public ushort NativeId;
@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
         public NetSegmentStateV2 State;
     }
 
-    internal sealed class NetWorldSnapshotV2
+    public sealed class NetWorldSnapshotV2
     {
         public readonly Dictionary<ushort, NetNativeNodeRecord> Nodes = new Dictionary<ushort, NetNativeNodeRecord>();
         public readonly Dictionary<ushort, NetNativeSegmentRecord> Segments = new Dictionary<ushort, NetNativeSegmentRecord>();

@@ -103,6 +103,12 @@ namespace CsmForge.Runtime.Cities1
         private void HandleSnapshotOffer(SnapshotOfferV2 offer)
         {
             if (!offer.RequiresTransfer) throw new InvalidOperationException("V3 requires a transfer-backed host snapshot.");
+            if (replica != null)
+            {
+                lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
+                replica = null;
+                clientWater = null;
+            }
             if (clientSnapshot != null) clientSnapshot.Dispose();
             string path = Path.Combine(Path.GetTempPath(), "csm-forge-snapshot-" + offer.TransferId.ToString("N") + ".crp");
             clientOffer = offer;

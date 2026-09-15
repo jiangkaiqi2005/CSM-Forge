@@ -154,6 +154,7 @@ namespace CsmForge.Runtime.Cities1
         public static readonly CitiesGameThreadScheduler Scheduler = new CitiesGameThreadScheduler(Lifecycle, Events);
         public static readonly CitiesPatchCoordinator Patches = new CitiesPatchCoordinator(Events);
         public static readonly ForgeSaveMetadataStore Metadata = new ForgeSaveMetadataStore(Events);
+        public static readonly ForgeEntityMapStore EntityMaps = new ForgeEntityMapStore();
         public static readonly CitiesReceivedWorldLoader WorldLoader = new CitiesReceivedWorldLoader();
         public static readonly CitiesMultiplayerSessionV3 Multiplayer = new CitiesMultiplayerSessionV3(Lifecycle, Events);
         public static void Enable() { Lifecycle.Enable(); Patches.InstallWhenReady(); }
@@ -163,6 +164,7 @@ namespace CsmForge.Runtime.Cities1
             WorldLoader.CancelPending();
             Scheduler.Detach();
             Patches.Uninstall();
+            EntityMaps.Clear();
             Lifecycle.Disable();
         }
     }

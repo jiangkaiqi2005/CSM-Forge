@@ -7,7 +7,7 @@ namespace CsmForge.Tests
     public static class BuildingDomainV2Tests
     {
         [Case]
-        public static void CreateAndDeleteRoundTripUseForgeEntityIdentity()
+        public static void CreateDeleteAndRefundRoundTripUseForgeEntityIdentity()
         {
             BuildingIntentV2 create = BuildingIntentV2.Create("building:vanilla:clinic", 12.5f, 7f, -2f, 1.25f, 4, 12345);
             BuildingIntentV2 decodedIntent = BuildingDomainCodecV2.DecodeIntent(BuildingDomainCodecV2.EncodeIntent(create));
@@ -23,6 +23,12 @@ namespace CsmForge.Tests
             Assert.Equal(state.PrefabKey, decodedResult.State.PrefabKey);
             Assert.Equal((uint)321, decodedResult.State.BuildIndex);
             Assert.Equal(12345, decodedResult.State.ConstructionCost);
+
+            BuildingResultV2 deleted = BuildingResultV2.Deleted(entity, 777);
+            BuildingResultV2 decodedDeleted = BuildingDomainCodecV2.DecodeResult(BuildingDomainCodecV2.EncodeResult(deleted));
+            Assert.Equal(BuildingResultKindV2.Deleted, decodedDeleted.Kind);
+            Assert.Equal(entity, decodedDeleted.Entity);
+            Assert.Equal(777, decodedDeleted.RefundAmount);
 
             BuildingIntentV2 delete = BuildingIntentV2.Delete(entity);
             BuildingIntentV2 decodedDelete = BuildingDomainCodecV2.DecodeIntent(BuildingDomainCodecV2.EncodeIntent(delete));

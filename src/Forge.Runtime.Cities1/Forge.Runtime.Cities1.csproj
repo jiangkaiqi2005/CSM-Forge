@@ -10,13 +10,26 @@
       <HintPath>$(CitiesManagedPath)/ICities.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(CitiesManagedPath)/Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ColossalManaged">
+      <HintPath>$(CitiesManagedPath)/ColossalManaged.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="UnityEngine">
       <HintPath>$(CitiesManagedPath)/UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.UI" Condition="Exists('$(CitiesManagedPath)/UnityEngine.UI.dll')">
+      <HintPath>$(CitiesManagedPath)/UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <PackageReference Include="CitiesHarmony.API" Version="2.2.0" />
   </ItemGroup>
   <Target Name="RequireLegalGameReferences" BeforeTargets="ResolveReferences">
-    <Error Condition="'$(CitiesManagedPath)' == '' Or !Exists('$(CitiesManagedPath)/ICities.dll') Or !Exists('$(CitiesManagedPath)/UnityEngine.dll')"
-      Text="Set CitiesManagedPath to your legally installed Cities: Skylines 1 Cities_Data/Managed directory. Game DLLs are neither downloaded nor replaced by build stubs." />
+    <Error Condition="'$(CitiesManagedPath)' == '' Or !Exists('$(CitiesManagedPath)/ICities.dll') Or !Exists('$(CitiesManagedPath)/Assembly-CSharp.dll') Or !Exists('$(CitiesManagedPath)/ColossalManaged.dll') Or !Exists('$(CitiesManagedPath)/UnityEngine.dll')"
+      Text="Set CitiesManagedPath to your legally installed Cities: Skylines 1 Cities_Data/Managed directory. Game DLLs are neither downloaded nor committed." />
   </Target>
 </Project>

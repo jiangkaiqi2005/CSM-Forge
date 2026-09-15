@@ -6,35 +6,77 @@ using ICities;
 
 namespace CsmForge.Runtime.Cities1
 {
-    /// <summary>Development probe only. Does not patch simulation, open sockets or alter saves.</summary>
     public sealed class ForgeMod : IUserMod
     {
-        public string Name { get { return "CSM-Forge [runtime probe - NOT MULTIPLAYER]"; } }
+        public string Name { get { return "CSM-Forge V3"; } }
         public string Description
         {
-            get { return "Development-only runtime diagnostics. Multiplayer remains disabled until integration acceptance passes."; }
+            get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; }
+        }
+
+        public void OnEnabled()
+        {
+            RuntimeServices.Enable();
+            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; multiplayer write access remains gated by session/runtime acceptance.");
+        }
+
+        public void OnDisabled()
+        {
+            RuntimeServices.Disable();
+            UnityEngine.Debug.Log("[CSM-Forge] runtime disabled and Forge-owned patches/resources released.");
         }
     }
 
     public sealed class ForgeLoadingExtension : LoadingExtensionBase
     {
+        public override void OnCreated(ILoading loading)
+        {
+            base.OnCreated(loading);
+            RuntimeServices.Lifecycle.LoadingCreated();
+        }
+
         public override void OnLevelLoaded(LoadMode mode)
         {
             base.OnLevelLoaded(mode);
-            UnityEngine.Debug.Log("[CSM-Forge] probe-only; multiplayer=disabled; load=" + mode +
-                "; managedRuntime=" + Environment.Version + "; unity=" + UnityEngine.Application.unityVersion +
-                "; callbackThread=" + Thread.CurrentThread.ManagedThreadId +
-                "; kernel=" + typeof(HostSession).Assembly.GetName().Version);
-            ReportEngineSurface();
+            try
+            {
+                LoadIdentity identity = RuntimeServices.Lifecycle.LevelLoaded(mode,
+                    RuntimeServices.Metadata.PendingWorldId, RuntimeServices.Metadata.PendingEpoch);
+                RuntimeServices.Metadata.Attach(identity);
+                CompatibilityManifest manifest = CitiesCompatibilityCollector.Collect();
+                UnityEngine.Debug.Log("[CSM-Forge] level loaded; world=" + identity.WorldId +
+                    "; epoch=" + identity.Epoch + "; generation=" + identity.Generation +
+                    "; load=" + mode + "; compatibilityEntries=" + manifest.Entries.Length +
+                    "; gameBuild=" + BuildConfig.applicationVersion +
+                    "; managedRuntime=" + Environment.Version +
+                    "; unity=" + UnityEngine.Application.unityVersion +
+                    "; callbackThread=" + Thread.CurrentThread.ManagedThreadId +
+                    "; core=" + typeof(SessionStamp).Assembly.GetName().Version);
+                ReportEngineSurface(identity);
+            }
+            catch (Exception error)
+            {
+                RuntimeServices.Events.Record(RuntimeEventCode.Error, RuntimeServices.Lifecycle.Current.Generation,
+                    "level-load: " + error.GetType().Name);
+                RuntimeServices.Lifecycle.Fence("level initialization failed");
+                UnityEngine.Debug.LogError("[CSM-Forge] level initialization failed: " + error);
+            }
         }
 
         public override void OnLevelUnloading()
         {
-            UnityEngine.Debug.Log("[CSM-Forge] probe level unloading; no multiplayer session was started.");
+            RuntimeServices.Lifecycle.BeginUnload();
+            RuntimeServices.Metadata.Clear();
             base.OnLevelUnloading();
         }
 
-        private static void ReportEngineSurface()
+        public override void OnReleased()
+        {
+            RuntimeServices.Lifecycle.Released();
+            base.OnReleased();
+        }
+
+        private static void ReportEngineSurface(LoadIdentity identity)
         {
             Type simulation = null;
             foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -44,11 +86,51 @@ namespace CsmForge.Runtime.Cities1
             }
             bool fixedUpdate = false;
             if (simulation != null)
+            {
                 foreach (MethodInfo method in simulation.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                    if (method.Name == "FixedUpdate" && method.GetParameters().Length == 0) fixedUpdate = true;
-            UnityEngine.Debug.Log("[CSM-Forge] SimulationManager=" + (simulation != null) +
-                "; FixedUpdate-surface=" + fixedUpdate + "; simulation-isolation=UNPROVEN; result-application=UNPROVEN.");
-            // Existence of a method is not evidence that patching/skipping it is safe.
+                {
+                    if (method.Name == "FixedUpdate" && method.GetParameters().Length == 0)
+                    {
+                        fixedUpdate = true;
+                        break;
+                    }
+                }
+            }
+            UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
+                "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
+                "; simulation-isolation=UNPROVEN; authority-projection=UNPROVEN.");
+        }
+    }
+
+    public sealed class ForgeThreadingExtension : ThreadingExtensionBase
+    {
+        public override void OnCreated(IThreading threading)
+        {
+            base.OnCreated(threading);
+            RuntimeServices.Scheduler.Attach(threading);
+        }
+
+        public override void OnBeforeSimulationTick()
+        {
+            base.OnBeforeSimulationTick();
+            LoadIdentity identity = RuntimeServices.Lifecycle.Current;
+            if (!identity.IsValid) return;
+            // Network/session inbox draining is connected here in later gates. This callback
+            // is deliberately kept as the single simulation-owner entry point.
+        }
+
+        public override void OnAfterSimulationTick()
+        {
+            LoadIdentity identity = RuntimeServices.Lifecycle.Current;
+            if (identity.IsValid)
+                RuntimeScopeGuard.EndOfSimulationTick(RuntimeServices.Lifecycle, RuntimeServices.Events);
+            base.OnAfterSimulationTick();
+        }
+
+        public override void OnReleased()
+        {
+            RuntimeServices.Scheduler.Detach();
+            base.OnReleased();
         }
     }
 }

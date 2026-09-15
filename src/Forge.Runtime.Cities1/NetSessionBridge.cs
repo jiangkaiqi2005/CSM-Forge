@@ -8,6 +8,8 @@ namespace CsmForge.Runtime.Cities1
     {
         private NetAuthorityDomain hostNet;
         private NetReplicaDomain clientNet;
+        private ZoneAuthorityDomain hostZones;
+        private ZoneReplicaDomain clientZones;
 
         private IAuthorityDomainV2[] CreateHostDomains(LoadIdentity identity)
         {
@@ -16,7 +18,8 @@ namespace CsmForge.Runtime.Cities1
             committedDemandRoot = hostDemand.StateRoot;
             hostBuildings = new BuildingAuthorityDomain(identity);
             hostNet = new NetAuthorityDomain(identity);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostBuildings, hostNet };
+            hostZones = new ZoneAuthorityDomain(identity, hostNet);
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostBuildings, hostNet, hostZones };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -25,7 +28,8 @@ namespace CsmForge.Runtime.Cities1
             clientDemand = new DemandReplicaDomain(identity);
             clientBuildings = new BuildingReplicaDomain(identity);
             clientNet = new NetReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientBuildings, clientNet };
+            clientZones = new ZoneReplicaDomain(identity, clientNet);
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientBuildings, clientNet, clientZones };
         }
 
         internal bool IsHostNetAuthorityActive
@@ -110,6 +114,55 @@ namespace CsmForge.Runtime.Cities1
             if (batch == null || authority.IsFenced)
             {
                 FenceSession("observed-net-change-could-not-commit");
+                return;
+            }
+            BroadcastBatch(batch);
+        }
+
+        internal bool TryInterceptClientZoneRefresh(ushort blockId, ulong requestedZone1, ulong requestedZone2,
+            bool playerTool, out ulong restoreZone1, out ulong restoreZone2)
+        {
+            restoreZone1 = restoreZone2 = 0;
+            if (mode != MultiplayerSessionMode.ClientLive || clientZones == null || replica == null) return false;
+            ZoneBlockKeyV2 key;
+            if (!clientZones.TryGetCommittedForBlock(blockId, out key, out restoreZone1, out restoreZone2))
+                return false;
+            if (!playerTool || (requestedZone1 == restoreZone1 && requestedZone2 == restoreZone2)) return true;
+            if (snapshotSave != null || clientOperation == ulong.MaxValue) return false;
+            clientOperation++;
+            ZoneIntentV2 request = new ZoneIntentV2(new ZoneStateV2(key, requestedZone1, requestedZone2));
+            PlayerIntentV2 intent = new PlayerIntentV2(replica.Stamp, clientMember, clientOperation, clientPermissionVersion,
+                ZoneAuthorityDomain.Id, clientZones.StateRoot, ZoneDomainCodecV2.EncodeIntent(request));
+            SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
+            lock (gate) detail = "zone-intent-" + clientOperation + ":pending";
+            return true;
+        }
+
+        internal void ObserveHostZoneBlock(ushort blockId)
+        {
+            if (mode != MultiplayerSessionMode.Hosting || hostZones == null || authority == null || snapshotSave != null) return;
+            Hash256 before = hostZones.StateRoot;
+            ZoneMutationV2 mutation = hostZones.ObserveBlock(blockId);
+            PublishObservedZoneMutation(before, mutation);
+        }
+
+        internal void PollObservedHostZones()
+        {
+            if (mode != MultiplayerSessionMode.Hosting || hostZones == null || authority == null || snapshotSave != null) return;
+            Hash256 before = hostZones.StateRoot;
+            ZoneMutationV2 mutation = hostZones.ReconcileWorld();
+            PublishObservedZoneMutation(before, mutation);
+        }
+
+        private void PublishObservedZoneMutation(Hash256 before, ZoneMutationV2 mutation)
+        {
+            if (mutation == null || mutation.Count == 0) return;
+            Hash256 after = hostZones.StateRoot;
+            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ZoneAuthorityDomain.Id,
+                before, after, ZoneDomainCodecV2.EncodeMutation(mutation));
+            if (batch == null || authority.IsFenced)
+            {
+                FenceSession("observed-zone-change-could-not-commit");
                 return;
             }
             BroadcastBatch(batch);

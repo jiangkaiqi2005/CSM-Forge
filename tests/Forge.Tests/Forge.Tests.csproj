@@ -8,5 +8,6 @@
     <ProjectReference Include="../../src/Forge.Core/Forge.Core.csproj" />
     <ProjectReference Include="../../src/Forge.Protocol/Forge.Protocol.csproj" />
     <ProjectReference Include="../../src/Forge.Transport.LiteNet/Forge.Transport.LiteNet.csproj" />
+    <ProjectReference Include="../../src/Forge.Checkpoints/Forge.Checkpoints.csproj" />
   </ItemGroup>
 </Project>

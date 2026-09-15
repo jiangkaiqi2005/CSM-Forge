@@ -325,6 +325,7 @@ namespace CsmForge.Core
 
         private bool TryGet(JoinIdentity join, out State state)
         {
+            state = null;
             if (!join.IsValid || !joins.TryGetValue(join.JoinId, out state)) return false;
             return state.Join.Equals(join);
         }

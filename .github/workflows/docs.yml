@@ -1,0 +1,23 @@
+name: docs-contract
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  docs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Validate documentation contract
+        run: python3 scripts/check_docs.py
+      - name: Test checker failure modes
+        run: python3 -m unittest discover -s tests/docs -p 'test_*.py' -v

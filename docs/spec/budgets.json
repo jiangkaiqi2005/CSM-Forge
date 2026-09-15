@@ -1,0 +1,53 @@
+{
+  "profile": "v2-p0-proposed",
+  "status": "design_target_not_measured",
+  "note": "These are proposed v2 validation limits, not the current M0 Limits or measured performance guarantees.",
+  "capacity": {
+    "max_players_including_host": 4,
+    "max_concurrent_joins": 2
+  },
+  "time_ms": {
+    "heartbeat_interval": 2000,
+    "network_degraded_after": 6000,
+    "network_expired_after": 20000,
+    "handshake_deadline": 15000,
+    "join_progress_stall": 120000,
+    "join_total_deadline": 600000,
+    "join_lease_max_lifetime": 600000,
+    "barrier_ttl": 15000,
+    "activation_grant_ttl": 15000,
+    "journal_max_age": 600000,
+    "automatic_resync_window": 300000,
+    "live_lag_target": 2000
+  },
+  "retry": {
+    "max_barrier_attempts_per_join": 3,
+    "max_rebases_per_join": 1,
+    "max_automatic_semantic_resyncs_per_window": 1
+  },
+  "bytes": {
+    "max_frame_payload": 65536,
+    "max_logical_commit": 1048576,
+    "chunk_data": 32768,
+    "max_snapshot": 536870912,
+    "snapshot_cache": 2147483648,
+    "journal_store": 536870912,
+    "state_queue_per_peer": 8388608,
+    "state_queues_total": 33554432,
+    "bulk_inflight_per_peer": 2097152,
+    "bulk_inflight_total": 8388608,
+    "catchup_spool_per_join": 134217728,
+    "catchup_spools_total": 268435456,
+    "target_plugin_extra_memory": 268435456
+  },
+  "counts": {
+    "max_snapshot_chunks": 16384,
+    "max_commit_parts": 32
+  },
+  "performance_targets_ms": {
+    "steady_tick_added_p99": 2,
+    "game_publish_window_p99": 8,
+    "snapshot_safe_point_p99": 250,
+    "live_rtt_p95_added_by_parallel_join": 50
+  }
+}

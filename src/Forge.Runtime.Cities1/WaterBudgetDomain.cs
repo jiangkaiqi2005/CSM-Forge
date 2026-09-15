@@ -141,11 +141,13 @@ namespace CsmForge.Runtime.Cities1
 
             if (role == CitiesRuntimeRole.HostLive || role == CitiesRuntimeRole.ClientReplicaLive)
             {
+                bool queued;
                 if (service == ItemClass.Service.Water && subService == ItemClass.SubService.None)
-                    RuntimeServices.Multiplayer.TryQueueWaterBudget(night, budget);
+                    queued = RuntimeServices.Multiplayer.TryQueueWaterBudget(night, budget);
+                else
+                    queued = RuntimeServices.Multiplayer.TryQueueBudget(service, subService, budget, night);
+                if (!queued) RuntimeServices.Lifecycle.Fence("Budget write could not be routed through Host authority");
             }
-            // All direct multiplayer budget writes are suppressed. Only the supported Water
-            // slice is converted to an Intent; other services remain explicitly unsupported.
             return false;
         }
     }

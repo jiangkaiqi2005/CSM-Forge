@@ -6,7 +6,10 @@ namespace CsmForge.Transport.LiteNet
 {
     public abstract class LiteNetTransportBase : IDisposable
     {
-        public const int MaxPacketBytes = 64 * 1024;
+        // Protocol v2 allows up to 64 KiB of application payload plus its fixed frame
+        // header and integrity trailer. Keep the transport envelope larger than the
+        // protocol payload ceiling so the delivery layer never truncates a legal frame.
+        public const int MaxPacketBytes = 128 * 1024;
         public const int DefaultEventLimit = 512;
         public const int DefaultQueueBytes = 4 * 1024 * 1024;
 

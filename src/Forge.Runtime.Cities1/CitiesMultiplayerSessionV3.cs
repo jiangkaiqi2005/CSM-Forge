@@ -37,6 +37,7 @@ namespace CsmForge.Runtime.Cities1
         private readonly CitiesLifecycleCoordinator lifecycle;
         private readonly RuntimeEventLog events;
         private readonly Queue<WaterBudgetIntent> pendingBudget = new Queue<WaterBudgetIntent>();
+        private readonly Queue<BuildingIntentV2> pendingBuildings = new Queue<BuildingIntentV2>();
         private readonly Dictionary<Guid, HostPeer> hostPeers = new Dictionary<Guid, HostPeer>();
         private readonly Dictionary<Guid, uint> memberGenerations = new Dictionary<Guid, uint>();
         private readonly List<string> snapshotFiles = new List<string>();
@@ -53,6 +54,8 @@ namespace CsmForge.Runtime.Cities1
         private JoinCoordinator joins;
         private WaterBudgetAuthorityDomain hostWater;
         private WaterBudgetReplicaDomain clientWater;
+        private BuildingAuthorityDomain hostBuildings;
+        private BuildingReplicaDomain clientBuildings;
         private Guid hostLocalBinding;
         private MemberIdentity hostLocalMember;
         private ulong hostLocalOperation;
@@ -150,8 +153,10 @@ namespace CsmForge.Runtime.Cities1
             RuntimeServices.WorldLoader.CancelPending();
             foreach (HostPeer peer in hostPeers.Values)
                 try { if (peer.SnapshotCursor != null) peer.SnapshotCursor.Dispose(); } catch { }
+            try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; clientSnapshot = null; snapshotSave = null;
             authority = null; replica = null; joins = null; hostWater = null; clientWater = null;
+            hostBuildings = null; clientBuildings = null;
             hostPolicy = null; localManifest = null; publishedSnapshot = null;
             hostPeers.Clear(); memberGenerations.Clear(); clientManifestPages = null; clientOffer = null;
             clientCompatibilityAccepted = false; clientSessionReady = false; clientSequences = null;
@@ -163,6 +168,7 @@ namespace CsmForge.Runtime.Cities1
             {
                 preserveAcrossLevelLoad = false;
                 pendingBudget.Clear();
+                pendingBuildings.Clear();
                 mode = MultiplayerSessionMode.Offline;
                 detail = "offline";
             }
@@ -182,6 +188,18 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public bool TryQueueBuilding(BuildingIntentV2 intent)
+        {
+            if (intent == null) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                if (pendingBuildings.Count >= 64) return false;
+                pendingBuildings.Enqueue(intent);
+                return true;
+            }
+        }
+
         public void PollSimulation()
         {
             if (!load.IsValid || !lifecycle.IsCurrent(load)) return;
@@ -196,6 +214,7 @@ namespace CsmForge.Runtime.Cities1
                 }
                 if (client != null) DrainClientEvents();
                 DrainBudgetIntents();
+                DrainBuildingIntents();
             }
             catch (Exception error) { FenceSession("session-poll:" + error.GetType().Name); }
         }
@@ -224,6 +243,19 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        private void DrainBuildingIntents()
+        {
+            if (snapshotSave != null) return;
+            int count = 0;
+            while (count++ < 16)
+            {
+                BuildingIntentV2 intent;
+                lock (gate) { if (pendingBuildings.Count == 0) break; intent = pendingBuildings.Dequeue(); }
+                if (mode == MultiplayerSessionMode.Hosting) SubmitHostBuilding(intent);
+                else if (mode == MultiplayerSessionMode.ClientLive) SubmitClientBuilding(intent);
+            }
+        }
+
         private void SubmitHostBudget(WaterBudgetIntent value)
         {
             if (hostLocalOperation == ulong.MaxValue) throw new InvalidOperationException("Host operation counter exhausted.");
@@ -244,6 +276,28 @@ namespace CsmForge.Runtime.Cities1
                 WaterBudgetAuthorityDomain.Id, clientWater.StateRoot, WaterBudgetCodec.EncodeIntent(value));
             SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
             lock (gate) detail = "intent-" + clientOperation + ":pending";
+        }
+
+        private void SubmitHostBuilding(BuildingIntentV2 value)
+        {
+            if (hostLocalOperation == ulong.MaxValue) throw new InvalidOperationException("Host operation counter exhausted.");
+            hostLocalOperation++;
+            PlayerIntentV2 intent = new PlayerIntentV2(authority.Stamp, hostLocalMember, hostLocalOperation, 1,
+                BuildingAuthorityDomain.Id, hostBuildings.StateRoot, BuildingDomainCodecV2.EncodeIntent(value));
+            AuthoritySubmitResultV2 result = authority.Submit(hostLocalBinding, intent);
+            if (result.Decision != AuthoritySubmitDecisionV2.Committed || result.Batch == null)
+                throw new InvalidOperationException("Host-local building operation was rejected: " + result.Decision);
+            BroadcastBatch(result.Batch);
+        }
+
+        private void SubmitClientBuilding(BuildingIntentV2 value)
+        {
+            if (clientOperation == ulong.MaxValue) throw new InvalidOperationException("Client operation counter exhausted.");
+            clientOperation++;
+            PlayerIntentV2 intent = new PlayerIntentV2(replica.Stamp, clientMember, clientOperation, clientPermissionVersion,
+                BuildingAuthorityDomain.Id, clientBuildings.StateRoot, BuildingDomainCodecV2.EncodeIntent(value));
+            SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
+            lock (gate) detail = "building-intent-" + clientOperation + ":pending";
         }
 
         private void SendServerBootstrap(HostPeer peer, BootstrapKind kind, byte[] payload)
@@ -309,16 +363,17 @@ namespace CsmForge.Runtime.Cities1
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }
+            try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; authority = null; replica = null; joins = null;
-            hostWater = null; clientWater = null; hostPeers.Clear();
-            lock (gate) { preserveAcrossLevelLoad = false; pendingBudget.Clear(); mode = MultiplayerSessionMode.Faulted; detail = reason; }
+            hostWater = null; clientWater = null; hostBuildings = null; clientBuildings = null; hostPeers.Clear();
+            lock (gate) { preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); mode = MultiplayerSessionMode.Faulted; detail = reason; }
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
         }
 
         private void FenceSession(string reason)
         {
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
-            lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); }
+            lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); pendingBuildings.Clear(); }
             lifecycle.Fence(reason);
             RestoreSnapshotPause();
             try { if (server != null) server.Stop(); } catch { }

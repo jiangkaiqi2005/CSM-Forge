@@ -13,8 +13,6 @@ namespace CsmForge.Runtime.Cities1
         {
             if (budget < 0 || budget > 255 || snapshotSave != null) return false;
             BudgetStateV2 requested = new BudgetStateV2(new BudgetKeyV2((int)service, (int)subService, night), budget);
-            BudgetStateV2 supported;
-            if (!BudgetGameAccess.TryRead(requested.Key, out supported)) return false;
             LoadIdentity identity = load;
             if (!identity.IsValid || !lifecycle.IsCurrent(identity)) return false;
             return RuntimeServices.Scheduler.QueueSimulation(identity,
@@ -24,6 +22,13 @@ namespace CsmForge.Runtime.Cities1
         private void SubmitBudgetIntent(BudgetIntentV2 value)
         {
             if (snapshotSave != null || value == null) return;
+            BudgetStateV2 supported;
+            if (!BudgetGameAccess.TryRead(value.Requested.Key, out supported))
+            {
+                if (mode == MultiplayerSessionMode.Hosting) FenceSession("unsupported-host-budget-target");
+                else if (mode == MultiplayerSessionMode.ClientLive) FenceSession("unsupported-client-budget-target");
+                return;
+            }
             if (mode == MultiplayerSessionMode.Hosting)
             {
                 if (authority == null || hostBudgets == null || hostLocalOperation == ulong.MaxValue)

@@ -73,6 +73,14 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public static void SetStyle(LoadIdentity load, byte nativeId, ushort style)
+        {
+            if (!RuntimeServices.Lifecycle.IsCurrent(load) || !Live(nativeId))
+                throw new InvalidOperationException("District style target is unavailable.");
+            using (RuntimeScopeGuard.EnterApply(load, DistrictAuthorityDomain.Id))
+                DistrictManager.instance.m_districts.m_buffer[nativeId].m_Style = style;
+        }
+
         private static byte Native(EntityIdentityV2 identity, EntityIdMapV2 ids)
         {
             uint native;
@@ -227,6 +235,20 @@ namespace CsmForge.Runtime.Cities1
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive)
                 return DomainExecutionV2.Rejected();
+
+            if (DistrictStyleCodecV2.LooksLikeStyle(payload))
+            {
+                DistrictStyleIntentV2 style;
+                try { style = DistrictStyleCodecV2.Decode(payload); } catch { return DomainExecutionV2.Rejected(); }
+                uint nativeValue;
+                if (!Ids.TryGetNative(style.District, out nativeValue) || nativeValue == 0 || nativeValue > byte.MaxValue)
+                    return DomainExecutionV2.Rejected();
+                DistrictGameAccess.SetStyle(Load, (byte)nativeValue, style.Style);
+                DistrictMutationV2 styleMutation = ReconcileAll();
+                if (styleMutation == null) return DomainExecutionV2.Rejected();
+                return DomainExecutionV2.Success(DistrictDomainCodecV2.EncodeMutation(styleMutation), StateRoot);
+            }
+
             DistrictPaintIntentV2 intent;
             try { intent = DistrictDomainCodecV2.DecodeIntent(payload); } catch { return DomainExecutionV2.Rejected(); }
             byte native = 0;
@@ -266,7 +288,9 @@ namespace CsmForge.Runtime.Cities1
                 byte native;
                 if (Ids.TryGetNative(entity.Entity, out existing)) native = (byte)existing;
                 else if (!RuntimeServices.Multiplayer.TryTakeCommittedPendingDistrict(out native)) native = DistrictGameAccess.CreateDistrict(Load);
-                if (!Ids.TryGetIdentity(native, out _)) Ids.BindKnown(entity.Entity, native);
+                EntityIdentityV2 localIdentity;
+                if (!Ids.TryGetIdentity(native, out localIdentity)) Ids.BindKnown(entity.Entity, native);
+                else if (!localIdentity.Equals(entity.Entity)) throw new InvalidOperationException("District speculative slot identity conflict.");
                 DistrictGameAccess.InstallEntity(Load, native, entity);
             }
             for (int i = 0; i < mutation.Cells.Length; i++) DistrictGameAccess.ApplyCell(Load, mutation.Cells[i], Ids);

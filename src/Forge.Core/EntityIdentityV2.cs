@@ -26,6 +26,20 @@ namespace CsmForge.Core
         public override string ToString() { return EntityId + ":" + Generation; }
     }
 
+    public sealed class EntityMapEntryV2
+    {
+        public EntityIdentityV2 Identity { get; private set; }
+        public uint NativeId { get; private set; }
+
+        public EntityMapEntryV2(EntityIdentityV2 identity, uint nativeId)
+        {
+            if (!identity.IsValid) throw new ArgumentException("Invalid entity identity.", "identity");
+            if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
+            Identity = identity;
+            NativeId = nativeId;
+        }
+    }
+
     /// <summary>
     /// Owner-thread mapping between Forge entity identities and process-local CS1 manager IDs.
     /// Retired Forge IDs are never silently rebound to another native object. Snapshot restore may
@@ -109,6 +123,36 @@ namespace CsmForge.Core
         }
 
         public bool IsRetired(ulong entityId) { return entityId != 0 && retired.Contains(entityId); }
+
+        public EntityMapEntryV2[] SnapshotEntries()
+        {
+            List<ulong> ids = new List<ulong>(byEntity.Keys);
+            ids.Sort();
+            EntityMapEntryV2[] result = new EntityMapEntryV2[ids.Count];
+            for (int i = 0; i < ids.Count; i++)
+            {
+                Entry entry = byEntity[ids[i]];
+                result[i] = new EntityMapEntryV2(entry.Identity, entry.NativeId);
+            }
+            return result;
+        }
+
+        public void RestoreSnapshot(IEnumerable<EntityMapEntryV2> entries, ulong highestIssuedId)
+        {
+            if (entries == null) throw new ArgumentNullException("entries");
+            byEntity.Clear();
+            byNative.Clear();
+            retired.Clear();
+            nextEntityId = 0;
+            foreach (EntityMapEntryV2 value in entries)
+            {
+                if (value == null) throw new ArgumentException("Snapshot contains a null entity mapping.", "entries");
+                BindKnown(value.Identity, value.NativeId);
+            }
+            if (highestIssuedId < nextEntityId)
+                throw new InvalidOperationException("Snapshot entity ID watermark precedes a live identity.");
+            nextEntityId = highestIssuedId;
+        }
 
         public void ClearForSnapshotRestore()
         {

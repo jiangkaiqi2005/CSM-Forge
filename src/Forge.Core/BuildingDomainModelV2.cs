@@ -55,14 +55,15 @@ namespace CsmForge.Core
         public float Z { get; private set; }
         public float Angle { get; private set; }
         public byte Length { get; private set; }
+        public uint BuildIndex { get; private set; }
 
-        public BuildingStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, float angle, byte length)
+        public BuildingStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, float angle, byte length, uint buildIndex)
         {
             if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
             BuildingIntentV2.ValidatePrefab(prefabKey);
             BuildingIntentV2.ValidateFloat(x); BuildingIntentV2.ValidateFloat(y); BuildingIntentV2.ValidateFloat(z); BuildingIntentV2.ValidateFloat(angle);
             if (length == 0) throw new ArgumentOutOfRangeException("length");
-            Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Angle = angle; Length = length;
+            Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Angle = angle; Length = length; BuildIndex = buildIndex;
         }
     }
 
@@ -140,7 +141,7 @@ namespace CsmForge.Core
                     writer.Write(state.Entity.Generation);
                     WriteString(writer, state.PrefabKey);
                     writer.Write(state.X); writer.Write(state.Y); writer.Write(state.Z); writer.Write(state.Angle);
-                    writer.Write(state.Length);
+                    writer.Write(state.Length); writer.Write(state.BuildIndex);
                 }
                 writer.Flush(); return stream.ToArray();
             }
@@ -197,7 +198,7 @@ namespace CsmForge.Core
                 if (value.Kind == BuildingResultKindV2.Created)
                 {
                     WriteString(writer, value.State.PrefabKey); writer.Write(value.State.X); writer.Write(value.State.Y); writer.Write(value.State.Z);
-                    writer.Write(value.State.Angle); writer.Write(value.State.Length);
+                    writer.Write(value.State.Angle); writer.Write(value.State.Length); writer.Write(value.State.BuildIndex);
                 }
                 writer.Flush(); return stream.ToArray();
             }
@@ -205,7 +206,7 @@ namespace CsmForge.Core
 
         public static BuildingResultV2 DecodeResult(byte[] bytes)
         {
-            if (bytes == null || bytes.Length < 13 || bytes.Length > 256) throw new InvalidDataException("Invalid building result length.");
+            if (bytes == null || bytes.Length < 13 || bytes.Length > 260) throw new InvalidDataException("Invalid building result length.");
             using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes, false)))
             {
                 BuildingResultKindV2 kind = (BuildingResultKindV2)reader.ReadByte();
@@ -215,7 +216,7 @@ namespace CsmForge.Core
                 {
                     string prefab = ReadString(reader);
                     result = BuildingResultV2.Created(new BuildingStateV2(entity, prefab,
-                        reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte()));
+                        reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte(), reader.ReadUInt32()));
                 }
                 else if (kind == BuildingResultKindV2.Deleted) result = BuildingResultV2.Deleted(entity);
                 else throw new InvalidDataException("Unknown building result kind.");

@@ -15,11 +15,11 @@ namespace CsmForge.Runtime.Cities1
             get { return mode == MultiplayerSessionMode.ClientLive && clientBuildings != null && replica != null; }
         }
 
-        internal void ObserveHostBuildingCreated(ushort nativeId, uint buildIndex)
+        internal void ObserveHostBuildingCreated(ushort nativeId, uint buildIndex, int constructionCost)
         {
             if (!IsHostBuildingAuthorityActive || snapshotSave != null)
                 throw new InvalidOperationException("Observed building creation is not valid in the current Host state.");
-            ObservedBuildingChange change = hostBuildings.ObserveCreated(nativeId, buildIndex);
+            ObservedBuildingChange change = hostBuildings.ObserveCreated(nativeId, buildIndex, constructionCost);
             if (change == null) return;
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation,
                 BuildingAuthorityDomain.Id, change.BeforeRoot, change.AfterRoot,

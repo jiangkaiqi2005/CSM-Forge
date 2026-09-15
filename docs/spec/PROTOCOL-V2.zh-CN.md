@@ -18,7 +18,7 @@
 
 ## 2. 固定 Bootstrap
 
-Bootstrap 使用独立 CSFB magic 与固定消息表，不能使用尚未协商的世界 Schema 或动态 protobuf 子类型注册表。单消息最大 16 KiB，支持清单采用有限分页和最终摘要，限制条目数与总字节；不在一个 Hello 塞入数千资产名称。
+Bootstrap 使用独立 CSFB magic 与固定消息表，不能使用尚未协商商定的世界 Schema 或动态 protobuf 子类型注册表。单消息最大 16 KiB，支持清单采用有限分页和最终摘要，限制条目数与总字节；不在一个 Hello 塞入数千资产名称。
 
 协商字段包括：实现版本、支持的协议 major/minor、游戏 build 摘要、规范化 Schema 集合摘要、必需能力、内容/Mod 清单摘要、平台/运行时证据标识和协商上限。协议 major 不同拒绝；minor 仅允许明确能力交集且不删除主机必需能力。未知关键字段或未知必需能力拒绝。
 
@@ -84,9 +84,9 @@ GNS lane 是每连接调度，不自动解决所有连接共享主机上行带�
 | SnapshotChunk | Host→Client / BULK | SnapshotId、TransferId、index/offset、长度、块摘要与字节 |
 | SnapshotProgress | Client→Host / CONTROL | 已验证范围/块位图摘要、有界缺块请求；只影响本 Transfer |
 | WorldInstalled | Client→Host / CONTROL | 当前 LoadGeneration、B 与真实投影的根；不是只通知文件下载完成 |
-| ReplayBarrier | Host→Client / STATE | BarrierId、固定 H、Root(H)、JoinIdentity、期限 |
+| ReplayBarrier | Host→Client / STATE | BarrierId、固定 H、Root(H)、JoinIdentity、TTL |
 | BarrierAck | Client→Host / CONTROL | 对同一固定 H 的根证明与当前加入代次 |
-| ActivationGrant | Host→Client / STATE | GrantId、固定 A 与 Root(A)、Member/Join/Connection 绑定、权限版本、期限 |
+| ActivationGrant | Host→Client / STATE | GrantId、固定 A 与 Root(A)、Member/Join/Connection 绑定、权限版本、TTL |
 | Activated | Client→Host / CONTROL | GrantId、A；与之后 Intent 在同一有序控制流 |
 | GapRequest | Client→Host / CONTROL | 最后已应用位置和期望区间；限频，不能索取其他 Epoch 文件 |
 | ResyncRequired | Host→Client / CONTROL | 原因、作用域、新 JoinGeneration 的启动策略；不直接覆写客户端城市 |
@@ -100,7 +100,9 @@ GNS lane 是每连接调度，不自动解决所有连接共享主机上行带�
 
 应用层逻辑批次最大 1 MiB，分片数据最大 32 KiB、最多 32 片，均为首版提议预算。网络帧上限仍为 64 KiB，分片元数据也必须计入。必须同时校验 begin 元数据、part 序号/总数/长度、累计字节与整体摘要。
 
-完整批次之前没有游戏应用、没有 AppliedAck、没有成功 Receipt。缺 begin、重复冲突、缺 part、无效 end 或重装连接后的半批次均不能续用。若完整批次准备后游戏执行失败，不能把成功的 part 当作已提交子操作；进入明确的部分应用恢复。
+Client 在完整收齐并验证逻辑批次前不得应用游戏状态；只有完整游戏投影发布后才发送 AppliedAck。缺 begin、重复冲突、缺 part、无效 end 或重装连接后的半批次均不能续用。若完整批次准备后游戏执行失败，不能把成功的 part 当作已应用子操作；进入明确的部分应用恢复。
+
+Host 的 Committed Receipt 在其自身权威批次成功封装并提交后产生，**不等待任何 Client 收齐、应用或确认**。通过 CONTROL 到达的 Receipt 可能早于 STATE 结果；此时 UI 只能显示“主机已提交，等待本地显示”，不能据此提高本地 AppliedRevision、解锁未激活玩家或宣布已经保存。Host 不能在自身批次只执行了一部分时发成功回执，但一个 Client 应用失败也不能撤销 Host 已经提交的事实。
 
 大城市状态必须按真正封闭的领域批次捕获或在已证明的原子批次组中发布，不能因超过协议上限截断。批次组引入需要额外版本化协议与完整性测试；v2 首次实现先拒绝超过上限的工具计划，支持城市规模必须覆盖自然模拟输出峰值。
 
@@ -114,7 +116,17 @@ Host 按成员保留最高已处理计数和有界回执。相同键相同摘要
 
 当前 M0 的 RequestId 跟随连接，只能提供较窄保证；WP-01 必须显式引入 Member 账本与迁移测试，不能把旧连接 GUID 重用来“实现重连”。
 
-## 8. 版本、兼容和存档
+## 8. 期限、时钟与迟到授权
+
+Host 的 leaseDeadline 是仅在 Host 上解释的单调时钟值，不把它作为可跨机器比较的时间戳。Barrier/Grant 在线上携带有限 TTL 时长；Host 保存自己的发放时间和到期点，收到 Ack/Activated/Intent 时独立检查。重复消息不重置原授权期限；延长期限必须创建新的、显式绑定的授权流程。
+
+Client 从首次接收时起，用自己的单调时钟为该 Barrier/Grant 建立本地最长处理期限；这一期限只是本地停止等待的上限，不能证明 Host 的授权此刻仍有效。延迟期间 Host 已撤销或到期时，即使 Client 的本地 TTL 尚未到，Host 也拒绝 Activated/Intent，返回 Expired/RejoinRequired。Client 立即撤销编辑并重新进入受限恢复流程，不将失败操作自动作为新意图发送。
+
+正常高延迟也可能使一个授予过期，因此设置有界重试与追赶预算；不靠伪造时钟同步消除这一情况。客户端短暂显示可编辑不会成为权威写入：它只发送意图，Host 的有效成员/Grant/权限/读集检查仍是最终边界。UI 应尽量等明确的成员状态确认，并在落后或健康信号异常时提前禁用持久工具。
+
+身份票据的证书/UTC 有效期属于认证协议，由验证方的受信本机时间和有限容差检查；它与会话内单调租约不同。不能使用对端自报的墙钟决定票据有效，不能通过重置本地超时来延长票据授权。
+
+## 9. 版本、兼容和存档
 
 区分产品版本、Wire major/minor、消息 Schema、领域 Schema、Checkpoint Schema、游戏 build 与支持目录版本。必要能力不匹配时，在下载前拒绝，给结构化差异报告。minor 升级仅能启用双方明确支持的扩展，不静默放宽权威规则。
 
@@ -122,10 +134,10 @@ Host 按成员保留最高已处理计数和有界回执。相同键相同摘要
 
 支持目录清单是内容/配置事实加维护者审核规则，不是客户端自报的安全标签。清单中的路径只用于本地采集，不允许远端指定任意读取路径。日志记录差异 ID 与摘要，不上传原始密钥和私人文件路径。
 
-## 9. 安全边界与验证
+## 10. 安全边界与验证
 
 解码预算覆盖单报文、单连接、房间总量、解压后总量、字段条目和字符串长度；首版不自动接受未知压缩格式。快照只写应用控制的临时目录，不接受远端文件路径。清单以内容摘要索引，防止路径穿越和任意文件替换。
 
 未认证请求限时清理，认证票据限用途并防重放；禁止客户端修改 Host 权限、请求任意后台管理命令或触发自动下载执行 Mod。原生 IO 回调只投递经过验证的连接上下文，回调队列中的旧 userdata 不可当作当前成员归属。[S-STEAM]
 
-验证包括字段级 golden vectors、独立解码器互测、部分读写、畸形批次、错误角色、错误阶段、过期 token、重连重放、跨 lane 重排、身份服务和中继不可用。实现前仍须完成认证 API 可行性门槛；[验收规范](ACCEPTANCE.zh-CN.md) 给出对应 AT 编号。来源见 [SOURCES](SOURCES.zh-CN.md)。
+验证包括字段级 golden vectors、独立解码器互测、部分读写、畸形批次、错误角色、错误阶段、过期 token、重连重放、跨 lane 重排、身份服务和中继不可用。增加 Host Receipt 先到但 STATE 尚未应用、Host Grant 已过期但 Client 本地 TTL 尚未到、重复 Grant 不续期的确定性测试。实现前仍须完成认证 API 可行性门槛；[验收规范](ACCEPTANCE.zh-CN.md) 给出对应 AT 编号。来源见 [SOURCES](SOURCES.zh-CN.md)。

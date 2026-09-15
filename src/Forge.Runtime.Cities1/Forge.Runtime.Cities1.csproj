@@ -8,6 +8,7 @@
     <ProjectReference Include="../Forge.Core/Forge.Core.csproj" />
     <ProjectReference Include="../Forge.Protocol/Forge.Protocol.csproj" />
     <ProjectReference Include="../Forge.Transport.LiteNet/Forge.Transport.LiteNet.csproj" />
+    <ProjectReference Include="../Forge.Checkpoints/Forge.Checkpoints.csproj" />
     <Reference Include="ICities">
       <HintPath>$(CitiesManagedPath)/ICities.dll</HintPath>
       <Private>false</Private>

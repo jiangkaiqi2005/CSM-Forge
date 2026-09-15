@@ -19,8 +19,9 @@ namespace CsmForge.Runtime.Cities1
                 hostPolicy = new CompatibilityPolicy(localManifest.GameBuildHash, localManifest.SchemaHash,
                     localManifest.Entries, new ComponentFingerprint[0]);
                 hostWater = new WaterBudgetAuthorityDomain(load);
+                hostBuildings = new BuildingAuthorityDomain(load);
                 authority = new AuthorityCoordinatorV2(new SessionStamp(load.WorldId, load.Epoch),
-                    new IAuthorityDomainV2[] { hostWater });
+                    new IAuthorityDomainV2[] { hostWater, hostBuildings });
                 joins = new JoinCoordinator(MonotonicMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);

@@ -11,7 +11,7 @@ namespace CsmForge.Transport.LiteNet
         public const int DefaultQueueBytes = 4 * 1024 * 1024;
 
         protected readonly object Gate = new object();
-        protected readonly BoundedTransportQueue Queue;
+        private readonly BoundedTransportQueue queue;
         protected NetManager Manager;
         private Thread worker;
         private volatile bool running;
@@ -19,7 +19,7 @@ namespace CsmForge.Transport.LiteNet
 
         protected LiteNetTransportBase(int eventLimit, int queueBytes)
         {
-            Queue = new BoundedTransportQueue(eventLimit, queueBytes);
+            queue = new BoundedTransportQueue(eventLimit, queueBytes);
         }
 
         public bool IsRunning { get { return running; } }
@@ -36,8 +36,8 @@ namespace CsmForge.Transport.LiteNet
             }
         }
 
-        public bool TryTake(out TransportEvent value) { return Queue.TryTake(out value); }
-        protected bool Enqueue(TransportEvent value) { return Queue.TryAdd(value); }
+        public bool TryTake(out TransportEvent value) { return queue.TryTake(out value); }
+        protected bool Enqueue(TransportEvent value) { return queue.TryAdd(value); }
 
         protected static byte[] ReadPacket(NetPacketReader reader)
         {
@@ -94,7 +94,7 @@ namespace CsmForge.Transport.LiteNet
                 disposed = true;
             }
             Stop();
-            Queue.Clear();
+            queue.Clear();
         }
     }
 }

@@ -186,6 +186,7 @@ namespace CsmForge.Runtime.Cities1
             foreach (HostPeer peer in hostPeers.Values)
             {
                 if (peer.SnapshotCursor == null) continue;
+                if (server.ReliableQueuePackets(peer.TransportId) >= 64) continue;
                 SnapshotChunkV2 chunk = peer.SnapshotCursor.ReadNext();
                 if (chunk == null)
                 {
@@ -217,7 +218,9 @@ namespace CsmForge.Runtime.Cities1
                     if (!authority.RecordApplied(SessionMessagesV2.DecodeAppliedAck(frame.Stamp, peer.TransportId, frame.Payload)))
                         throw new InvalidOperationException("Applied acknowledgement was invalid for retained authority history.");
                     break;
-                case MessageKindV2.GapRequest: SendJournal(peer, ControlMessagesV2.DecodeGapRequest(frame.Payload).AfterRevision); break;
+                case MessageKindV2.GapRequest:
+                    TrySendJournalOrResync(peer, ControlMessagesV2.DecodeGapRequest(frame.Payload).AfterRevision);
+                    break;
                 default: throw new InvalidOperationException("Client message is not valid in the current Host path.");
             }
         }
@@ -237,7 +240,7 @@ namespace CsmForge.Runtime.Cities1
                 throw new InvalidOperationException("WorldInstalled baseline did not match the join offer.");
             ulong h = authority.Revision; Hash256 root;
             if (!authority.TryGetRoot(h, out root)) throw new InvalidOperationException("Barrier root is unavailable.");
-            SendJournal(peer, installed.Revision);
+            if (!TrySendJournalOrResync(peer, installed.Revision)) return;
             ReplayBarrier barrier = joins.IssueBarrier(peer.Join, h, root, 30000);
             if (barrier == null) throw new InvalidOperationException("Could not issue fixed replay barrier.");
             SendServerFrame(peer, MessageKindV2.ReplayBarrier,
@@ -253,7 +256,7 @@ namespace CsmForge.Runtime.Cities1
                 throw new InvalidOperationException("Barrier acknowledgement failed.");
             ulong a = authority.Revision; Hash256 root;
             if (!authority.TryGetRoot(a, out root)) throw new InvalidOperationException("Activation root is unavailable.");
-            SendJournal(peer, ack.Revision);
+            if (!TrySendJournalOrResync(peer, ack.Revision)) return;
             ActivationGrant grant = joins.IssueActivation(peer.Join, a, root, 1, 30000);
             if (grant == null) throw new InvalidOperationException("Could not issue activation grant.");
             peer.StateSubscribed = true;
@@ -304,13 +307,36 @@ namespace CsmForge.Runtime.Cities1
                     SubmitRemoteIntent(peer, peer.DeferredIntents.Dequeue());
         }
 
-        private void SendJournal(HostPeer peer, ulong afterRevision)
+        private bool TrySendJournalOrResync(HostPeer peer, ulong afterRevision)
         {
             AuthorityBatch[] batches;
             if (!authority.TryReadJournal(afterRevision, out batches))
-                throw new InvalidOperationException("Required authority journal range is unavailable.");
+            {
+                BeginPeerResync(peer);
+                return false;
+            }
             foreach (AuthorityBatch batch in batches)
                 SendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch));
+            return true;
+        }
+
+        private void BeginPeerResync(HostPeer peer)
+        {
+            authority.SetLive(peer.TransportId, false);
+            peer.Live = false;
+            peer.StateSubscribed = false;
+            peer.DeferredIntents.Clear();
+            if (peer.SnapshotCursor != null)
+            {
+                peer.SnapshotCursor.Dispose();
+                peer.SnapshotCursor = null;
+            }
+            if (peer.Join.IsValid) joins.Cancel(peer.Join);
+            peer.Join = default(JoinIdentity);
+            peer.TransferId = Guid.Empty;
+            peer.LastProgressOffset = 0;
+            QueueSnapshotFor(peer);
+            lock (gate) detail = "peer-resync-snapshot:" + peer.TransportId;
         }
 
         private void RemoveHostPeer(HostPeer peer)

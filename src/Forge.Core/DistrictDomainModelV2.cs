@@ -80,13 +80,13 @@ namespace CsmForge.Core
             if (alpha == 0 && district.IsValid) throw new ArgumentException("Empty district cell slot must not carry an identity.");
         }
 
-        internal EntityIdentityV2 IdentityAt(int slot)
+        public EntityIdentityV2 IdentityAt(int slot)
         {
             if (slot == 0) return District1; if (slot == 1) return District2;
             if (slot == 2) return District3; if (slot == 3) return District4;
             throw new ArgumentOutOfRangeException("slot");
         }
-        internal byte AlphaAt(int slot)
+        public byte AlphaAt(int slot)
         {
             if (slot == 0) return Alpha1; if (slot == 1) return Alpha2;
             if (slot == 2) return Alpha3; if (slot == 3) return Alpha4;

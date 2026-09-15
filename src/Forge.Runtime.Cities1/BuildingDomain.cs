@@ -17,8 +17,10 @@ namespace CsmForge.Runtime.Cities1
             Building building = manager.m_buildings.m_buffer[(ushort)nativeId];
             if (building.m_flags == Building.Flags.None) throw new InvalidOperationException("Building is not live.");
             BuildingInfo info = building.Info; if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Building prefab is unavailable.");
+            int length = building.Length;
+            if (length <= 0 || length > byte.MaxValue) throw new InvalidOperationException("Building length exceeds Forge V3 supported range.");
             Vector3 position = building.m_position;
-            return new BuildingStateV2(entity, info.name, position.x, position.y, position.z, building.m_angle, building.Length, buildIndex, constructionCost);
+            return new BuildingStateV2(entity, info.name, position.x, position.y, position.z, building.m_angle, (byte)length, buildIndex, constructionCost);
         }
 
         public static BuildingInfo ResolvePrefab(string prefabKey)
@@ -142,7 +144,7 @@ namespace CsmForge.Runtime.Cities1
         private void SeedExistingBuildings()
         {
             BuildingManager manager = BuildingManager.instance; if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
-            int size = manager.m_buildings.m_size;
+            int size = checked((int)manager.m_buildings.m_size);
             for (int i = 1; i < size; i++) if (manager.m_buildings.m_buffer[i].m_flags != Building.Flags.None)
             { EntityIdentityV2 identity = Ids.Allocate((uint)i); BuildingGameAccess.Capture(identity, (uint)i, 0, 0); }
         }

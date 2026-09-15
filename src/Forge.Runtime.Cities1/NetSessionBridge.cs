@@ -20,18 +20,21 @@ namespace CsmForge.Runtime.Cities1
             hostBuildings = new BuildingAuthorityDomain(identity);
             hostNet = new NetAuthorityDomain(identity);
             hostZones = new ZoneAuthorityDomain(identity, hostNet);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBuildings, hostNet, hostZones };
+            hostDistricts = new DistrictAuthorityDomain(identity);
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBuildings, hostNet, hostZones, hostDistricts };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
         {
+            ClearDistrictClientPending();
             clientWater = new WaterBudgetReplicaDomain(identity);
             clientDemand = new DemandReplicaDomain(identity);
             clientTaxes = new TaxReplicaDomain(identity);
             clientBuildings = new BuildingReplicaDomain(identity);
             clientNet = new NetReplicaDomain(identity);
             clientZones = new ZoneReplicaDomain(identity, clientNet);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBuildings, clientNet, clientZones };
+            clientDistricts = new DistrictReplicaDomain(identity);
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBuildings, clientNet, clientZones, clientDistricts };
         }
 
         internal bool IsHostNetAuthorityActive

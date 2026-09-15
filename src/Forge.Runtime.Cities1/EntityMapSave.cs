@@ -141,14 +141,24 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public void SuspendCurrent()
+        {
+            lock (gate)
+            {
+                foreach (KeyValuePair<ushort, EntityIdMapV2> pair in current)
+                    pending[pair.Key] = new SavedEntityDomainV2(pair.Key, pair.Value.HighestIssuedId, pair.Value.SnapshotEntries());
+                current.Clear();
+            }
+        }
+
         public byte[] EncodeCurrent()
         {
             lock (gate)
             {
-                List<SavedEntityDomainV2> values = new List<SavedEntityDomainV2>();
+                Dictionary<ushort, SavedEntityDomainV2> combined = new Dictionary<ushort, SavedEntityDomainV2>(pending);
                 foreach (KeyValuePair<ushort, EntityIdMapV2> pair in current)
-                    values.Add(new SavedEntityDomainV2(pair.Key, pair.Value.HighestIssuedId, pair.Value.SnapshotEntries()));
-                return EntityMapSaveCodecV2.Encode(values);
+                    combined[pair.Key] = new SavedEntityDomainV2(pair.Key, pair.Value.HighestIssuedId, pair.Value.SnapshotEntries());
+                return EntityMapSaveCodecV2.Encode(combined.Values);
             }
         }
 

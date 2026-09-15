@@ -15,6 +15,14 @@ namespace CsmForge.Runtime.Cities1
             get { return mode == MultiplayerSessionMode.ClientLive && clientBuildings != null && replica != null; }
         }
 
+        internal bool TryQueueClientBuildingDelete(ushort nativeId)
+        {
+            if (!IsClientBuildingReplicaActive || nativeId == 0) return false;
+            EntityIdentityV2 identity;
+            if (!clientBuildings.TryResolveEntity(nativeId, out identity)) return false;
+            return TryQueueBuilding(BuildingIntentV2.Delete(identity));
+        }
+
         internal void ObserveHostBuildingCreated(ushort nativeId, uint buildIndex, int constructionCost)
         {
             if (!IsHostBuildingAuthorityActive || snapshotSave != null)

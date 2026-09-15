@@ -84,22 +84,49 @@ namespace CsmForge.Runtime.Cities1
         }
     }
 
+    /// <summary>
+    /// BuildingTool charges construction cost before reaching BuildingManager.CreateBuilding.
+    /// Replica players must not mutate local cash before the Host accepts their intent.
+    /// </summary>
+    [HarmonyPatch]
+    internal static class BuildingToolConstructionFetchPatch
+    {
+        public static MethodBase TargetMethod()
+        {
+            MethodInfo method = AccessTools.Method(typeof(EconomyManager), "FetchResource", new Type[]
+            { typeof(EconomyManager.Resource), typeof(int), typeof(ItemClass) });
+            if (method == null) throw new MissingMethodException("EconomyManager.FetchResource(Resource,int,ItemClass) is unavailable.");
+            return method;
+        }
+
+        public static bool Prefix(EconomyManager.Resource __0, int __1, ref int __result)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            if (RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.ClientReplicaLive &&
+                BuildingToolIntentScope.Active && __0 == EconomyManager.Resource.Construction)
+            {
+                __result = __1;
+                return false;
+            }
+            return true;
+        }
+    }
+
     [HarmonyPatch]
     internal static class BuildingManagerCreateWriteBarrierPatch
     {
         public static MethodBase TargetMethod()
         {
-            Type byRefUShort = typeof(ushort).MakeByRefType();
-            Type byRefRandomizer = typeof(Randomizer).MakeByRefType();
             MethodInfo method = AccessTools.Method(typeof(BuildingManager), "CreateBuilding", new Type[]
             {
-                byRefUShort, byRefRandomizer, typeof(BuildingInfo), typeof(Vector3), typeof(float), typeof(int), typeof(uint)
+                typeof(ushort).MakeByRefType(), typeof(Randomizer).MakeByRefType(), typeof(BuildingInfo),
+                typeof(Vector3), typeof(float), typeof(int), typeof(uint)
             });
             if (method == null) throw new MissingMethodException("BuildingManager.CreateBuilding signature is unavailable.");
             return method;
         }
 
-        public static bool Prefix(ref ushort __0, BuildingInfo __2, Vector3 __3, float __4, int __5, uint __6,
+        public static bool Prefix(ref ushort __0, BuildingInfo __2, Vector3 __3, float __4, int __5,
             ref bool __result, out bool __state)
         {
             __state = false;
@@ -108,11 +135,11 @@ namespace CsmForge.Runtime.Cities1
             if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading)
                 return true;
 
-            if (BuildingToolIntentScope.Active && (role == CitiesRuntimeRole.HostLive || role == CitiesRuntimeRole.ClientReplicaLive))
+            if (BuildingToolIntentScope.Active && role == CitiesRuntimeRole.ClientReplicaLive)
             {
                 bool valid = __2 != null && !string.IsNullOrEmpty(__2.name) && __5 > 0 && __5 <= byte.MaxValue;
                 bool queued = valid && RuntimeServices.Multiplayer.TryQueueBuilding(
-                    BuildingIntentV2.Create(__2.name, __3.x, __3.y, __3.z, __4, (byte)__5));
+                    BuildingIntentV2.Create(__2.name, __3.x, __3.y, __3.z, __4, (byte)__5, 0));
                 __0 = 0;
                 __result = false;
                 if (!queued) RuntimeServices.Lifecycle.Fence("Building player intent could not be queued");
@@ -121,20 +148,25 @@ namespace CsmForge.Runtime.Cities1
 
             if (role == CitiesRuntimeRole.HostLive)
             {
+                // Host player tools and Host simulation keep executing the real game path; Postfix
+                // observes their final world fact and publishes it as an authority result.
                 __state = true;
                 return true;
             }
 
-            // Replica-side simulation is not allowed to author persistent building state.
             __0 = 0;
             __result = false;
             return false;
         }
 
-        public static void Postfix(ushort __0, uint __6, bool __result, bool __state)
+        public static void Postfix(ushort __0, BuildingInfo __2, uint __6, bool __result, bool __state)
         {
             if (!__state || !__result || __0 == 0 || RuntimeScopeGuard.IsApplying) return;
-            RuntimeServices.Multiplayer.ObserveHostBuildingCreated(__0, __6);
+            int constructionCost = 0;
+            if (BuildingToolIntentScope.Active && __2 != null && ToolManager.instance != null &&
+                (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.Game) != 0)
+                constructionCost = Math.Max(0, __2.GetConstructionCost());
+            RuntimeServices.Multiplayer.ObserveHostBuildingCreated(__0, __6, constructionCost);
         }
     }
 
@@ -153,8 +185,7 @@ namespace CsmForge.Runtime.Cities1
                 __state = RuntimeServices.Multiplayer.PrepareHostBuildingDelete(building);
                 return true;
             }
-            // Client bulldoze and replica-local simulation deletion remain unsupported until a
-            // dedicated bulldoze intent is captured; silently authoring replica state is forbidden.
+            // Client bulldoze remains blocked until a dedicated player-delete tool intent is captured.
             return false;
         }
 

@@ -64,6 +64,21 @@ namespace CsmForge.Transport.LiteNet
             return false;
         }
 
+        public int ReliableQueuePackets(Guid connectionId)
+        {
+            if (connectionId == Guid.Empty) return int.MaxValue;
+            lock (Gate)
+            {
+                foreach (PeerState state in peers.Values)
+                {
+                    if (state.ConnectionId != connectionId) continue;
+                    if (state.Peer.ConnectionState != ConnectionState.Connected) return int.MaxValue;
+                    return state.Peer.GetPacketsCountInReliableQueue(0, true);
+                }
+            }
+            return int.MaxValue;
+        }
+
         public void Disconnect(Guid connectionId)
         {
             lock (Gate)

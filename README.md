@@ -1,49 +1,103 @@
 # CSM-Forge
 
-从零重写的 **Cities: Skylines 1 多人共同经营系统**。CSM / CSM-CQU 仅作只读研究，不复用旧架构或协议。
+面向 **Cities: Skylines 1** 的 Host-authoritative 多人共同经营系统。Forge 作为新一代主干，吸收 CSM-CQU 已验证的异常安全、热加入、兼容采集、世界传输和真实 CS1 接入经验，但不继承旧的 Command Relay/Replay 作为最终同步模型。
 
-**当前代码是 M0 参考域复制内核、v1 协议、68 项内核回归与未实机验证的 ICities 探针，不是可以开房游玩的完整 Mod。** 本轮已补齐 v2 技术规范、并行加入/游玩期恢复路线和可检查的需求索引；新增 v2 游戏能力尚未实现。
+当前 `fix/forge-cqu-integration-docs` 已从 M0 参考内核推进到 **V3 development runtime**：具备 v2 会话/结果协议、AuthorityBatch、AppliedAck、固定 Barrier/Activation、LiteNetLib 开发直连、真实 CS1 生命周期/线程/存档元数据、Mod/Asset 指纹采集、流式 Snapshot 文件传输、原生 `.crp` 保存/加载桥，以及首个真实 Host-authoritative 领域切片（水服务昼/夜预算）。
 
-## 产品目标
+**这仍不是已完成 E3/E4 实机验收的玩家发行版。** 仓库无法提交或在公共 CI 中使用游戏 DLL，因此真实 CS1 编译、两机联机、不同城市规模、弱网与长跑必须在安装了合法 CS1 的 Windows 环境继续验证。开发传输使用 LiteNetLib + 房间口令，只适合受控开发/LAN 测试，不等同最终公网认证方案。
 
-Host 权威模拟、Client 提交意图并应用结果；主机自身操作与自然模拟也进入同一提交序列。正式目标包含实时共同经营、游戏进行中多玩家并行进入，以及单个客户端失败时不拖停其他玩家。
+## 当前 V3 能力
 
-首发目标为 Windows x64 四人房间（含 Host）、至少两名玩家并行加入、已验证的游戏/DLC/内容组合。暂停城市双人编辑只是内部验证关卡，不是最终产品范围。实际支持规模和性能必须经过真实游戏验收。
+- Host 单写者、世界 `CommitRevision`、Domain root 与 aggregate root；
+- 玩家 Intent 与 Host/Simulation 结果分离，Simulation batch 不伪造玩家 RequestId；
+- Replica 只应用连续批次，Gap 请求日志，投影成功后发送 `AppliedAck`；
+- 独立 `JoinId/JoinGeneration`，固定 H Barrier 与 A Activation，不追逐 Host 当前头；
+- 多加入者共享不可变 Snapshot 文件，但各自拥有独立传输游标、TransferId 和取消生命周期；
+- Snapshot 采用 32 KiB 分块、offset/index 校验、chunk SHA-256 与整文件 SHA-256，Client 先写临时文件，完整校验后才交给游戏；
+- Host 通过真实 `SavePanel.SaveGame` 生成 `.crp`；Client 采用 CSM-CQU 已验证的内存 `Package` + `LoadingManager.LoadLevel` 线程边界加载；
+- Forge 主动换图时保留网络 Session，新 `LoadGeneration` 从存档内 Forge metadata 恢复后再继续 catch-up；
+- Compatibility Manifest 采集游戏 build、程序集/插件/资产身份并默认严格匹配；
+- 首个真实领域 `WaterBudget`：Client 的 `SetBudget(Water, ...)` 被拦截为 Intent，Host simulation-thread 实际执行，再向 Client 投影绝对昼/夜预算结果；
+- LiteNetLib 仅作为开发 Transport，业务身份、权限、Revision、Join 与 Authority 都由 Forge 上层决定；
+- Core/Protocol/Transport/Checkpoint 的 net35/net8 回归由 GitHub Actions 在 Linux/Windows 执行。
 
-## 技术文档入口
+当前没有宣称已经覆盖建筑、道路、车辆、居民、完整经济、自然模拟闭包或任意第三方模拟 Mod。未覆盖的持久操作不应被当成已支持功能。
+
+## V3 设计文档
 
 | 内容 | 文档 |
 | --- | --- |
-| 完整技术方案、需求、模块、接口、当前代码差距 | [技术总纲](docs/TECHNICAL-SPEC.zh-CN.md) |
-| 独立 JoinContext、共享快照、历史屏障和取消/重连 | [并行加入](docs/spec/PARALLEL-JOIN.zh-CN.md) |
-| 游戏线程、模拟隔离、自然结果、实体和领域闭包 | [运行时复制](docs/spec/RUNTIME-REPLICATION.zh-CN.md) |
-| 认证、消息、通道、版本和字节边界 | [协议 v2 设计](docs/spec/PROTOCOL-V2.zh-CN.md) |
-| 游玩期故障、独立恢复、存档、资源与诊断 | [鲁棒性规范](docs/spec/ROBUSTNESS.zh-CN.md) |
-| 12 个工作包、依赖和可并行开发路径 | [完整实施路线](docs/ROADMAP.zh-CN.md) |
-| 20 组验收、弱网络和 24 小时长跑要求 | [验收规范](docs/spec/ACCEPTANCE.zh-CN.md) |
-| 来源与尚未取得的证据 | [来源索引](docs/spec/SOURCES.zh-CN.md) |
+| Forge × CSM-CQU 融合总架构 | [ARCHITECTURE-V3](docs/ARCHITECTURE-V3.zh-CN.md) |
+| CSM-CQU 机制迁移审计 | [CSM-CQU-MIGRATION](docs/CSM-CQU-MIGRATION.zh-CN.md) |
+| 真实 CS1 Runtime 接入 | [CS1-RUNTIME-INTEGRATION](docs/CS1-RUNTIME-INTEGRATION.zh-CN.md) |
+| Host Authority / 结果复制渐进迁移 | [AUTHORITY-REPLICATION](docs/AUTHORITY-REPLICATION.zh-CN.md) |
+| V3 Gate 与施工路线 | [IMPLEMENTATION-ROADMAP-V3](docs/IMPLEMENTATION-ROADMAP-V3.zh-CN.md) |
+| 并行加入安全不变量 | [并行加入](docs/spec/PARALLEL-JOIN.zh-CN.md) |
+| 协议 v2 | [协议 v2](docs/spec/PROTOCOL-V2.zh-CN.md) |
+| 运行时复制 | [运行时复制](docs/spec/RUNTIME-REPLICATION.zh-CN.md) |
+| 故障与恢复 | [鲁棒性规范](docs/spec/ROBUSTNESS.zh-CN.md) |
+| 实机/长跑验收 | [验收规范](docs/spec/ACCEPTANCE.zh-CN.md) |
 
-机器可检查的 [需求/工作包/验收索引](docs/spec/spec-index.json) 与 [提议预算](docs/spec/budgets.json) 配套维护。数值预算是未实测目标，不是已经达到的性能数据。
+旧 M0/v1 文档仍保留用于历史与兼容测试，不再代表 V3 当前实现主线。
 
-旧资料保留：[原架构研究](docs/research/architecture-review.zh-CN.md)、[当前代码的 v1 协议](docs/PROTOCOL.md)、[M0 历史设计与验证](docs/history/README.md)。新路线的关键决策见 [ADR-0002](docs/adr/0002-parallel-hot-join.md)。
+## 构建纯内核与协议
 
-## 已实现的 M0 范围
-
-主机排序、权限/阶段检查、有限请求回执、日志保留、参考世界绝对结果应用、前后状态校验、缺口和快照恢复状态机、主机未记录变更防护；有界二进制帧及 Intent/Commit codec；磁盘分片组装与完整性校验；兼容策略、单调时钟和有界诊断。
-
-`ParameterWorld` 只是 16 个整数槽，不是已经接入游戏的税率、道路或城市模拟。测试中的多副本丢包/重复投递不是实际互联网联机。`CompleteJoin` 的当前头比较等入口还需要按 v2 改造。
-
-真实传输/身份服务、并行加入协调器、Mod 实际采集、CS1 模拟隔离、自然模拟结果适配、原生检查点和玩家 UI 尚未完成。游戏探针只观察加载环境，不开启网络或修改城市。
-
-## 验证
-
-```sh
-python scripts/check_docs.py
-python -m unittest discover -s tests/docs -p "test_*.py"
+```powershell
 dotnet build tests/Forge.Tests/Forge.Tests.csproj -c Release --nologo
 dotnet run --project tests/Forge.Tests/Forge.Tests.csproj -c Release -f net8.0 --no-build
 ```
 
-有 Mono 时可运行 `mono tests/Forge.Tests/bin/Release/net35/CSM.Forge.Tests.exe`。现代 .NET/标准 Mono 通过不等于游戏自带 Mono、Harmony 或实机多人通过。文档检查也不证明 v2 功能已实现。详见 [测试入口](docs/TESTING.zh-CN.md)。
+Linux CI 还会执行实际 `net35` 产物的 Mono 回归。现代 .NET/标准 Mono 通过不等于游戏自带 Mono 与真实 CS1 已通过，但可以阻止 Core/Protocol/Transport/Checkpoint 回归。
 
-代码进入 develop，核对该提交 CI 后快进 main；两者都是开发基线，不是玩家发行版。构建不自动安装，不下载/提交游戏程序集、用户城市或密钥。本轮不改动旧仓库，也不设置 GitHub 服务端分支保护。
+文档合同：
+
+```powershell
+python scripts/check_docs.py
+python -m unittest discover -s tests/docs -p "test_*.py"
+```
+
+## 构建真实 CS1 Runtime
+
+仓库不会提交 Cities: Skylines、Unity 或 Steam 的游戏程序集。请使用你本机合法安装的 CS1 `Cities_Data/Managed`：
+
+```powershell
+pwsh ./scripts/build-runtime.ps1 `
+  -CitiesManagedPath "D:\SteamLibrary\steamapps\common\Cities_Skylines\Cities_Data\Managed"
+```
+
+脚本会：
+
+1. 检查 `ICities.dll`、`Assembly-CSharp.dll`、`ColossalManaged.dll`、`UnityEngine.dll`；
+2. 编译 `Forge.Runtime.Cities1` 的 net35 版本；
+3. 拒绝把游戏自有 DLL 打入发行包；
+4. 将 Forge DLL 与允许的依赖放到 `dist/runtime/CSM-Forge`；
+5. 生成 `SHA256SUMS.txt` 和 `CSM-Forge-runtime.zip`。
+
+CitiesHarmony 需要在游戏环境中可用。首次测试请只使用备份城市。
+
+## 开发直连测试流程
+
+当前开发 UI 位于 Mod 设置页：
+
+1. Host 与 Client 都安装同一 Forge build，并保证 Compatibility Manifest 可通过；
+2. Host 进入城市，在设置页填写 UDP 端口与临时房间口令，点击 **Host 当前城市**；
+3. Client 进入任意测试城市/存档作为运行时起点，填写 Host IPv4、端口、相同房间口令，点击 **Join Host 城市**；
+4. Host 生成 Forge Snapshot，Client 流式下载并校验后加载 Host `.crp`；
+5. Client 追赶 Authority journal，完成固定 Barrier/Activation 后进入 `ClientLive`；
+6. 当前可验证的持久编辑切片仅是水服务昼/夜预算。其他领域尚未达到 V3 Authority 验收，不应据此认定已支持完整共同建设。
+
+如果日志淘汰、Snapshot/Projection 校验失败或客户端状态根不匹配，设计目标是只隔离/恢复该 Client；Host 世界自身出现未记录持久变化则 Fence 房间，禁止继续发布不可信结果。
+
+## 当前仍需真实游戏验收的阻断项
+
+- `scripts/build-runtime.ps1` 在目标 CS1 build 上的实际编译；
+- CitiesHarmony patch 签名与 Water Budget Hook 实机命中；
+- Host `.crp` Snapshot 在真实大/小城市中的保存安全点；
+- Client 加载期间 LiteNet 网络线程保活与新 `LoadGeneration` 重绑定；
+- 两名 Client 同时加入、一人慢/取消不阻断另一人；
+- Gap recovery、日志淘汰后的重新 Snapshot；
+- 24 小时长跑、弱网、断线/重连、存档/重新加载；
+- Building、Road/Net、自然模拟等后续领域闭包；
+- 最终公网认证 Transport（当前 room-key LiteNet 仅是开发适配器）。
+
+因此当前分支可以作为 **V3 实机开发候选**，但在上述 E3/E4 证据完成前，不应标记为 Release/玩家正式版。

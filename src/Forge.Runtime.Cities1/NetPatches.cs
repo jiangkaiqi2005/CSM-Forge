@@ -61,9 +61,12 @@ namespace CsmForge.Runtime.Cities1
 
             if (role == CitiesRuntimeRole.ClientReplicaLive)
             {
-                NetControlPointV2 start, middle, end;
-                bool valid = TryEncodePoint(startPoint, out start) && TryEncodePoint(middlePoint, out middle) &&
-                    TryEncodePoint(endPoint, out end);
+                NetControlPointV2 start = null;
+                NetControlPointV2 middle = null;
+                NetControlPointV2 end = null;
+                bool valid = TryEncodePoint(startPoint, out start);
+                if (valid) valid = TryEncodePoint(middlePoint, out middle);
+                if (valid) valid = TryEncodePoint(endPoint, out end);
                 bool queued = valid && RuntimeServices.Multiplayer.TrySubmitNetIntent(NetIntentV2.Create(info.name,
                     start, middle, end, maxSegments, testEnds, autoFix, invert, switchDir, (uint)NetTool.m_zoneGridFlags));
                 firstNode = lastNode = segmentID = 0; cost = productionRate = 0;

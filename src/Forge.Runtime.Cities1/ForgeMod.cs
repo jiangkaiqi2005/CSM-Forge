@@ -9,26 +9,11 @@ namespace CsmForge.Runtime.Cities1
     public sealed class ForgeMod : IUserMod
     {
         public static readonly ForgeSettings Settings = new ForgeSettings();
-
         public string Name { get { return "CSM-Forge V3"; } }
         public string Description { get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; } }
-
-        public void OnEnabled()
-        {
-            RuntimeServices.Enable();
-            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; persistent multiplayer writes stay gated until a Forge session is Live.");
-        }
-
-        public void OnDisabled()
-        {
-            RuntimeServices.Disable();
-            UnityEngine.Debug.Log("[CSM-Forge] runtime disabled and Forge-owned transport/patch resources released.");
-        }
-
-        public void OnSettingsUI(UIHelperBase helper)
-        {
-            ForgeSettingsPanel.Build(helper, Settings);
-        }
+        public void OnEnabled() { RuntimeServices.Enable(); UnityEngine.Debug.Log("[CSM-Forge] runtime enabled."); }
+        public void OnDisabled() { RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+        public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
 
     public sealed class ForgeLoadingExtension : LoadingExtensionBase
@@ -57,11 +42,12 @@ namespace CsmForge.Runtime.Cities1
                     "; callbackThread=" + Thread.CurrentThread.ManagedThreadId +
                     "; core=" + typeof(SessionStamp).Assembly.GetName().Version);
                 ReportEngineSurface(identity);
+                RuntimeServices.WorldLoader.NotifyLevelLoaded(identity);
             }
             catch (Exception error)
             {
                 RuntimeServices.Events.Record(RuntimeEventCode.Error, RuntimeServices.Lifecycle.Current.Generation,
-                    "level-load: " + error.GetType().Name);
+                    "level-load:" + error.GetType().Name);
                 RuntimeServices.Lifecycle.Fence("level initialization failed");
                 UnityEngine.Debug.LogError("[CSM-Forge] level initialization failed: " + error);
             }
@@ -69,7 +55,8 @@ namespace CsmForge.Runtime.Cities1
 
         public override void OnLevelUnloading()
         {
-            RuntimeServices.Multiplayer.RequestStop();
+            if (!RuntimeServices.Multiplayer.PreserveAcrossLevelLoad)
+                RuntimeServices.Multiplayer.StopImmediately();
             RuntimeServices.Lifecycle.BeginUnload();
             RuntimeServices.Metadata.Clear();
             base.OnLevelUnloading();
@@ -77,7 +64,8 @@ namespace CsmForge.Runtime.Cities1
 
         public override void OnReleased()
         {
-            RuntimeServices.Multiplayer.RequestStop();
+            if (!RuntimeServices.Multiplayer.PreserveAcrossLevelLoad)
+                RuntimeServices.Multiplayer.StopImmediately();
             RuntimeServices.Lifecycle.Released();
             base.OnReleased();
         }
@@ -94,9 +82,7 @@ namespace CsmForge.Runtime.Cities1
             if (simulation != null)
             {
                 foreach (MethodInfo method in simulation.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                {
                     if (method.Name == "FixedUpdate" && method.GetParameters().Length == 0) { fixedUpdate = true; break; }
-                }
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
@@ -111,15 +97,11 @@ namespace CsmForge.Runtime.Cities1
             base.OnCreated(threading);
             RuntimeServices.Scheduler.Attach(threading);
         }
-
         public override void OnBeforeSimulationTick()
         {
             base.OnBeforeSimulationTick();
-            LoadIdentity identity = RuntimeServices.Lifecycle.Current;
-            if (!identity.IsValid) return;
-            RuntimeServices.Multiplayer.PollSimulation();
+            if (RuntimeServices.Lifecycle.Current.IsValid) RuntimeServices.Multiplayer.PollSimulation();
         }
-
         public override void OnAfterSimulationTick()
         {
             LoadIdentity identity = RuntimeServices.Lifecycle.Current;
@@ -130,10 +112,10 @@ namespace CsmForge.Runtime.Cities1
             }
             base.OnAfterSimulationTick();
         }
-
         public override void OnReleased()
         {
-            RuntimeServices.Multiplayer.RequestStop();
+            if (!RuntimeServices.Multiplayer.PreserveAcrossLevelLoad)
+                RuntimeServices.Multiplayer.StopImmediately();
             RuntimeServices.Scheduler.Detach();
             base.OnReleased();
         }

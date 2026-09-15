@@ -86,7 +86,11 @@ namespace CsmForge.Core
         }
     }
 
-    /// <summary>Pure canonical projection of the currently supported building-placement closure.</summary>
+    /// <summary>
+    /// Pure canonical projection of the currently supported building-placement closure.
+    /// BuildIndex is intentionally not part of the long-lived root: it is a create-time projection
+    /// parameter and is not required to reconstruct the visible building state from a loaded save.
+    /// </summary>
     public sealed class BuildingStateIndexV2
     {
         private readonly SortedDictionary<ulong, BuildingStateV2> states = new SortedDictionary<ulong, BuildingStateV2>();
@@ -141,7 +145,7 @@ namespace CsmForge.Core
                     writer.Write(state.Entity.Generation);
                     WriteString(writer, state.PrefabKey);
                     writer.Write(state.X); writer.Write(state.Y); writer.Write(state.Z); writer.Write(state.Angle);
-                    writer.Write(state.Length); writer.Write(state.BuildIndex);
+                    writer.Write(state.Length);
                 }
                 writer.Flush(); return stream.ToArray();
             }

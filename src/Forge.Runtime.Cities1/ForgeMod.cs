@@ -8,22 +8,26 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed class ForgeMod : IUserMod
     {
+        public static readonly ForgeSettings Settings = new ForgeSettings();
+
         public string Name { get { return "CSM-Forge V3"; } }
-        public string Description
-        {
-            get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; }
-        }
+        public string Description { get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; } }
 
         public void OnEnabled()
         {
             RuntimeServices.Enable();
-            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; multiplayer write access remains gated by session/runtime acceptance.");
+            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; persistent multiplayer writes stay gated until a Forge session is Live.");
         }
 
         public void OnDisabled()
         {
             RuntimeServices.Disable();
-            UnityEngine.Debug.Log("[CSM-Forge] runtime disabled and Forge-owned patches/resources released.");
+            UnityEngine.Debug.Log("[CSM-Forge] runtime disabled and Forge-owned transport/patch resources released.");
+        }
+
+        public void OnSettingsUI(UIHelperBase helper)
+        {
+            ForgeSettingsPanel.Build(helper, Settings);
         }
     }
 
@@ -65,6 +69,7 @@ namespace CsmForge.Runtime.Cities1
 
         public override void OnLevelUnloading()
         {
+            RuntimeServices.Multiplayer.RequestStop();
             RuntimeServices.Lifecycle.BeginUnload();
             RuntimeServices.Metadata.Clear();
             base.OnLevelUnloading();
@@ -72,6 +77,7 @@ namespace CsmForge.Runtime.Cities1
 
         public override void OnReleased()
         {
+            RuntimeServices.Multiplayer.RequestStop();
             RuntimeServices.Lifecycle.Released();
             base.OnReleased();
         }
@@ -89,16 +95,12 @@ namespace CsmForge.Runtime.Cities1
             {
                 foreach (MethodInfo method in simulation.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
                 {
-                    if (method.Name == "FixedUpdate" && method.GetParameters().Length == 0)
-                    {
-                        fixedUpdate = true;
-                        break;
-                    }
+                    if (method.Name == "FixedUpdate" && method.GetParameters().Length == 0) { fixedUpdate = true; break; }
                 }
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=UNPROVEN; authority-projection=UNPROVEN.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-BUDGET-SLICE-ONLY.");
         }
     }
 
@@ -115,20 +117,23 @@ namespace CsmForge.Runtime.Cities1
             base.OnBeforeSimulationTick();
             LoadIdentity identity = RuntimeServices.Lifecycle.Current;
             if (!identity.IsValid) return;
-            // Network/session inbox draining is connected here in later gates. This callback
-            // is deliberately kept as the single simulation-owner entry point.
+            RuntimeServices.Multiplayer.PollSimulation();
         }
 
         public override void OnAfterSimulationTick()
         {
             LoadIdentity identity = RuntimeServices.Lifecycle.Current;
             if (identity.IsValid)
+            {
+                RuntimeServices.Multiplayer.AfterSimulationTick();
                 RuntimeScopeGuard.EndOfSimulationTick(RuntimeServices.Lifecycle, RuntimeServices.Events);
+            }
             base.OnAfterSimulationTick();
         }
 
         public override void OnReleased()
         {
+            RuntimeServices.Multiplayer.RequestStop();
             RuntimeServices.Scheduler.Detach();
             base.OnReleased();
         }

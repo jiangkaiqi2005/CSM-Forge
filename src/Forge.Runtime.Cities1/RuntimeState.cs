@@ -246,6 +246,7 @@ namespace CsmForge.Runtime.Cities1
         public static readonly CitiesGameThreadScheduler Scheduler = new CitiesGameThreadScheduler(Lifecycle, Events);
         public static readonly CitiesPatchCoordinator Patches = new CitiesPatchCoordinator(Events);
         public static readonly ForgeSaveMetadataStore Metadata = new ForgeSaveMetadataStore(Events);
+        public static readonly CitiesMultiplayerSession Multiplayer = new CitiesMultiplayerSession(Lifecycle, Events);
 
         public static void Enable()
         {
@@ -255,6 +256,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static void Disable()
         {
+            Multiplayer.RequestStop();
             Scheduler.Detach();
             Patches.Uninstall();
             Lifecycle.Disable();

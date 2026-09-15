@@ -22,7 +22,9 @@ namespace CsmForge.Tests
             Assert.Equal((ushort)0, decoded.Index);
             Assert.Equal((ushort)1, decoded.Total);
             Assert.Equal(2, decoded.Entries.Length);
-            Assert.True(decoded.Entries[0].Matches(entries[0]));
+            ComponentFingerprint[] canonical = manifest.Entries;
+            Assert.True(decoded.Entries[0].Matches(canonical[0]));
+            Assert.True(decoded.Entries[1].Matches(canonical[1]));
 
             SessionWelcomeV2 welcome = new SessionWelcomeV2(new SessionStamp(Guid.NewGuid(), 7), Guid.NewGuid(),
                 new MemberIdentity(Guid.NewGuid(), 2), 3, 12, Hash256.Compute(new byte[] { 6 }));

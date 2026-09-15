@@ -144,7 +144,8 @@ namespace CsmForge.Runtime.Cities1
 
     public sealed class ForgeSerializableDataExtension : SerializableDataExtensionBase
     {
-        private const string DataId = "CSM-Forge.V3.Metadata";
+        private const string MetadataDataId = "CSM-Forge.V3.Metadata";
+        private const string EntityMapDataId = "CSM-Forge.V3.EntityMaps";
         private ISerializableData serializableData;
 
         public override void OnCreated(ISerializableData value)
@@ -158,14 +159,17 @@ namespace CsmForge.Runtime.Cities1
             base.OnLoadData();
             try
             {
-                byte[] bytes = serializableData == null ? null : serializableData.LoadData(DataId);
-                RuntimeServices.Metadata.LoadPending(bytes);
+                byte[] metadata = serializableData == null ? null : serializableData.LoadData(MetadataDataId);
+                byte[] entityMaps = serializableData == null ? null : serializableData.LoadData(EntityMapDataId);
+                RuntimeServices.Metadata.LoadPending(metadata);
+                RuntimeServices.EntityMaps.LoadPending(entityMaps);
             }
             catch (Exception error)
             {
                 RuntimeServices.Events.Record(RuntimeEventCode.Error, RuntimeServices.Lifecycle.Current.Generation,
-                    "metadata-load: " + error.GetType().Name);
+                    "forge-save-load: " + error.GetType().Name);
                 RuntimeServices.Metadata.Clear();
+                RuntimeServices.EntityMaps.Clear();
             }
         }
 
@@ -176,14 +180,15 @@ namespace CsmForge.Runtime.Cities1
             if (serializableData == null || !identity.IsValid) return;
             try
             {
-                serializableData.SaveData(DataId, RuntimeServices.Metadata.EncodeCurrent(identity));
+                serializableData.SaveData(MetadataDataId, RuntimeServices.Metadata.EncodeCurrent(identity));
+                serializableData.SaveData(EntityMapDataId, RuntimeServices.EntityMaps.EncodeCurrent());
                 RuntimeServices.Events.Record(RuntimeEventCode.SaveMetadataSaved, identity.Generation, null);
             }
             catch (Exception error)
             {
                 RuntimeServices.Events.Record(RuntimeEventCode.Error, identity.Generation,
-                    "metadata-save: " + error.GetType().Name);
-                RuntimeServices.Lifecycle.Fence("Forge metadata save failed");
+                    "forge-save: " + error.GetType().Name);
+                RuntimeServices.Lifecycle.Fence("Forge save metadata or entity-map save failed");
             }
         }
 

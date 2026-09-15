@@ -34,10 +34,7 @@ namespace CsmForge.Runtime.Cities1
                 return true;
 
             if ((layer & DistrictTool.Layer.Districts) == 0)
-            {
-                // Park/Campus painting is a separate authority domain; never allow it to mutate one replica only.
                 return false;
-            }
 
             if (role == CitiesRuntimeRole.HostLive)
             {
@@ -138,6 +135,40 @@ namespace CsmForge.Runtime.Cities1
                 role == CitiesRuntimeRole.HostLive) return true;
             if (role == CitiesRuntimeRole.ClientReplicaLive && RuntimeServices.Multiplayer.TryReleasePendingLocalDistrict(district))
                 return true;
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(DistrictWorldInfoPanel), "OnStyleChanged")]
+    internal static class DistrictStyleAuthorityPatch
+    {
+        public static bool Prefix(DistrictWorldInfoPanel __instance, int[] ___m_StyleMap, int value)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading)
+                return true;
+            if (role != CitiesRuntimeRole.HostLive && role != CitiesRuntimeRole.ClientReplicaLive) return false;
+            if (__instance == null || ___m_StyleMap == null || value < 0 || value >= ___m_StyleMap.Length)
+            {
+                RuntimeServices.Lifecycle.Fence("District style UI produced an invalid selection");
+                return false;
+            }
+            FieldInfo field = typeof(DistrictWorldInfoPanel).GetField("m_InstanceID",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (field == null)
+            {
+                RuntimeServices.Lifecycle.Fence("District style panel instance identity is unavailable");
+                return false;
+            }
+            InstanceID instance = (InstanceID)field.GetValue(__instance);
+            byte native = instance.District;
+            EntityIdentityV2 district;
+            bool resolved = role == CitiesRuntimeRole.HostLive
+                ? RuntimeServices.Multiplayer.TryResolveHostDistrict(native, out district)
+                : RuntimeServices.Multiplayer.TryResolveClientDistrict(native, out district);
+            if (!resolved || !RuntimeServices.Multiplayer.TryQueueDistrictStyle(district, (ushort)___m_StyleMap[value]))
+                RuntimeServices.Lifecycle.Fence("District style could not be routed through Host authority");
             return false;
         }
     }

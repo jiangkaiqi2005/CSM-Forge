@@ -86,7 +86,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-BUDGET-SLICE-ONLY.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-BUILDING-ROAD.");
         }
     }
 
@@ -107,6 +107,7 @@ namespace CsmForge.Runtime.Cities1
             LoadIdentity identity = RuntimeServices.Lifecycle.Current;
             if (identity.IsValid)
             {
+                RuntimeServices.Multiplayer.PollObservedHostDemand();
                 RuntimeServices.Multiplayer.AfterSimulationTick();
                 RuntimeScopeGuard.EndOfSimulationTick(RuntimeServices.Lifecycle, RuntimeServices.Events);
             }

@@ -35,6 +35,11 @@ namespace CsmForge.Runtime.Cities1
             get { return mode == MultiplayerSessionMode.ClientLive && clientNet != null && replica != null; }
         }
 
+        internal Hash256 CaptureHostNetRoot()
+        {
+            return IsHostNetAuthorityActive ? hostNet.StateRoot : null;
+        }
+
         internal bool TryResolveClientNetNode(ushort nativeId, out EntityIdentityV2 entity)
         {
             entity = default(EntityIdentityV2);
@@ -84,6 +89,27 @@ namespace CsmForge.Runtime.Cities1
                 return true;
             }
             return false;
+        }
+
+        internal void PublishObservedHostNet(Hash256 beforeRoot, int constructionCost, int refund)
+        {
+            if (!IsHostNetAuthorityActive || beforeRoot == null || snapshotSave != null) return;
+            NetMutationV2 mutation = hostNet.ObserveHostChanges(constructionCost, refund);
+            if (mutation == null)
+            {
+                if (constructionCost != 0 || refund != 0)
+                    FenceSession("net-economy-side-effect-without-graph-change");
+                return;
+            }
+            Hash256 afterRoot = hostNet.StateRoot;
+            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, NetAuthorityDomain.Id,
+                beforeRoot, afterRoot, NetDomainCodecV2.EncodeMutation(mutation));
+            if (batch == null || authority.IsFenced)
+            {
+                FenceSession("observed-net-change-could-not-commit");
+                return;
+            }
+            BroadcastBatch(batch);
         }
     }
 }

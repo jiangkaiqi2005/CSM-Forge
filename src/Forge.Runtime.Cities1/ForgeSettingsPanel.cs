@@ -13,7 +13,11 @@ namespace CsmForge.Runtime.Cities1
         {
             if (helper == null || settings == null) return;
             UIHelperBase group = helper.AddGroup("CSM-Forge V3 开发直连");
-            group.AddLabel("当前网络层为 LiteNetLib + 临时房间口令，仅用于开发/LAN 验证，不代表最终认证传输。Client 目前需先进入任意城市以启动 CS1 Runtime；Join 后会下载、校验并加载 Host 快照，当前本地城市会被替换，请先自行保存。当前正式权威域仅开放 Water 日/夜预算。其他持久预算写入会被阻止，而不是偷偷本地执行。");
+            UITextField notice = (UITextField)group.AddTextfield("说明",
+                "LiteNetLib + 临时房间口令仅用于开发/LAN验证。Join 会下载并加载 Host 快照，请先保存当前城市。当前已接入 Water 与 Building 权威域。",
+                delegate(string text) { }, delegate(string text) { });
+            notice.readOnly = true;
+            notice.width = 700;
 
             UITextField name = (UITextField)group.AddTextfield("显示名", settings.DisplayName.value,
                 delegate(string text) { }, delegate(string text)
@@ -42,24 +46,28 @@ namespace CsmForge.Runtime.Cities1
                 delegate(string text) { roomKey = text; }, delegate(string text) { roomKey = text; });
             key.width = 360;
 
-            UILabel status = (UILabel)group.AddLabel(StatusText());
+            UITextField status = (UITextField)group.AddTextfield("状态", StatusText(),
+                delegate(string text) { }, delegate(string text) { });
+            status.readOnly = true;
+            status.width = 700;
+
             group.AddButton("Host 当前存档", delegate
             {
                 bool ok = RuntimeServices.Multiplayer.RequestHost(settings.Port.value, roomKey, settings.DisplayName.value);
-                status.text = (ok ? "已提交 Host 请求。" : "Host 请求失败：请确认已进入城市且当前没有 Forge 会话。") + "\n" + StatusText();
+                status.text = (ok ? "已提交 Host 请求。" : "Host 请求失败：请确认已进入城市且当前没有 Forge 会话。") + " " + StatusText();
             });
             group.AddButton("Join Host 快照", delegate
             {
                 IPAddress ip;
                 bool ok = IPAddress.TryParse(settings.HostAddress.value, out ip) &&
                     RuntimeServices.Multiplayer.RequestJoinCurrentWorld(new IPEndPoint(ip, settings.Port.value), roomKey, settings.DisplayName.value);
-                status.text = (ok ? "已提交 Join 请求；若兼容检查通过，将自动下载并加载 Host 快照。" :
-                    "Join 请求失败：仅支持有效 IPv4，且当前需先进入任意城市启动 Runtime。") + "\n" + StatusText();
+                status.text = (ok ? "已提交 Join 请求；兼容检查通过后会自动下载并加载 Host 快照。" :
+                    "Join 请求失败：仅支持有效 IPv4，且当前需先进入任意城市启动 Runtime。") + " " + StatusText();
             });
             group.AddButton("停止 Forge 会话", delegate
             {
                 RuntimeServices.Multiplayer.RequestStop();
-                status.text = "已提交停止请求。\n" + StatusText();
+                status.text = "已提交停止请求。 " + StatusText();
             });
             group.AddButton("刷新状态", delegate { status.text = StatusText(); });
         }

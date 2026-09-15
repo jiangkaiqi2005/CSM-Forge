@@ -5,6 +5,20 @@ using UnityEngine;
 
 namespace CsmForge.Runtime.Cities1
 {
+    internal sealed class ObservedBuildingChange
+    {
+        public Hash256 BeforeRoot;
+        public Hash256 AfterRoot;
+        public BuildingResultV2 Result;
+    }
+
+    internal sealed class ObservedBuildingDeleteTicket
+    {
+        public ushort NativeId;
+        public EntityIdentityV2 Entity;
+        public Hash256 BeforeRoot;
+    }
+
     internal static class BuildingGameAccess
     {
         public static BuildingStateV2 Capture(EntityIdentityV2 entity, uint nativeId, uint buildIndex)
@@ -163,6 +177,42 @@ namespace CsmForge.Runtime.Cities1
             if (!Ids.Retire(intent.Entity)) throw new InvalidOperationException("Building identity retirement failed.");
             BuildingResultV2 deleted = BuildingResultV2.Deleted(intent.Entity);
             return DomainExecutionV2.Success(BuildingDomainCodecV2.EncodeResult(deleted), StateRoot);
+        }
+
+        internal ObservedBuildingChange ObserveCreated(ushort nativeId, uint buildIndex)
+        {
+            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive)
+                throw new InvalidOperationException("Observed building creation is outside HostLive.");
+            EntityIdentityV2 existing;
+            if (Ids.TryGetIdentity(nativeId, out existing)) return null;
+            Hash256 before = StateRoot;
+            EntityIdentityV2 identity = Ids.Allocate(nativeId);
+            BuildingStateV2 state = BuildingGameAccess.Capture(identity, nativeId, buildIndex);
+            return new ObservedBuildingChange
+            {
+                BeforeRoot = before,
+                AfterRoot = StateRoot,
+                Result = BuildingResultV2.Created(state)
+            };
+        }
+
+        internal ObservedBuildingDeleteTicket PrepareObservedDelete(ushort nativeId)
+        {
+            EntityIdentityV2 identity;
+            if (!Ids.TryGetIdentity(nativeId, out identity)) return null;
+            return new ObservedBuildingDeleteTicket { NativeId = nativeId, Entity = identity, BeforeRoot = StateRoot };
+        }
+
+        internal ObservedBuildingChange CompleteObservedDelete(ObservedBuildingDeleteTicket ticket)
+        {
+            if (ticket == null) return null;
+            if (!Ids.Retire(ticket.Entity)) throw new InvalidOperationException("Observed building identity retirement failed.");
+            return new ObservedBuildingChange
+            {
+                BeforeRoot = ticket.BeforeRoot,
+                AfterRoot = StateRoot,
+                Result = BuildingResultV2.Deleted(ticket.Entity)
+            };
         }
     }
 

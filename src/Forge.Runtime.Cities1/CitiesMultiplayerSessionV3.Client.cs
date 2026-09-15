@@ -110,6 +110,7 @@ namespace CsmForge.Runtime.Cities1
                 replica = null;
                 clientWater = null;
                 clientBuildings = null;
+                clientNet = null;
             }
             if (clientSnapshot != null) clientSnapshot.Dispose();
             string path = Path.Combine(Path.GetTempPath(), "csm-forge-snapshot-" + offer.TransferId.ToString("N") + ".crp");
@@ -151,10 +152,8 @@ namespace CsmForge.Runtime.Cities1
                 load = identity;
                 if (!lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering))
                     throw new InvalidOperationException("Could not enter ClientRecovering after snapshot load.");
-                clientWater = new WaterBudgetReplicaDomain(load);
-                clientBuildings = new BuildingReplicaDomain(load);
-                replica = new ReplicaCoordinatorV2(clientStamp,
-                    new IReplicaDomainV2[] { clientWater, clientBuildings }, clientOffer.BaselineRevision);
+                IReplicaDomainV2[] domains = CreateClientDomains(load);
+                replica = new ReplicaCoordinatorV2(clientStamp, domains, clientOffer.BaselineRevision);
                 if (!replica.CurrentRoot.Equals(clientOffer.BaselineRoot))
                     throw new InvalidOperationException("Loaded game projection root does not match the offered baseline.");
                 lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.ClientCatchingUp; detail = "baseline-installed"; }

@@ -49,6 +49,12 @@ namespace CsmForge.Runtime.Cities1
             return clientDistricts != null && clientDistricts.TryResolve(nativeId, out entity);
         }
 
+        internal bool TryResolveHostDistrict(byte nativeId, out EntityIdentityV2 entity)
+        {
+            entity = default(EntityIdentityV2);
+            return hostDistricts != null && hostDistricts.TryResolve(nativeId, out entity);
+        }
+
         internal bool TrySubmitDistrictPaint(DistrictPaintIntentV2 value, byte pendingNative)
         {
             if (value == null || snapshotSave != null || mode != MultiplayerSessionMode.ClientLive ||
@@ -68,6 +74,43 @@ namespace CsmForge.Runtime.Cities1
             SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
             lock (gate) detail = "district-intent-" + clientOperation + ":pending";
             return true;
+        }
+
+        internal bool TryQueueDistrictStyle(EntityIdentityV2 district, ushort style)
+        {
+            if (!district.IsValid || snapshotSave != null) return false;
+            LoadIdentity identity = load;
+            if (!identity.IsValid || !lifecycle.IsCurrent(identity)) return false;
+            DistrictStyleIntentV2 request = new DistrictStyleIntentV2(district, style);
+            return RuntimeServices.Scheduler.QueueSimulation(identity, delegate { SubmitDistrictStyle(request); });
+        }
+
+        private void SubmitDistrictStyle(DistrictStyleIntentV2 value)
+        {
+            if (snapshotSave != null || value == null) return;
+            if (mode == MultiplayerSessionMode.Hosting)
+            {
+                if (authority == null || hostDistricts == null || hostLocalOperation == ulong.MaxValue)
+                { FenceSession("district-style-host-authority-unavailable"); return; }
+                hostLocalOperation++;
+                PlayerIntentV2 intent = new PlayerIntentV2(authority.Stamp, hostLocalMember, hostLocalOperation, 1,
+                    DistrictAuthorityDomain.Id, hostDistricts.StateRoot, DistrictStyleCodecV2.Encode(value));
+                AuthoritySubmitResultV2 result = authority.Submit(hostLocalBinding, intent);
+                if (result.Decision != AuthoritySubmitDecisionV2.Committed || result.Batch == null)
+                { FenceSession("host-district-style-rejected:" + result.Decision); return; }
+                BroadcastBatch(result.Batch);
+                return;
+            }
+            if (mode == MultiplayerSessionMode.ClientLive)
+            {
+                if (replica == null || clientDistricts == null || clientOperation == ulong.MaxValue)
+                { FenceSession("district-style-client-replica-unavailable"); return; }
+                clientOperation++;
+                PlayerIntentV2 intent = new PlayerIntentV2(replica.Stamp, clientMember, clientOperation, clientPermissionVersion,
+                    DistrictAuthorityDomain.Id, clientDistricts.StateRoot, DistrictStyleCodecV2.Encode(value));
+                SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
+                lock (gate) detail = "district-style-" + clientOperation + ":pending";
+            }
         }
 
         internal void HandleDistrictIntentReceipt(IntentReceiptV2 receipt)

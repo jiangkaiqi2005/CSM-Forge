@@ -38,14 +38,14 @@ namespace CsmForge.Tests
         }
 
         [Case]
-        public static void BuildIndexParticipatesInCanonicalRoot()
+        public static void BuildIndexIsProjectionMetadataNotLongLivedWorldRoot()
         {
             EntityIdentityV2 id = new EntityIdentityV2(2, 1);
             BuildingStateIndexV2 first = new BuildingStateIndexV2();
             BuildingStateIndexV2 second = new BuildingStateIndexV2();
             first.Seed(new BuildingStateV2(id, "building:test", 0, 0, 0, 0, 1, 12));
             second.Seed(new BuildingStateV2(id, "building:test", 0, 0, 0, 0, 1, 13));
-            Assert.True(!first.Root.Equals(second.Root));
+            Assert.Equal(first.Root, second.Root);
         }
 
         [Case]

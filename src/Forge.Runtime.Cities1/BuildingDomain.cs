@@ -5,35 +5,21 @@ using UnityEngine;
 
 namespace CsmForge.Runtime.Cities1
 {
-    internal sealed class ObservedBuildingChange
-    {
-        public Hash256 BeforeRoot;
-        public Hash256 AfterRoot;
-        public BuildingResultV2 Result;
-    }
-
-    internal sealed class ObservedBuildingDeleteTicket
-    {
-        public ushort NativeId;
-        public EntityIdentityV2 Entity;
-        public Hash256 BeforeRoot;
-    }
+    internal sealed class ObservedBuildingChange { public Hash256 BeforeRoot; public Hash256 AfterRoot; public BuildingResultV2 Result; }
+    internal sealed class ObservedBuildingDeleteTicket { public ushort NativeId; public EntityIdentityV2 Entity; public Hash256 BeforeRoot; }
 
     internal static class BuildingGameAccess
     {
         public static BuildingStateV2 Capture(EntityIdentityV2 entity, uint nativeId, uint buildIndex, int constructionCost)
         {
-            if (!entity.IsValid || nativeId == 0 || nativeId > ushort.MaxValue)
-                throw new ArgumentException("Invalid building capture identity.");
-            BuildingManager manager = BuildingManager.instance;
-            if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
+            if (!entity.IsValid || nativeId == 0 || nativeId > ushort.MaxValue) throw new ArgumentException("Invalid building capture identity.");
+            BuildingManager manager = BuildingManager.instance; if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
             Building building = manager.m_buildings.m_buffer[(ushort)nativeId];
             if (building.m_flags == Building.Flags.None) throw new InvalidOperationException("Building is not live.");
             BuildingInfo info = building.Info;
             if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Building prefab is unavailable.");
             Vector3 position = building.m_position;
-            return new BuildingStateV2(entity, info.name, position.x, position.y, position.z,
-                building.m_angle, building.Length, buildIndex, constructionCost);
+            return new BuildingStateV2(entity, info.name, position.x, position.y, position.z, building.m_angle, building.Length, buildIndex, constructionCost);
         }
 
         public static BuildingInfo ResolvePrefab(string prefabKey)
@@ -48,32 +34,25 @@ namespace CsmForge.Runtime.Cities1
             if (info == null) throw new ArgumentNullException("info");
             ToolManager tools = ToolManager.instance;
             if (tools == null || (tools.m_properties.m_mode & ItemClass.Availability.Game) == 0) return 0;
-            int constructionCost = info.GetConstructionCost();
-            if (constructionCost <= 0) return 0;
-            int fetched = EconomyManager.instance.FetchResource(EconomyManager.Resource.Construction,
-                constructionCost, info.m_class);
-            if (fetched != constructionCost) return -1;
-            return constructionCost;
+            int constructionCost = info.GetConstructionCost(); if (constructionCost <= 0) return 0;
+            int fetched = EconomyManager.instance.FetchResource(EconomyManager.Resource.Construction, constructionCost, info.m_class);
+            return fetched == constructionCost ? constructionCost : -1;
         }
 
         private static void ChargeReplicaConstruction(BuildingInfo info, int constructionCost)
         {
             if (constructionCost <= 0) return;
-            int fetched = EconomyManager.instance.FetchResource(EconomyManager.Resource.Construction,
-                constructionCost, info.m_class);
-            if (fetched != constructionCost)
-                throw new InvalidOperationException("Replica could not project the Host construction cost.");
+            int fetched = EconomyManager.instance.FetchResource(EconomyManager.Resource.Construction, constructionCost, info.m_class);
+            if (fetched != constructionCost) throw new InvalidOperationException("Replica could not project Host construction cost.");
         }
 
         public static ushort CreateHost(LoadIdentity load, BuildingIntentV2 intent, uint buildIndex, out int constructionCost)
         {
-            BuildingManager manager = BuildingManager.instance;
-            SimulationManager simulation = SimulationManager.instance;
+            BuildingManager manager = BuildingManager.instance; SimulationManager simulation = SimulationManager.instance;
             if (manager == null || simulation == null) throw new InvalidOperationException("CS1 building services are unavailable.");
-            ushort nativeId;
-            BuildingInfo info = ResolvePrefab(intent.PrefabKey);
-            constructionCost = ChargeHostConstruction(info);
+            BuildingInfo info = ResolvePrefab(intent.PrefabKey); constructionCost = ChargeHostConstruction(info);
             if (constructionCost < 0) return 0;
+            ushort nativeId;
             using (RuntimeScopeGuard.EnterApply(load, BuildingAuthorityDomain.Id))
             {
                 if (!manager.CreateBuilding(out nativeId, ref simulation.m_randomizer, info,
@@ -86,12 +65,9 @@ namespace CsmForge.Runtime.Cities1
 
         public static ushort CreateReplica(LoadIdentity load, BuildingStateV2 state)
         {
-            BuildingManager manager = BuildingManager.instance;
-            SimulationManager simulation = SimulationManager.instance;
+            BuildingManager manager = BuildingManager.instance; SimulationManager simulation = SimulationManager.instance;
             if (manager == null || simulation == null) throw new InvalidOperationException("CS1 building services are unavailable.");
-            BuildingInfo info = ResolvePrefab(state.PrefabKey);
-            Randomizer localRandomizer = simulation.m_randomizer;
-            ushort nativeId;
+            BuildingInfo info = ResolvePrefab(state.PrefabKey); Randomizer localRandomizer = simulation.m_randomizer; ushort nativeId;
             using (RuntimeScopeGuard.EnterApply(load, BuildingAuthorityDomain.Id))
             {
                 ChargeReplicaConstruction(info, state.ConstructionCost);
@@ -107,56 +83,41 @@ namespace CsmForge.Runtime.Cities1
         {
             BuildingManager manager = BuildingManager.instance;
             if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
-            if (nativeId == 0 || manager.m_buildings.m_buffer[nativeId].m_flags == Building.Flags.None)
-                throw new InvalidOperationException("Building is already absent.");
+            if (nativeId == 0 || manager.m_buildings.m_buffer[nativeId].m_flags == Building.Flags.None) throw new InvalidOperationException("Building is already absent.");
             using (RuntimeScopeGuard.EnterApply(load, BuildingAuthorityDomain.Id)) manager.ReleaseBuilding(nativeId);
-            if (manager.m_buildings.m_buffer[nativeId].m_flags != Building.Flags.None)
-                throw new InvalidOperationException("CS1 did not release the requested building.");
+            if (manager.m_buildings.m_buffer[nativeId].m_flags != Building.Flags.None) throw new InvalidOperationException("CS1 did not release requested building.");
         }
 
         public static bool Equivalent(BuildingStateV2 expected, BuildingStateV2 actual)
         {
-            return expected != null && actual != null && expected.Entity.Equals(actual.Entity) &&
-                expected.PrefabKey == actual.PrefabKey && expected.X == actual.X && expected.Y == actual.Y &&
-                expected.Z == actual.Z && expected.Angle == actual.Angle && expected.Length == actual.Length;
+            return expected != null && actual != null && expected.Entity.Equals(actual.Entity) && expected.PrefabKey == actual.PrefabKey &&
+                expected.X == actual.X && expected.Y == actual.Y && expected.Z == actual.Z && expected.Angle == actual.Angle && expected.Length == actual.Length;
         }
     }
 
     public abstract class BuildingDomainBase
     {
-        protected readonly LoadIdentity Load;
-        protected readonly EntityIdMapV2 Ids = new EntityIdMapV2();
-
+        protected readonly LoadIdentity Load; protected readonly EntityIdMapV2 Ids = new EntityIdMapV2();
         protected BuildingDomainBase(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
-            Load = load;
+            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load"); Load = load;
             RuntimeServices.EntityMaps.AttachDomain(BuildingAuthorityDomain.Id, Ids);
             if (Ids.Count == 0) SeedExistingBuildings(); else ValidateRestoredMappings();
         }
-
+        public bool TryResolveEntity(uint nativeId, out EntityIdentityV2 entity) { return Ids.TryGetIdentity(nativeId, out entity); }
         protected Hash256 CaptureRoot()
         {
-            BuildingStateIndexV2 index = new BuildingStateIndexV2();
-            EntityMapEntryV2[] mappings = Ids.SnapshotEntries();
-            for (int i = 0; i < mappings.Length; i++)
-                index.Seed(BuildingGameAccess.Capture(mappings[i].Identity, mappings[i].NativeId, 0, 0));
+            BuildingStateIndexV2 index = new BuildingStateIndexV2(); EntityMapEntryV2[] mappings = Ids.SnapshotEntries();
+            for (int i = 0; i < mappings.Length; i++) index.Seed(BuildingGameAccess.Capture(mappings[i].Identity, mappings[i].NativeId, 0, 0));
             return index.Root;
         }
-
         private void SeedExistingBuildings()
         {
-            BuildingManager manager = BuildingManager.instance;
-            if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
+            BuildingManager manager = BuildingManager.instance; if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
             int size = manager.m_buildings.m_size;
-            for (int i = 1; i < size; i++)
-            {
-                if (manager.m_buildings.m_buffer[i].m_flags == Building.Flags.None) continue;
-                EntityIdentityV2 identity = Ids.Allocate((uint)i);
-                BuildingGameAccess.Capture(identity, (uint)i, 0, 0);
-            }
+            for (int i = 1; i < size; i++) if (manager.m_buildings.m_buffer[i].m_flags != Building.Flags.None)
+            { EntityIdentityV2 identity = Ids.Allocate((uint)i); BuildingGameAccess.Capture(identity, (uint)i, 0, 0); }
         }
-
         private void ValidateRestoredMappings()
         {
             EntityMapEntryV2[] mappings = Ids.SnapshotEntries();
@@ -166,92 +127,67 @@ namespace CsmForge.Runtime.Cities1
 
     public sealed class BuildingAuthorityDomain : BuildingDomainBase, IAuthorityDomainV2
     {
-        public const ushort Id = 10;
-        public ushort DomainId { get { return Id; } }
-        public Hash256 StateRoot { get { return CaptureRoot(); } }
+        public const ushort Id = 10; public ushort DomainId { get { return Id; } } public Hash256 StateRoot { get { return CaptureRoot(); } }
         public BuildingAuthorityDomain(LoadIdentity load) : base(load) { }
-
         public DomainExecutionV2 ExecutePlayer(byte[] payload)
         {
-            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive)
-                return DomainExecutionV2.Rejected();
-            BuildingIntentV2 intent;
-            try { intent = BuildingDomainCodecV2.DecodeIntent(payload); } catch { return DomainExecutionV2.Rejected(); }
+            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return DomainExecutionV2.Rejected();
+            BuildingIntentV2 intent; try { intent = BuildingDomainCodecV2.DecodeIntent(payload); } catch { return DomainExecutionV2.Rejected(); }
             if (intent.Kind == BuildingIntentKindV2.Create)
             {
-                SimulationManager simulation = SimulationManager.instance;
-                if (simulation == null) return DomainExecutionV2.Rejected();
-                uint buildIndex = simulation.m_currentBuildIndex;
-                int constructionCost;
-                ushort nativeId = BuildingGameAccess.CreateHost(Load, intent, buildIndex, out constructionCost);
-                if (nativeId == 0) return DomainExecutionV2.Rejected();
+                SimulationManager simulation = SimulationManager.instance; if (simulation == null) return DomainExecutionV2.Rejected();
+                uint buildIndex = simulation.m_currentBuildIndex; int constructionCost;
+                ushort nativeId = BuildingGameAccess.CreateHost(Load, intent, buildIndex, out constructionCost); if (nativeId == 0) return DomainExecutionV2.Rejected();
                 EntityIdentityV2 identity = Ids.Allocate(nativeId);
                 BuildingStateV2 state = BuildingGameAccess.Capture(identity, nativeId, buildIndex, constructionCost);
                 BuildingResultV2 result = BuildingResultV2.Created(state);
                 return DomainExecutionV2.Success(BuildingDomainCodecV2.EncodeResult(result), StateRoot);
             }
-            uint native;
-            if (!Ids.TryGetNative(intent.Entity, out native) || native == 0 || native > ushort.MaxValue) return DomainExecutionV2.Rejected();
-            BuildingGameAccess.Delete(Load, (ushort)native);
-            if (!Ids.Retire(intent.Entity)) throw new InvalidOperationException("Building identity retirement failed.");
+            uint native; if (!Ids.TryGetNative(intent.Entity, out native) || native == 0 || native > ushort.MaxValue) return DomainExecutionV2.Rejected();
+            BuildingGameAccess.Delete(Load, (ushort)native); if (!Ids.Retire(intent.Entity)) throw new InvalidOperationException("Building identity retirement failed.");
             BuildingResultV2 deleted = BuildingResultV2.Deleted(intent.Entity);
             return DomainExecutionV2.Success(BuildingDomainCodecV2.EncodeResult(deleted), StateRoot);
         }
-
         internal ObservedBuildingChange ObserveCreated(ushort nativeId, uint buildIndex, int constructionCost)
         {
-            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive)
-                throw new InvalidOperationException("Observed building creation is outside HostLive.");
-            EntityIdentityV2 existing; if (Ids.TryGetIdentity(nativeId, out existing)) return null;
-            Hash256 before = StateRoot;
-            EntityIdentityV2 identity = Ids.Allocate(nativeId);
-            BuildingStateV2 state = BuildingGameAccess.Capture(identity, nativeId, buildIndex, constructionCost);
+            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) throw new InvalidOperationException("Observed building creation is outside HostLive.");
+            EntityIdentityV2 existing; if (Ids.TryGetIdentity(nativeId, out existing)) return null; Hash256 before = StateRoot;
+            EntityIdentityV2 identity = Ids.Allocate(nativeId); BuildingStateV2 state = BuildingGameAccess.Capture(identity, nativeId, buildIndex, constructionCost);
             return new ObservedBuildingChange { BeforeRoot = before, AfterRoot = StateRoot, Result = BuildingResultV2.Created(state) };
         }
-
         internal ObservedBuildingDeleteTicket PrepareObservedDelete(ushort nativeId)
         {
             EntityIdentityV2 identity; if (!Ids.TryGetIdentity(nativeId, out identity)) return null;
             return new ObservedBuildingDeleteTicket { NativeId = nativeId, Entity = identity, BeforeRoot = StateRoot };
         }
-
         internal ObservedBuildingChange CompleteObservedDelete(ObservedBuildingDeleteTicket ticket)
         {
-            if (ticket == null) return null;
-            if (!Ids.Retire(ticket.Entity)) throw new InvalidOperationException("Observed building identity retirement failed.");
+            if (ticket == null) return null; if (!Ids.Retire(ticket.Entity)) throw new InvalidOperationException("Observed building identity retirement failed.");
             return new ObservedBuildingChange { BeforeRoot = ticket.BeforeRoot, AfterRoot = StateRoot, Result = BuildingResultV2.Deleted(ticket.Entity) };
         }
     }
 
     public sealed class BuildingReplicaDomain : BuildingDomainBase, IReplicaDomainV2
     {
-        public ushort DomainId { get { return BuildingAuthorityDomain.Id; } }
-        public Hash256 StateRoot { get { return CaptureRoot(); } }
+        public ushort DomainId { get { return BuildingAuthorityDomain.Id; } } public Hash256 StateRoot { get { return CaptureRoot(); } }
         public BuildingReplicaDomain(LoadIdentity load) : base(load) { }
-
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
-            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
-            if (!RuntimeServices.Lifecycle.IsCurrent(Load) ||
-                (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))
-                throw new InvalidOperationException("Replica building apply is invalid in the current role.");
+            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot"); CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (!RuntimeServices.Lifecycle.IsCurrent(Load) || (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))
+                throw new InvalidOperationException("Replica building apply is invalid in current role.");
             BuildingResultV2 result = BuildingDomainCodecV2.DecodeResult(absoluteDelta);
             if (result.Kind == BuildingResultKindV2.Created)
             {
                 uint existing; if (Ids.TryGetNative(result.Entity, out existing)) throw new InvalidOperationException("Replica building entity already exists.");
-                ushort nativeId = BuildingGameAccess.CreateReplica(Load, result.State);
-                Ids.BindKnown(result.Entity, nativeId);
+                ushort nativeId = BuildingGameAccess.CreateReplica(Load, result.State); Ids.BindKnown(result.Entity, nativeId);
                 BuildingStateV2 actual = BuildingGameAccess.Capture(result.Entity, nativeId, result.State.BuildIndex, result.State.ConstructionCost);
                 if (!BuildingGameAccess.Equivalent(result.State, actual)) throw new InvalidOperationException("Replica building projection did not match Host result.");
             }
             else
             {
-                uint native;
-                if (!Ids.TryGetNative(result.Entity, out native) || native == 0 || native > ushort.MaxValue)
-                    throw new InvalidOperationException("Replica cannot delete an unknown building entity.");
-                BuildingGameAccess.Delete(Load, (ushort)native);
-                if (!Ids.Retire(result.Entity)) throw new InvalidOperationException("Replica building identity retirement failed.");
+                uint native; if (!Ids.TryGetNative(result.Entity, out native) || native == 0 || native > ushort.MaxValue) throw new InvalidOperationException("Replica cannot delete unknown building entity.");
+                BuildingGameAccess.Delete(Load, (ushort)native); if (!Ids.Retire(result.Entity)) throw new InvalidOperationException("Replica building identity retirement failed.");
             }
             if (!StateRoot.Equals(expectedAfterRoot)) throw new InvalidOperationException("Building projection root mismatch.");
         }

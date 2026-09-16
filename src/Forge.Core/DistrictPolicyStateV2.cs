@@ -84,13 +84,17 @@ namespace CsmForge.Core
     public sealed class DistrictAuthorityEnvelopeV2
     {
         public DistrictMutationV2 DistrictMutation { get; private set; }
+        public Hash256 DistrictAfterRoot { get; private set; }
         public DistrictPolicySnapshotV2 Policies { get; private set; }
 
-        public DistrictAuthorityEnvelopeV2(DistrictMutationV2 districtMutation, DistrictPolicySnapshotV2 policies)
+        public DistrictAuthorityEnvelopeV2(DistrictMutationV2 districtMutation, Hash256 districtAfterRoot,
+            DistrictPolicySnapshotV2 policies)
         {
             if (districtMutation == null) throw new ArgumentNullException("districtMutation");
+            if (districtAfterRoot == null) throw new ArgumentNullException("districtAfterRoot");
             if (policies == null) throw new ArgumentNullException("policies");
             DistrictMutation = districtMutation;
+            DistrictAfterRoot = districtAfterRoot;
             Policies = policies;
         }
     }
@@ -183,6 +187,7 @@ namespace CsmForge.Core
             {
                 BinaryWriter writer = new BinaryWriter(stream);
                 writer.Write(EnvelopeMagic);
+                writer.Write(value.DistrictAfterRoot.ToArray());
                 writer.Write((uint)district.Length);
                 writer.Write(district);
                 writer.Write((ushort)policies.Length);
@@ -197,11 +202,14 @@ namespace CsmForge.Core
 
         public static DistrictAuthorityEnvelopeV2 DecodeEnvelope(byte[] bytes)
         {
-            if (bytes == null || bytes.Length < 16 || bytes.Length > Limits.FramePayloadBytes)
+            if (bytes == null || bytes.Length < 48 || bytes.Length > Limits.FramePayloadBytes)
                 throw new InvalidDataException("Invalid district authority envelope length.");
             using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes, false)))
             {
                 if (reader.ReadUInt32() != EnvelopeMagic) throw new InvalidDataException("Unknown district authority envelope magic.");
+                byte[] rootBytes = reader.ReadBytes(Hash256.Size);
+                if (rootBytes.Length != Hash256.Size) throw new InvalidDataException("Truncated district child root.");
+                Hash256 districtAfterRoot = new Hash256(rootBytes);
                 uint districtLength = reader.ReadUInt32();
                 if (districtLength == 0 || districtLength > Limits.FramePayloadBytes || districtLength > reader.BaseStream.Length - reader.BaseStream.Position)
                     throw new InvalidDataException("Invalid district mutation length in envelope.");
@@ -213,7 +221,7 @@ namespace CsmForge.Core
                 if (reader.BaseStream.Position != reader.BaseStream.Length)
                     throw new InvalidDataException("Unexpected trailing district authority envelope bytes.");
                 return new DistrictAuthorityEnvelopeV2(DistrictDomainCodecV2.DecodeMutation(districtBytes),
-                    DecodePolicySnapshot(policyBytes));
+                    districtAfterRoot, DecodePolicySnapshot(policyBytes));
             }
         }
 

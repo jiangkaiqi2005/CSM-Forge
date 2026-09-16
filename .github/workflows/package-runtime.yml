@@ -1,0 +1,122 @@
+name: runtime-package
+
+on:
+  push:
+    branches:
+      - fix/forge-cqu-integration-docs
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - '.github/workflows/package-runtime.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run kernel regression gate
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet build tests/Forge.Tests/Forge.Tests.csproj -c Release --nologo
+          if ($LASTEXITCODE -ne 0) { throw "Kernel build failed: $LASTEXITCODE" }
+          dotnet run --project tests/Forge.Tests/Forge.Tests.csproj -c Release -f net8.0 --no-build
+          if ($LASTEXITCODE -ne 0) { throw "Kernel regression gate failed: $LASTEXITCODE" }
+
+      - name: Prepare isolated CS1 reference assemblies
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'csm-cs1-reference-assemblies.zip'
+          $extract = Join-Path $env:RUNNER_TEMP 'csm-cs1-reference-extract'
+          $managed = Join-Path $env:RUNNER_TEMP 'csm-cs1-managed'
+          Invoke-WebRequest 'https://storage.citiesskylinesmultiplayer.com/Assemblies.zip' -OutFile $zip -TimeoutSec 180
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+          New-Item -ItemType Directory -Force $managed | Out-Null
+          $required = @('Assembly-CSharp.dll','ColossalManaged.dll','ICities.dll','UnityEngine.dll')
+          $optional = @('UnityEngine.UI.dll')
+          foreach ($name in $required) {
+            $matches = @(Get-ChildItem $extract -Recurse -File -Filter $name)
+            if ($matches.Count -ne 1) { throw "Expected exactly one CS1 reference assembly $name; found $($matches.Count)." }
+            Copy-Item -LiteralPath $matches[0].FullName -Destination (Join-Path $managed $name)
+          }
+          foreach ($name in $optional) {
+            $matches = @(Get-ChildItem $extract -Recurse -File -Filter $name)
+            if ($matches.Count -eq 1) { Copy-Item -LiteralPath $matches[0].FullName -Destination (Join-Path $managed $name) }
+          }
+          "CS1_MANAGED=$managed" >> $env:GITHUB_ENV
+          "REFERENCE_ARCHIVE_SHA256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())" >> $env:GITHUB_ENV
+
+      - name: Build and stage installable runtime ZIP
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & pwsh -NoProfile -File scripts/build-runtime.ps1 -CitiesManagedPath $env:CS1_MANAGED -Configuration Release -OutputPath (Join-Path $env:RUNNER_TEMP 'forge-runtime')
+          if ($LASTEXITCODE -ne 0) { throw "Runtime package build failed: $LASTEXITCODE" }
+
+      - name: Add build provenance
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'forge-runtime'
+          $stage = Join-Path $root 'CSM-Forge'
+          $zip = Join-Path $root 'CSM-Forge-runtime.zip'
+          $dlls = @(Get-ChildItem $stage -File -Filter '*.dll' | Sort-Object Name | ForEach-Object {
+            [ordered]@{ name=$_.Name; bytes=$_.Length; sha256=(Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+          })
+          $info = [ordered]@{
+            repository=$env:GITHUB_REPOSITORY
+            source_commit=$env:GITHUB_SHA
+            source_ref=$env:GITHUB_REF
+            run_url="$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+            built_at_utc=[DateTime]::UtcNow.ToString('o')
+            target_framework='net35'
+            cs1_reference_archive_sha256=$env:REFERENCE_ARCHIVE_SHA256
+            gameplay_validation='NOT RUN BY CI'
+            dlls=$dlls
+          }
+          $info | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $stage 'BUILD_INFO.json') -Encoding UTF8
+          $manifest = @()
+          Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {
+            $fileHash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+            $manifest += ('{0}  {1}' -f $fileHash.Hash.ToLowerInvariant(), $_.Name)
+          }
+          $manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding ascii
+          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-ALPHA-INSTALL.ps1') -Root $stage
+          if ($LASTEXITCODE -ne 0) { throw "Staged Alpha verification failed: $LASTEXITCODE" }
+          if (Test-Path $zip) { Remove-Item -Force $zip }
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  CSM-Forge-runtime.zip" | Set-Content (Join-Path $root 'CSM-Forge-runtime.zip.sha256') -Encoding ascii
+          "Runtime ZIP SHA256: $hash" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload runtime package and evidence
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
+        with:
+          name: CSM-Forge-runtime-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip
+            ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip.sha256
+            ${{ runner.temp }}/forge-runtime/CSM-Forge/BUILD_INFO.json
+            ${{ runner.temp }}/forge-runtime/CSM-Forge/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net35;net8.0</TargetFrameworks>
+    <AssemblyName>CSM.Forge.Checkpoints</AssemblyName>
+    <RootNamespace>CsmForge.Checkpoints</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Forge.Core/Forge.Core.csproj" />
+    <ProjectReference Include="../Forge.Protocol/Forge.Protocol.csproj" />
+  </ItemGroup>
+</Project>

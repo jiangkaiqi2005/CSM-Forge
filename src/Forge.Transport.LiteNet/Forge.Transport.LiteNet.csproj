@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net35;net8.0</TargetFrameworks>
+    <AssemblyName>CSM.Forge.Transport.LiteNet</AssemblyName>
+    <RootNamespace>CsmForge.Transport.LiteNet</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Forge.Protocol/Forge.Protocol.csproj" />
+    <PackageReference Include="LiteNetLib" Version="0.9.4" />
+  </ItemGroup>
+</Project>

@@ -4,6 +4,11 @@ using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
+    public static class SimulationClockSave
+    {
+        public static readonly SimulationClockSaveStore Store = new SimulationClockSaveStore();
+    }
+
     public sealed class SimulationClockSaveStore
     {
         private readonly object gate = new object();
@@ -17,7 +22,7 @@ namespace CsmForge.Runtime.Cities1
                 if (bytes.Length != 8) throw new InvalidDataException("Invalid Forge simulation clock save length.");
                 using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes, false)))
                 {
-                    if (reader.ReadUInt32() != 0x4B4C4346u) throw new InvalidDataException("Unknown Forge simulation clock save magic."); // FCLK
+                    if (reader.ReadUInt32() != 0x4B4C4346u) throw new InvalidDataException("Unknown Forge simulation clock save magic.");
                     if (reader.ReadUInt16() != 1) throw new InvalidDataException("Unsupported Forge simulation clock save schema.");
                     byte paused = reader.ReadByte(); byte speed = reader.ReadByte();
                     if (paused > 1 || speed > 3) throw new InvalidDataException("Invalid Forge simulation clock save payload.");

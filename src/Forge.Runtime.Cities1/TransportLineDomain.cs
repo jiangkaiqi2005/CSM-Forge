@@ -305,7 +305,7 @@ namespace CsmForge.Runtime.Cities1
 
     public sealed class TransportLineAuthorityDomain : TransportLineDomainBase, IAuthorityDomainV2
     {
-        public const ushort Id = 30;
+        public const ushort Id = 40;
         public ushort DomainId { get { return Id; } }
         public Hash256 StateRoot { get { return CaptureRoot(); } }
         public TransportLineAuthorityDomain(LoadIdentity load) : base(load) { }

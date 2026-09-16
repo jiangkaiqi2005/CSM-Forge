@@ -124,4 +124,60 @@ namespace CsmForge.Runtime.Cities1
             return false;
         }
     }
+
+    [HarmonyPatch(typeof(TransportLine), "AddStop", new Type[] { typeof(ushort), typeof(int), typeof(Vector3), typeof(bool) })]
+    internal static class ForgeTransportAddStopPatch
+    {
+        public static bool Prefix(ushort lineID, int index, Vector3 newPos, bool fixedPlatform, ref bool __result)
+        {
+            if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
+            __result = false;
+            RuntimeServices.Multiplayer.TryQueueTransportRoute(lineID, TransportLineIntentKindV2.AddStop,
+                index, newPos.x, newPos.y, newPos.z, fixedPlatform);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(TransportLine), "RemoveStop", new Type[] { typeof(ushort), typeof(int) })]
+    internal static class ForgeTransportRemoveStopPatch
+    {
+        public static bool Prefix(ushort lineID, int index, ref bool __result)
+        {
+            if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
+            __result = false;
+            RuntimeServices.Multiplayer.TryQueueTransportRoute(lineID, TransportLineIntentKindV2.RemoveStop,
+                index, 0f, 0f, 0f, false);
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class ForgeTransportMoveStopPatch
+    {
+        public static MethodBase TargetMethod()
+        {
+            return typeof(TransportLine).GetMethod("MoveStop", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, new Type[] { typeof(ushort), typeof(int), typeof(Vector3), typeof(bool), typeof(Vector3).MakeByRefType() }, null);
+        }
+
+        public static bool Prefix(ushort lineID, int index, Vector3 newPos, bool fixedPlatform, ref bool __result)
+        {
+            if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
+            __result = false;
+            RuntimeServices.Multiplayer.TryQueueTransportRoute(lineID, TransportLineIntentKindV2.MoveStop,
+                index, newPos.x, newPos.y, newPos.z, fixedPlatform);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(TransportManager), "CreateLine")]
+    internal static class ForgeTransportCreateLinePatch
+    {
+        public static bool Prefix(ref ushort line, ref bool __result)
+        {
+            if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
+            line = 0; __result = false;
+            return false;
+        }
+    }
 }

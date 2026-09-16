@@ -31,6 +31,24 @@ namespace CsmForge.Tests
         }
 
         [Case]
+        public static void TransportCreateIntentCarriesAbsoluteRouteWithoutNativeId()
+        {
+            TransportLineIntentV2 create = TransportLineIntentV2.CreateLine("Metro Line", 10, 20, 30, 255, 120, 7,
+                true, true, true, new[]
+                {
+                    new TransportStopV2(100f, 5f, 200f, false),
+                    new TransportStopV2(300f, 6f, 400f, true)
+                });
+            TransportLineIntentV2 copy = TransportLineDomainCodecV2.DecodeIntent(TransportLineDomainCodecV2.EncodeIntent(create));
+            Assert.Equal(TransportLineIntentKindV2.Create, copy.Kind);
+            Assert.True(!copy.Target.IsValid);
+            Assert.Equal("Metro Line", copy.PrefabKey);
+            Assert.Equal(2, copy.Stops.Length);
+            Assert.Equal(300f, copy.Stops[1].X);
+            Assert.True(copy.Complete);
+        }
+
+        [Case]
         public static void TransportRootIsCanonicalAcrossInsertionOrder()
         {
             TransportLineStateV2 a = new TransportLineStateV2(new EntityIdentityV2(1, 1), "A", 1, 1, 1, 255, 100, 2, true, true);

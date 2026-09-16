@@ -6,7 +6,7 @@ on:
       - fix/forge-cqu-integration-docs
     paths:
       - 'src/**'
-      - 'scripts/build-runtime.ps1'
+      - 'scripts/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/package-runtime.yml'
@@ -95,6 +95,14 @@ jobs:
             dlls=$dlls
           }
           $info | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $stage 'BUILD_INFO.json') -Encoding UTF8
+          $manifest = @()
+          Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {
+            $fileHash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+            $manifest += ('{0}  {1}' -f $fileHash.Hash.ToLowerInvariant(), $_.Name)
+          }
+          $manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding ascii
+          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-ALPHA-INSTALL.ps1') -Root $stage
+          if ($LASTEXITCODE -ne 0) { throw "Staged Alpha verification failed: $LASTEXITCODE" }
           if (Test-Path $zip) { Remove-Item -Force $zip }
           Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()

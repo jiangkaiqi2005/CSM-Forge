@@ -17,8 +17,8 @@ function Copy-OpenFile([string]$Source, [string]$Destination) {
     $sourceStream = $null
     $destinationStream = $null
     try {
-        $sourceStream = New-Object IO.FileStream($Source, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
-        $destinationStream = New-Object IO.FileStream($Destination, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $sourceStream = [IO.File]::Open($Source, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        $destinationStream = [IO.File]::Open($Destination, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
         $sourceStream.CopyTo($destinationStream)
     }
     finally {

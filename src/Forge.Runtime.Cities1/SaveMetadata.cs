@@ -28,7 +28,7 @@ namespace CsmForge.Runtime.Cities1
 
     public static class ForgeSaveMetadataCodec
     {
-        private const uint Magic = 0x4D465343; // CSFM little endian
+        private const uint Magic = 0x4D465343;
         private const int FixedBytes = 4 + 2 + 2 + 16 + 8 + 8 + 1 + Hash256.Size;
 
         public static byte[] Encode(ForgeSaveMetadata metadata)
@@ -146,6 +146,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private const string MetadataDataId = "CSM-Forge.V3.Metadata";
         private const string EntityMapDataId = "CSM-Forge.V3.EntityMaps";
+        private const string ClockDataId = "CSM-Forge.V3.SimulationClock";
         private ISerializableData serializableData;
 
         public override void OnCreated(ISerializableData value)
@@ -161,8 +162,10 @@ namespace CsmForge.Runtime.Cities1
             {
                 byte[] metadata = serializableData == null ? null : serializableData.LoadData(MetadataDataId);
                 byte[] entityMaps = serializableData == null ? null : serializableData.LoadData(EntityMapDataId);
+                byte[] clock = serializableData == null ? null : serializableData.LoadData(ClockDataId);
                 RuntimeServices.Metadata.LoadPending(metadata);
                 RuntimeServices.EntityMaps.LoadPending(entityMaps);
+                SimulationClockSave.Store.LoadPending(clock);
             }
             catch (Exception error)
             {
@@ -170,6 +173,7 @@ namespace CsmForge.Runtime.Cities1
                     "forge-save-load: " + error.GetType().Name);
                 RuntimeServices.Metadata.Clear();
                 RuntimeServices.EntityMaps.Clear();
+                SimulationClockSave.Store.Clear();
             }
         }
 
@@ -182,13 +186,14 @@ namespace CsmForge.Runtime.Cities1
             {
                 serializableData.SaveData(MetadataDataId, RuntimeServices.Metadata.EncodeCurrent(identity));
                 serializableData.SaveData(EntityMapDataId, RuntimeServices.EntityMaps.EncodeCurrent());
+                serializableData.SaveData(ClockDataId, SimulationClockSave.Store.EncodeCurrent());
                 RuntimeServices.Events.Record(RuntimeEventCode.SaveMetadataSaved, identity.Generation, null);
             }
             catch (Exception error)
             {
                 RuntimeServices.Events.Record(RuntimeEventCode.Error, identity.Generation,
                     "forge-save: " + error.GetType().Name);
-                RuntimeServices.Lifecycle.Fence("Forge save metadata or entity-map save failed");
+                RuntimeServices.Lifecycle.Fence("Forge save metadata, entity-map, or clock save failed");
             }
         }
 

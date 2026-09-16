@@ -82,13 +82,6 @@ foreach ($name in $forbidden) {
     }
 }
 
-$manifest = @()
-Get-ChildItem -LiteralPath $stage -File | Sort-Object Name | ForEach-Object {
-    $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
-    $manifest += ('{0}  {1}' -f $hash.Hash.ToLowerInvariant(), $_.Name)
-}
-$manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding UTF8
-
 $notice = @'
 CSM-Forge V3 minimum-playable Alpha
 
@@ -101,6 +94,11 @@ Windows install target:
 
 Copy the CONTENTS of this package's CSM-Forge folder so that CSM.Forge.Runtime.Cities1.dll is directly inside that directory. Enable CSM-Forge and CitiesHarmony in Content Manager, then restart the game.
 
+Before testing on each machine:
+1. Run VERIFY-ALPHA-INSTALL.ps1 from the installed CSM-Forge directory.
+2. Confirm it reports PASS.
+3. Confirm source_commit and manifest_sha256 are identical on every Host/Client machine.
+
 Minimum-playable Alpha scope:
 - supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand and weather authority;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
@@ -110,17 +108,38 @@ Minimum-playable Alpha scope:
 
 First two-machine test:
 1. Back up the Host city and install the exact same Alpha ZIP + CitiesHarmony on both machines.
-2. Enter a city on both machines. Host opens CSM-Forge settings and chooses Host current save.
-3. Client enters Host IPv4, same UDP port and temporary room key, then chooses Join Host snapshot.
-4. Wait until Client status is ClientLive before editing.
-5. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
-6. Do NOT use Tree/Prop/Terrain tools in this Alpha; they are fail-closed intentionally.
-7. Test a second client join/rejoin while the first client and Host remain live.
-8. If a Forge projection-drift warning appears, preserve the game log and note the action immediately before it.
+2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
+3. Enter a city on both machines. Host opens CSM-Forge settings and chooses Host current save.
+4. Client enters Host IPv4, same UDP port and temporary room key, then chooses Join Host snapshot.
+5. Wait until Client status is ClientLive before editing.
+6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
+7. Do NOT use Tree/Prop/Terrain tools in this Alpha; they are fail-closed intentionally.
+8. Test a second client join/rejoin while the first client and Host remain live.
+9. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city.
+10. Run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine and keep the generated ZIPs together with the action that immediately preceded the failure.
 
 A successful build proves compilation/package integrity, not multi-hour gameplay acceptance. Keep using backed-up saves until the E4 multiplayer gates pass.
 '@
 $notice | Set-Content -LiteralPath (Join-Path $stage 'README-DEV.txt') -Encoding UTF8
+
+$packagedTools = @(
+    @('scripts/verify-alpha-install.ps1', 'VERIFY-ALPHA-INSTALL.ps1'),
+    @('scripts/collect-alpha-diagnostics.ps1', 'COLLECT-ALPHA-DIAGNOSTICS.ps1')
+)
+foreach ($tool in $packagedTools) {
+    $source = Join-Path $repo $tool[0]
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        throw "Required Alpha support script is missing: $source"
+    }
+    Copy-Item -LiteralPath $source -Destination (Join-Path $stage $tool[1])
+}
+
+$manifest = @()
+Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {
+    $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256
+    $manifest += ('{0}  {1}' -f $hash.Hash.ToLowerInvariant(), $_.Name)
+}
+$manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding ascii
 
 if (-not $NoZip) {
     $zip = Join-Path $OutputPath 'CSM-Forge-runtime.zip'

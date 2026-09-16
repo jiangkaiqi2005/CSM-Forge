@@ -29,6 +29,7 @@ namespace CsmForge.Runtime.Cities1
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
         {
             ClearDistrictClientPending();
+            SimulationClockSave.Store.ApplyPending(identity);
             clientWater = new WaterBudgetReplicaDomain(identity);
             clientDemand = new DemandReplicaDomain(identity);
             clientTaxes = new TaxReplicaDomain(identity);

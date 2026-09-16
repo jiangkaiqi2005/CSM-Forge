@@ -172,4 +172,72 @@ namespace CsmForge.Runtime.Cities1
             return false;
         }
     }
+
+    internal static class DistrictPolicyPatchHelper
+    {
+        public static bool District(DistrictPolicies.Policies policy, byte native, bool enabled)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading)
+                return true;
+            if (role != CitiesRuntimeRole.HostLive && role != CitiesRuntimeRole.ClientReplicaLive) return false;
+            EntityIdentityV2 district;
+            bool resolved = role == CitiesRuntimeRole.HostLive
+                ? RuntimeServices.Multiplayer.TryResolveHostDistrict(native, out district)
+                : RuntimeServices.Multiplayer.TryResolveClientDistrict(native, out district);
+            if (!resolved || !RuntimeServices.Multiplayer.TryQueueDistrictPolicy(
+                new DistrictPolicyIntentV2(district, (int)policy, enabled)))
+                RuntimeServices.Lifecycle.Fence("District policy could not be routed through Host authority");
+            return false;
+        }
+
+        public static bool City(DistrictPolicies.Policies policy, bool enabled)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading)
+                return true;
+            if (role != CitiesRuntimeRole.HostLive && role != CitiesRuntimeRole.ClientReplicaLive) return false;
+            if (!RuntimeServices.Multiplayer.TryQueueDistrictPolicy(DistrictPolicyIntentV2.City((int)policy, enabled)))
+                RuntimeServices.Lifecycle.Fence("City policy could not be routed through Host authority");
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(DistrictManager), "SetDistrictPolicy")]
+    internal static class DistrictSetPolicyAuthorityPatch
+    {
+        public static bool Prefix(DistrictPolicies.Policies policy, byte district)
+        {
+            return DistrictPolicyPatchHelper.District(policy, district, true);
+        }
+    }
+
+    [HarmonyPatch(typeof(DistrictManager), "UnsetDistrictPolicy")]
+    internal static class DistrictUnsetPolicyAuthorityPatch
+    {
+        public static bool Prefix(DistrictPolicies.Policies policy, byte district)
+        {
+            return DistrictPolicyPatchHelper.District(policy, district, false);
+        }
+    }
+
+    [HarmonyPatch(typeof(DistrictManager), "SetCityPolicy")]
+    internal static class DistrictSetCityPolicyAuthorityPatch
+    {
+        public static bool Prefix(DistrictPolicies.Policies policy)
+        {
+            return DistrictPolicyPatchHelper.City(policy, true);
+        }
+    }
+
+    [HarmonyPatch(typeof(DistrictManager), "UnsetCityPolicy")]
+    internal static class DistrictUnsetCityPolicyAuthorityPatch
+    {
+        public static bool Prefix(DistrictPolicies.Policies policy)
+        {
+            return DistrictPolicyPatchHelper.City(policy, false);
+        }
+    }
 }

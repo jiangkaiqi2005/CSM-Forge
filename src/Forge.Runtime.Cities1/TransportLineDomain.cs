@@ -11,7 +11,9 @@ namespace CsmForge.Runtime.Cities1
         public static bool Live(ushort lineId)
         {
             if (lineId == 0 || TransportManager.instance == null) return false;
-            return (TransportManager.instance.m_lines.m_buffer[lineId].m_flags & TransportLine.Flags.Created) != TransportLine.Flags.None;
+            TransportLine.Flags flags = TransportManager.instance.m_lines.m_buffer[lineId].m_flags;
+            return (flags & TransportLine.Flags.Created) != TransportLine.Flags.None &&
+                (flags & TransportLine.Flags.Temporary) == TransportLine.Flags.None;
         }
 
         public static TransportInfo ResolvePrefab(string key)
@@ -30,8 +32,20 @@ namespace CsmForge.Runtime.Cities1
             Color32 color = line.m_color;
             bool day = (line.m_flags & TransportLine.Flags.DisabledDay) == TransportLine.Flags.None;
             bool night = (line.m_flags & TransportLine.Flags.DisabledNight) == TransportLine.Flags.None;
+            bool complete = (line.m_flags & TransportLine.Flags.Complete) != TransportLine.Flags.None;
+            int count = line.CountStops(lineId);
+            if (count < 0 || count > 512) throw new InvalidOperationException("Transport line stop count exceeds Forge bounds.");
+            List<TransportStopV2> stops = new List<TransportStopV2>(count);
+            ushort node = line.m_stops;
+            for (int i = 0; i < count; i++)
+            {
+                if (node == 0) throw new InvalidOperationException("Transport line stop chain ended early.");
+                Vector3 position = NetManager.instance.m_nodes.m_buffer[node].m_position;
+                stops.Add(new TransportStopV2(position.x, position.y, position.z, false));
+                node = TransportLine.GetNextStop(node);
+            }
             return new TransportLineStateV2(entity, info.name, color.r, color.g, color.b, color.a,
-                line.m_budget, line.m_ticketPrice, day, night);
+                line.m_budget, line.m_ticketPrice, day, night, complete, stops.ToArray());
         }
 
         public static void ApplyProperties(LoadIdentity load, ushort lineId, TransportLineIntentV2 value)
@@ -50,6 +64,30 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public static bool ApplyRouteIntent(LoadIdentity load, ushort lineId, TransportLineIntentV2 value)
+        {
+            if (!RuntimeServices.Lifecycle.IsCurrent(load) || !Live(lineId)) return false;
+            TransportManager manager = TransportManager.instance; bool result = false;
+            using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id))
+            {
+                if (value.Kind == TransportLineIntentKindV2.AddStop)
+                {
+                    Vector3 position = new Vector3(value.Stop.X, value.Stop.Y, value.Stop.Z);
+                    result = manager.m_lines.m_buffer[lineId].AddStop(lineId, value.StopIndex, position, value.Stop.FixedPlatform);
+                }
+                else if (value.Kind == TransportLineIntentKindV2.RemoveStop)
+                    result = manager.m_lines.m_buffer[lineId].RemoveStop(lineId, value.StopIndex);
+                else if (value.Kind == TransportLineIntentKindV2.MoveStop)
+                {
+                    Vector3 oldPosition;
+                    Vector3 position = new Vector3(value.Stop.X, value.Stop.Y, value.Stop.Z);
+                    result = manager.m_lines.m_buffer[lineId].MoveStop(lineId, value.StopIndex, position, value.Stop.FixedPlatform, out oldPosition);
+                }
+                if (result) manager.UpdateLine(lineId);
+            }
+            return result;
+        }
+
         public static ushort CreateReplica(LoadIdentity load, TransportLineStateV2 state)
         {
             TransportManager manager = TransportManager.instance; SimulationManager simulation = SimulationManager.instance;
@@ -58,13 +96,46 @@ namespace CsmForge.Runtime.Cities1
             using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id))
             {
                 if (!manager.CreateLine(out lineId, ref random, info, true)) throw new InvalidOperationException("CS1 rejected replica line creation.");
-                TransportLine line = manager.m_lines.m_buffer[lineId];
-                line.m_color = new Color32(state.Red, state.Green, state.Blue, state.Alpha);
-                line.m_flags |= TransportLine.Flags.CustomColor;
-                line.m_budget = state.Budget; line.m_ticketPrice = state.TicketPrice;
-                line.SetActive(state.Day, state.Night); manager.m_lines.m_buffer[lineId] = line;
             }
+            ApplyState(load, lineId, state);
             return lineId;
+        }
+
+        public static void ApplyState(LoadIdentity load, ushort lineId, TransportLineStateV2 state)
+        {
+            TransportLineIntentV2 properties = new TransportLineIntentV2(TransportLineIntentKindV2.SetProperties, state.Entity,
+                state.Red, state.Green, state.Blue, state.Alpha, state.Budget, state.TicketPrice, state.Day, state.Night);
+            ApplyProperties(load, lineId, properties);
+            RebuildRoute(load, lineId, state);
+        }
+
+        private static void RebuildRoute(LoadIdentity load, ushort lineId, TransportLineStateV2 state)
+        {
+            TransportManager manager = TransportManager.instance;
+            using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id))
+            {
+                int guard = 0;
+                while (manager.m_lines.m_buffer[lineId].m_stops != 0 && guard++ < 600)
+                {
+                    if (!manager.m_lines.m_buffer[lineId].RemoveStop(lineId, 0))
+                        throw new InvalidOperationException("Could not clear replica transport route.");
+                }
+                if (manager.m_lines.m_buffer[lineId].m_stops != 0)
+                    throw new InvalidOperationException("Replica transport route clear guard exhausted.");
+                for (int i = 0; i < state.Stops.Length; i++)
+                {
+                    TransportStopV2 stop = state.Stops[i]; Vector3 pos = new Vector3(stop.X, stop.Y, stop.Z);
+                    if (!manager.m_lines.m_buffer[lineId].AddStop(lineId, i, pos, stop.FixedPlatform))
+                        throw new InvalidOperationException("Could not project transport stop " + i + ".");
+                }
+                if (state.Complete && state.Stops.Length != 0)
+                {
+                    TransportStopV2 first = state.Stops[0];
+                    if (!manager.m_lines.m_buffer[lineId].AddStop(lineId, -1, new Vector3(first.X, first.Y, first.Z), first.FixedPlatform))
+                        throw new InvalidOperationException("Could not close replica transport route.");
+                }
+                manager.UpdateLine(lineId);
+            }
         }
 
         public static void Release(LoadIdentity load, ushort lineId)
@@ -76,9 +147,16 @@ namespace CsmForge.Runtime.Cities1
 
         public static bool Equivalent(TransportLineStateV2 a, TransportLineStateV2 b)
         {
-            return a != null && b != null && a.Entity.Equals(b.Entity) && a.PrefabKey == b.PrefabKey &&
-                a.Red == b.Red && a.Green == b.Green && a.Blue == b.Blue && a.Alpha == b.Alpha &&
-                a.Budget == b.Budget && a.TicketPrice == b.TicketPrice && a.Day == b.Day && a.Night == b.Night;
+            if (a == null || b == null || !a.Entity.Equals(b.Entity) || a.PrefabKey != b.PrefabKey ||
+                a.Red != b.Red || a.Green != b.Green || a.Blue != b.Blue || a.Alpha != b.Alpha ||
+                a.Budget != b.Budget || a.TicketPrice != b.TicketPrice || a.Day != b.Day || a.Night != b.Night ||
+                a.Complete != b.Complete || a.Stops.Length != b.Stops.Length) return false;
+            for (int i = 0; i < a.Stops.Length; i++)
+            {
+                TransportStopV2 x = a.Stops[i], y = b.Stops[i];
+                if (x.X != y.X || x.Y != y.Y || x.Z != y.Z || x.FixedPlatform != y.FixedPlatform) return false;
+            }
+            return true;
         }
     }
 
@@ -185,16 +263,18 @@ namespace CsmForge.Runtime.Cities1
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return DomainExecutionV2.Rejected();
             TransportLineIntentV2 intent; try { intent = TransportLineDomainCodecV2.DecodeIntent(payload); } catch { return DomainExecutionV2.Rejected(); }
             uint native; if (!Ids.TryGetNative(intent.Target, out native) || native == 0 || native > ushort.MaxValue) return DomainExecutionV2.Rejected();
+            ushort lineId = (ushort)native;
             if (intent.Kind == TransportLineIntentKindV2.Release)
             {
-                TransportLineGameAccess.Release(Load, (ushort)native);
+                TransportLineGameAccess.Release(Load, lineId);
                 if (!Ids.Retire(intent.Target)) throw new InvalidOperationException("Transport identity retirement failed.");
                 RefreshCommitted();
                 return DomainExecutionV2.Success(TransportLineDomainCodecV2.EncodeMutation(
                     new TransportLineMutationV2(new TransportLineStateV2[0], new[] { intent.Target })), StateRoot);
             }
-            TransportLineGameAccess.ApplyProperties(Load, (ushort)native, intent);
-            TransportLineStateV2 actual = TransportLineGameAccess.Capture(intent.Target, (ushort)native);
+            if (intent.Kind == TransportLineIntentKindV2.SetProperties) TransportLineGameAccess.ApplyProperties(Load, lineId, intent);
+            else if (!TransportLineGameAccess.ApplyRouteIntent(Load, lineId, intent)) return DomainExecutionV2.Rejected();
+            TransportLineStateV2 actual = TransportLineGameAccess.Capture(intent.Target, lineId);
             RefreshCommitted();
             return DomainExecutionV2.Success(TransportLineDomainCodecV2.EncodeMutation(
                 new TransportLineMutationV2(new[] { actual }, new EntityIdentityV2[0])), StateRoot);
@@ -234,12 +314,7 @@ namespace CsmForge.Runtime.Cities1
                 {
                     ushort created = TransportLineGameAccess.CreateReplica(Load, state); Ids.BindKnown(state.Entity, created); native = created;
                 }
-                else
-                {
-                    TransportLineIntentV2 properties = new TransportLineIntentV2(TransportLineIntentKindV2.SetProperties, state.Entity,
-                        state.Red, state.Green, state.Blue, state.Alpha, state.Budget, state.TicketPrice, state.Day, state.Night);
-                    TransportLineGameAccess.ApplyProperties(Load, (ushort)native, properties);
-                }
+                else TransportLineGameAccess.ApplyState(Load, (ushort)native, state);
                 TransportLineStateV2 actual = TransportLineGameAccess.Capture(state.Entity, (ushort)native);
                 if (!TransportLineGameAccess.Equivalent(state, actual)) throw new InvalidOperationException("Replica transport projection mismatch.");
             }

@@ -116,6 +116,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.PollObservedHostWeather();
                 RuntimeServices.Multiplayer.RestoreClientWeatherTargets();
+                RuntimeServices.Multiplayer.AuditClientProjection();
                 RuntimeServices.Multiplayer.AfterSimulationTick();
                 RuntimeScopeGuard.EndOfSimulationTick(RuntimeServices.Lifecycle, RuntimeServices.Events);
             }

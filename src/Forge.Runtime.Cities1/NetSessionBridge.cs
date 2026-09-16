@@ -20,13 +20,15 @@ namespace CsmForge.Runtime.Cities1
             committedDemandRoot = hostDemand.StateRoot;
             hostTaxes = new TaxAuthorityDomain(identity);
             hostBudgets = new BudgetAuthorityDomain(identity);
+            hostCash = new EconomyCashAuthorityDomain(identity);
+            committedCashRoot = hostCash.StateRoot;
             hostBuildings = new BuildingAuthorityDomain(identity);
             hostNet = new NetAuthorityDomain(identity);
             hostZones = new ZoneAuthorityDomain(identity, hostNet);
             hostDistricts = new DistrictCompositeAuthorityDomain(identity);
             hostClock = new SimulationClockAuthorityDomain(identity);
             hostTransport = new TransportLineAuthorityDomain(identity);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport };
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -38,13 +40,14 @@ namespace CsmForge.Runtime.Cities1
             clientDemand = new DemandReplicaDomain(identity);
             clientTaxes = new TaxReplicaDomain(identity);
             clientBudgets = new BudgetReplicaDomain(identity);
+            clientCash = new EconomyCashReplicaDomain(identity);
             clientBuildings = new BuildingReplicaDomain(identity);
             clientNet = new NetReplicaDomain(identity);
             clientZones = new ZoneReplicaDomain(identity, clientNet);
             clientDistricts = new DistrictCompositeReplicaDomain(identity);
             clientClock = new SimulationClockReplicaDomain(identity);
             clientTransport = new TransportLineReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport };
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport };
         }
 
         internal bool IsHostNetAuthorityActive

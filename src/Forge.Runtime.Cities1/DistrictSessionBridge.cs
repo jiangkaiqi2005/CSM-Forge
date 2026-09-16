@@ -7,8 +7,8 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed partial class CitiesMultiplayerSessionV3
     {
-        private DistrictAuthorityDomain hostDistricts;
-        private DistrictReplicaDomain clientDistricts;
+        private DistrictCompositeAuthorityDomain hostDistricts;
+        private DistrictCompositeReplicaDomain clientDistricts;
         private readonly HashSet<byte> pendingLocalDistricts = new HashSet<byte>();
         private readonly Dictionary<ulong, byte> pendingDistrictByOperation = new Dictionary<ulong, byte>();
         private readonly Queue<byte> committedPendingDistricts = new Queue<byte>();
@@ -85,31 +85,50 @@ namespace CsmForge.Runtime.Cities1
             return RuntimeServices.Scheduler.QueueSimulation(identity, delegate { SubmitDistrictStyle(request); });
         }
 
+        internal bool TryQueueDistrictPolicy(DistrictPolicyIntentV2 value)
+        {
+            if (value == null || snapshotSave != null) return false;
+            LoadIdentity identity = load;
+            if (!identity.IsValid || !lifecycle.IsCurrent(identity)) return false;
+            return RuntimeServices.Scheduler.QueueSimulation(identity, delegate { SubmitDistrictPolicy(value); });
+        }
+
         private void SubmitDistrictStyle(DistrictStyleIntentV2 value)
         {
             if (snapshotSave != null || value == null) return;
+            SubmitDistrictPayload(DistrictStyleCodecV2.Encode(value), "district-style");
+        }
+
+        private void SubmitDistrictPolicy(DistrictPolicyIntentV2 value)
+        {
+            if (snapshotSave != null || value == null) return;
+            SubmitDistrictPayload(DistrictPolicyCodecV2.Encode(value), "district-policy");
+        }
+
+        private void SubmitDistrictPayload(byte[] payload, string label)
+        {
             if (mode == MultiplayerSessionMode.Hosting)
             {
                 if (authority == null || hostDistricts == null || hostLocalOperation == ulong.MaxValue)
-                { FenceSession("district-style-host-authority-unavailable"); return; }
+                { FenceSession(label + "-host-authority-unavailable"); return; }
                 hostLocalOperation++;
                 PlayerIntentV2 intent = new PlayerIntentV2(authority.Stamp, hostLocalMember, hostLocalOperation, 1,
-                    DistrictAuthorityDomain.Id, hostDistricts.StateRoot, DistrictStyleCodecV2.Encode(value));
+                    DistrictAuthorityDomain.Id, hostDistricts.StateRoot, payload);
                 AuthoritySubmitResultV2 result = authority.Submit(hostLocalBinding, intent);
                 if (result.Decision != AuthoritySubmitDecisionV2.Committed || result.Batch == null)
-                { FenceSession("host-district-style-rejected:" + result.Decision); return; }
+                { FenceSession("host-" + label + "-rejected:" + result.Decision); return; }
                 BroadcastBatch(result.Batch);
                 return;
             }
             if (mode == MultiplayerSessionMode.ClientLive)
             {
                 if (replica == null || clientDistricts == null || clientOperation == ulong.MaxValue)
-                { FenceSession("district-style-client-replica-unavailable"); return; }
+                { FenceSession(label + "-client-replica-unavailable"); return; }
                 clientOperation++;
                 PlayerIntentV2 intent = new PlayerIntentV2(replica.Stamp, clientMember, clientOperation, clientPermissionVersion,
-                    DistrictAuthorityDomain.Id, clientDistricts.StateRoot, DistrictStyleCodecV2.Encode(value));
+                    DistrictAuthorityDomain.Id, clientDistricts.StateRoot, payload);
                 SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
-                lock (gate) detail = "district-style-" + clientOperation + ":pending";
+                lock (gate) detail = label + "-" + clientOperation + ":pending";
             }
         }
 
@@ -144,11 +163,11 @@ namespace CsmForge.Runtime.Cities1
         {
             if (beforeRoot == null || mode != MultiplayerSessionMode.Hosting || hostDistricts == null ||
                 authority == null || snapshotSave != null) return;
-            DistrictMutationV2 mutation = hostDistricts.ObserveHostWorld();
-            if (mutation == null || mutation.Count == 0) return;
+            DistrictAuthorityEnvelopeV2 envelope = hostDistricts.ObserveHostWorld();
+            if (envelope == null) return;
             Hash256 after = hostDistricts.StateRoot;
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, DistrictAuthorityDomain.Id,
-                beforeRoot, after, DistrictDomainCodecV2.EncodeMutation(mutation));
+                beforeRoot, after, DistrictPolicyEnvelopeCodecV2.EncodeEnvelope(envelope));
             if (batch == null || authority.IsFenced)
             {
                 FenceSession("observed-district-change-could-not-commit");

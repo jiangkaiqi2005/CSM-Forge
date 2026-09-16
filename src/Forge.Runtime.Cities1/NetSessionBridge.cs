@@ -23,7 +23,7 @@ namespace CsmForge.Runtime.Cities1
             hostBuildings = new BuildingAuthorityDomain(identity);
             hostNet = new NetAuthorityDomain(identity);
             hostZones = new ZoneAuthorityDomain(identity, hostNet);
-            hostDistricts = new DistrictAuthorityDomain(identity);
+            hostDistricts = new DistrictCompositeAuthorityDomain(identity);
             hostClock = new SimulationClockAuthorityDomain(identity);
             hostTransport = new TransportLineAuthorityDomain(identity);
             return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport };
@@ -32,6 +32,7 @@ namespace CsmForge.Runtime.Cities1
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
         {
             ClearDistrictClientPending();
+            ClearTransportClientPending();
             SimulationClockSave.Store.ApplyPending(identity);
             clientWater = new WaterBudgetReplicaDomain(identity);
             clientDemand = new DemandReplicaDomain(identity);
@@ -40,7 +41,7 @@ namespace CsmForge.Runtime.Cities1
             clientBuildings = new BuildingReplicaDomain(identity);
             clientNet = new NetReplicaDomain(identity);
             clientZones = new ZoneReplicaDomain(identity, clientNet);
-            clientDistricts = new DistrictReplicaDomain(identity);
+            clientDistricts = new DistrictCompositeReplicaDomain(identity);
             clientClock = new SimulationClockReplicaDomain(identity);
             clientTransport = new TransportLineReplicaDomain(identity);
             return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport };

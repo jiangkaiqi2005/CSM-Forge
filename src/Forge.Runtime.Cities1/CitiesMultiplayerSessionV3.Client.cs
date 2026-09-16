@@ -95,6 +95,7 @@ namespace CsmForge.Runtime.Cities1
                 case MessageKindV2.IntentReceipt:
                     IntentReceiptV2 receipt = ControlMessagesV2.DecodeReceipt(frame.Payload);
                     HandleDistrictIntentReceipt(receipt);
+                    HandleTransportIntentReceipt(receipt);
                     lock (gate) detail = "intent-" + receipt.OperationCounter + ":" + receipt.Decision;
                     break;
                 default: throw new InvalidOperationException("Host message is not valid in the current Client path.");
@@ -109,14 +110,18 @@ namespace CsmForge.Runtime.Cities1
                 lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
                 RuntimeServices.EntityMaps.SuspendCurrent();
                 ClearDistrictClientPending();
+                ClearTransportClientPending();
                 replica = null;
                 clientWater = null;
                 clientDemand = null;
                 clientTaxes = null;
+                clientBudgets = null;
                 clientBuildings = null;
                 clientNet = null;
                 clientZones = null;
                 clientDistricts = null;
+                clientClock = null;
+                clientTransport = null;
             }
             if (clientSnapshot != null) clientSnapshot.Dispose();
             string path = Path.Combine(Path.GetTempPath(), "csm-forge-snapshot-" + offer.TransferId.ToString("N") + ".crp");

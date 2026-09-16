@@ -134,6 +134,17 @@ foreach ($tool in $packagedTools) {
     Copy-Item -LiteralPath $source -Destination (Join-Path $stage $tool[1])
 }
 
+foreach ($scriptName in @('VERIFY-ALPHA-INSTALL.ps1','COLLECT-ALPHA-DIAGNOSTICS.ps1')) {
+    $scriptPath = Join-Path $stage $scriptName
+    $tokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors) | Out-Null
+    if ($parseErrors.Count -gt 0) {
+        $messages = ($parseErrors | ForEach-Object { $_.Message }) -join '; '
+        throw "Packaged Alpha support script does not parse: $scriptName :: $messages"
+    }
+}
+
 $manifest = @()
 Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {
     $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256

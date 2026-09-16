@@ -155,8 +155,8 @@ namespace CsmForge.Runtime.Cities1
                 try { if (peer.SnapshotCursor != null) peer.SnapshotCursor.Dispose(); } catch { }
             try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; clientSnapshot = null; snapshotSave = null;
-            authority = null; replica = null; joins = null; hostWater = null; clientWater = null;
-            hostBuildings = null; clientBuildings = null;
+            authority = null; replica = null; joins = null;
+            ClearAllDomainReferences();
             hostPolicy = null; localManifest = null; publishedSnapshot = null;
             hostPeers.Clear(); memberGenerations.Clear(); clientManifestPages = null; clientOffer = null;
             clientCompatibilityAccepted = false; clientSessionReady = false; clientSequences = null;
@@ -365,7 +365,8 @@ namespace CsmForge.Runtime.Cities1
             try { if (client != null) client.Dispose(); } catch { }
             try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; authority = null; replica = null; joins = null;
-            hostWater = null; clientWater = null; hostBuildings = null; clientBuildings = null; hostPeers.Clear();
+            ClearAllDomainReferences();
+            hostPeers.Clear();
             lock (gate) { preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); mode = MultiplayerSessionMode.Faulted; detail = reason; }
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
         }

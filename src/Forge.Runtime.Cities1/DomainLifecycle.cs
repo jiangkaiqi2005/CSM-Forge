@@ -4,6 +4,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private void ClearClientDomainReferences()
         {
+            ClearClientProjectionAudit();
             ClearDistrictClientPending();
             ClearTransportClientPending();
             clientWater = null;

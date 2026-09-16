@@ -12,6 +12,8 @@ namespace CsmForge.Runtime.Cities1
         private ZoneReplicaDomain clientZones;
         private TransportLineAuthorityDomain hostTransport;
         private TransportLineReplicaDomain clientTransport;
+        private StableNameAuthorityDomain hostNames;
+        private StableNameReplicaDomain clientNames;
 
         private IAuthorityDomainV2[] CreateHostDomains(LoadIdentity identity)
         {
@@ -31,7 +33,8 @@ namespace CsmForge.Runtime.Cities1
             hostDistricts = new DistrictCompositeAuthorityDomain(identity);
             hostClock = new SimulationClockAuthorityDomain(identity);
             hostTransport = new TransportLineAuthorityDomain(identity);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport };
+            hostNames = new StableNameAuthorityDomain(identity);
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -52,7 +55,8 @@ namespace CsmForge.Runtime.Cities1
             clientDistricts = new DistrictCompositeReplicaDomain(identity);
             clientClock = new SimulationClockReplicaDomain(identity);
             clientTransport = new TransportLineReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport };
+            clientNames = new StableNameReplicaDomain(identity);
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames };
         }
 
         internal bool IsHostNetAuthorityActive

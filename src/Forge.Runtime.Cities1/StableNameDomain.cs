@@ -149,7 +149,7 @@ namespace CsmForge.Runtime.Cities1
         }
     }
 
-    public sealed class StableNameAuthorityDomain : StableNameDomainBase, IAuthorityDomainV2
+    internal sealed class StableNameAuthorityDomain : StableNameDomainBase, IAuthorityDomainV2
     {
         public const ushort Id = 8;
         public ushort DomainId { get { return Id; } }
@@ -172,7 +172,7 @@ namespace CsmForge.Runtime.Cities1
         }
     }
 
-    public sealed class StableNameReplicaDomain : StableNameDomainBase, IReplicaDomainV2
+    internal sealed class StableNameReplicaDomain : StableNameDomainBase, IReplicaDomainV2
     {
         public ushort DomainId { get { return StableNameAuthorityDomain.Id; } }
         public Hash256 StateRoot { get { return CurrentRoot; } }

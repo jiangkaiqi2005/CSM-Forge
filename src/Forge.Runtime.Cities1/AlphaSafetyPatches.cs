@@ -21,6 +21,15 @@ namespace CsmForge.Runtime.Cities1
             {
                 if (RuntimeScopeGuard.IsApplying) return false;
                 CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+                if (role == CitiesRuntimeRole.HostLive)
+                {
+                    // Supported Host Building/Net tools may legitimately clear trees/props as a
+                    // side effect. Their authoritative result remains Building/Net-owned; do not
+                    // let the Alpha safety layer break those already-supported operations.
+                    if (BuildingToolIntentScope.Active) return false;
+                    ToolController controller = ToolsModifierControl.toolController;
+                    if (controller != null && controller.CurrentTool is NetTool) return false;
+                }
                 return role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
                     role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientReplicaLive ||
                     role == CitiesRuntimeRole.ClientRecovering || role == CitiesRuntimeRole.WorldFenced;

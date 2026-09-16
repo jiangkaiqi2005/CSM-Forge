@@ -34,7 +34,8 @@ namespace CsmForge.Runtime.Cities1
             hostClock = new SimulationClockAuthorityDomain(identity);
             hostTransport = new TransportLineAuthorityDomain(identity);
             hostNames = new StableNameAuthorityDomain(identity);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames };
+            hostCityName = new CityNameAuthorityDomain(identity);
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames, hostCityName };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -56,7 +57,8 @@ namespace CsmForge.Runtime.Cities1
             clientClock = new SimulationClockReplicaDomain(identity);
             clientTransport = new TransportLineReplicaDomain(identity);
             clientNames = new StableNameReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames };
+            clientCityName = new CityNameReplicaDomain(identity);
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames, clientCityName };
         }
 
         internal bool IsHostNetAuthorityActive

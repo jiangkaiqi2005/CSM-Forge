@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: '8.0.x'
@@ -73,6 +74,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set up .NET SDK
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
@@ -110,13 +112,14 @@ jobs:
           $root = Join-Path $env:RUNNER_TEMP 'forge-runtime'
           $stage = Join-Path $root 'CSM-Forge'
           $zip = Join-Path $root 'CSM-Forge-runtime.zip'
+          $sourceCommit = (git rev-parse HEAD).Trim()
           $dlls = @(Get-ChildItem $stage -File -Filter '*.dll' | Sort-Object Name | ForEach-Object {
             [ordered]@{ name=$_.Name; bytes=$_.Length; sha256=(Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
           })
           [ordered]@{
             repository=$env:GITHUB_REPOSITORY
-            source_commit=$env:GITHUB_SHA
-            source_ref=$env:GITHUB_REF
+            source_commit=$sourceCommit
+            source_ref='${{ github.event.pull_request.head.ref || github.ref }}'
             run_url="$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
             built_at_utc=[DateTime]::UtcNow.ToString('o')
             target_framework='net35'
@@ -132,7 +135,7 @@ jobs:
       - name: Upload installable runtime and evidence
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
         with:
-          name: CSM-Forge-runtime-${{ github.sha }}
+          name: CSM-Forge-runtime-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip
             ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip.sha256

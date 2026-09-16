@@ -86,7 +86,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT.");
         }
     }
 
@@ -113,6 +113,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostTransportLines();
                 RuntimeServices.Multiplayer.PollObservedHostEconomyControl();
                 RuntimeServices.Multiplayer.PollObservedHostCash();
+                RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.AfterSimulationTick();
                 RuntimeScopeGuard.EndOfSimulationTick(RuntimeServices.Lifecycle, RuntimeServices.Events);
             }

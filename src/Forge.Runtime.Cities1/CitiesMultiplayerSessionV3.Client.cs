@@ -179,6 +179,7 @@ namespace CsmForge.Runtime.Cities1
             }
             if (decision != ReplicaDecisionV2.Applied && decision != ReplicaDecisionV2.Duplicate)
                 throw new InvalidOperationException("Replica rejected authority batch: " + decision);
+            if (decision == ReplicaDecisionV2.Applied) ObserveClientProjectionBatch(batch);
             AppliedAck ack = replica.CreateAppliedAck(clientBinding, 0);
             if (ack != null) SendClientFrame(MessageKindV2.AppliedAck, SessionMessagesV2.EncodeAppliedAck(ack));
         }
@@ -205,6 +206,7 @@ namespace CsmForge.Runtime.Cities1
                 throw new InvalidOperationException("Activation grant cannot be applied to the current replica state.");
             clientPermissionVersion = grant.PermissionVersion;
             lock (gate) { mode = MultiplayerSessionMode.ClientLive; detail = "live"; }
+            InitializeClientProjectionAudit();
             SendClientFrame(MessageKindV2.Activated,
                 JoinMessagesV2.EncodeActivated(new ActivatedV2(grant.JoinId, grant.JoinGeneration, grant.GrantId, grant.Revision)));
         }

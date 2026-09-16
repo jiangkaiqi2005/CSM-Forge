@@ -5,9 +5,6 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed partial class CitiesMultiplayerSessionV3
     {
-        private StableNameAuthorityDomain hostNames;
-        private StableNameReplicaDomain clientNames;
-
         internal uint StableNameNativeUpperBound(StableNameTargetKindV2 kind)
         {
             if (kind == StableNameTargetKindV2.Building)

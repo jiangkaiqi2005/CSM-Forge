@@ -43,7 +43,7 @@ namespace CsmForge.Tests
             WeatherStateV2 newTarget = new WeatherStateV2(
                 0.65f, 0.8f, 0.55f, 0.6f, 0.45f, 0.5f,
                 0.35f, 0.4f, 0.25f, 0.3f, 0.15f, 0.2f);
-            Assert.False(first.TargetRoot.Equals(newTarget.TargetRoot));
+            Assert.True(!first.TargetRoot.Equals(newTarget.TargetRoot));
         }
 
         [Case]

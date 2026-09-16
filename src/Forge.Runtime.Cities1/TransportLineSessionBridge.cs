@@ -19,6 +19,11 @@ namespace CsmForge.Runtime.Cities1
             return pendingLocalTransportLines.Add(nativeId);
         }
 
+        internal bool IsEditablePendingTransportLine(ushort nativeId)
+        {
+            return nativeId != 0 && pendingLocalTransportLines.Contains(nativeId);
+        }
+
         internal bool IsPendingLocalTransportLine(ushort nativeId)
         {
             if (nativeId == 0) return false;

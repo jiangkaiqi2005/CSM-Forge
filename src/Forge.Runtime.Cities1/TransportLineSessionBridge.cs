@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CsmForge.Core;
 using CsmForge.Protocol;
 
@@ -6,6 +7,75 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed partial class CitiesMultiplayerSessionV3
     {
+        private readonly HashSet<ushort> pendingLocalTransportLines = new HashSet<ushort>();
+        private readonly Dictionary<ulong, ushort> pendingTransportByOperation = new Dictionary<ulong, ushort>();
+        private readonly Queue<ushort> committedPendingTransportLines = new Queue<ushort>();
+
+        internal bool RegisterPendingLocalTransportLine(ushort nativeId)
+        {
+            if (nativeId == 0 || mode != MultiplayerSessionMode.ClientLive || clientTransport == null) return false;
+            EntityIdentityV2 existing;
+            if (clientTransport.TryResolveEntity(nativeId, out existing)) return false;
+            return pendingLocalTransportLines.Add(nativeId);
+        }
+
+        internal bool IsPendingLocalTransportLine(ushort nativeId)
+        {
+            if (nativeId == 0) return false;
+            if (pendingLocalTransportLines.Contains(nativeId)) return true;
+            foreach (ushort value in pendingTransportByOperation.Values) if (value == nativeId) return true;
+            foreach (ushort value in committedPendingTransportLines) if (value == nativeId) return true;
+            return false;
+        }
+
+        internal bool TrySubmitPendingTransportLine(ushort nativeId)
+        {
+            if (mode != MultiplayerSessionMode.ClientLive || clientTransport == null || replica == null ||
+                snapshotSave != null || clientOperation == ulong.MaxValue || !pendingLocalTransportLines.Contains(nativeId)) return false;
+            TransportLineIntentV2 create;
+            try { create = TransportLineGameAccess.CaptureCreateIntent(nativeId); }
+            catch { return false; }
+            if (!create.Complete || create.Stops.Length < 2) return false;
+            clientOperation++;
+            pendingLocalTransportLines.Remove(nativeId);
+            pendingTransportByOperation.Add(clientOperation, nativeId);
+            PlayerIntentV2 intent = new PlayerIntentV2(replica.Stamp, clientMember, clientOperation, clientPermissionVersion,
+                TransportLineAuthorityDomain.Id, clientTransport.StateRoot, TransportLineDomainCodecV2.EncodeIntent(create));
+            SendClientFrame(MessageKindV2.Intent, SessionMessagesV2.EncodeIntent(intent));
+            lock (gate) detail = "transport-create-" + clientOperation + ":pending";
+            return true;
+        }
+
+        internal void HandleTransportIntentReceipt(IntentReceiptV2 receipt)
+        {
+            if (receipt == null) return;
+            ushort native;
+            if (!pendingTransportByOperation.TryGetValue(receipt.OperationCounter, out native)) return;
+            pendingTransportByOperation.Remove(receipt.OperationCounter);
+            if (receipt.Decision == AuthoritySubmitDecisionV2.Committed)
+            {
+                committedPendingTransportLines.Enqueue(native);
+                return;
+            }
+            try { TransportLineGameAccess.Release(load, native); }
+            catch { lifecycle.Fence("Rejected pending transport line could not be released"); }
+        }
+
+        internal bool TryTakeCommittedPendingTransportLine(out ushort native)
+        {
+            native = 0;
+            if (committedPendingTransportLines.Count == 0) return false;
+            native = committedPendingTransportLines.Dequeue();
+            return native != 0 && TransportLineGameAccess.Live(native);
+        }
+
+        internal void ClearTransportClientPending()
+        {
+            pendingLocalTransportLines.Clear();
+            pendingTransportByOperation.Clear();
+            committedPendingTransportLines.Clear();
+        }
+
         internal bool TryResolveClientTransportLine(ushort nativeId, out EntityIdentityV2 entity)
         {
             entity = default(EntityIdentityV2);

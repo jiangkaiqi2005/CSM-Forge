@@ -54,7 +54,7 @@ namespace CsmForge.Tests
             Assert.Equal(2, routeCopy.StopIndex);
             Assert.Equal(11f, routeCopy.Stop.Y);
             Assert.True(routeCopy.Stop.FixedPlatform);
-            Assert.Throws<InvalidDataException>(delegate { TransportLineDomainCodecV2.DecodeIntent(new byte[1]); });
+            Assert.Throws<EndOfStreamException>(delegate { TransportLineDomainCodecV2.DecodeIntent(new byte[1]); });
         }
     }
 }

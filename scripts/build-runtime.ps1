@@ -102,7 +102,7 @@ Before testing on each machine:
 Minimum-playable Alpha scope:
 - supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand and weather authority;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
-- diagnostic-only projection audit logs local drift without automatically kicking/resyncing a client;
+- diagnostic-only projection audit logs projection-drift/local drift without automatically kicking/resyncing a client;
 - temporarily blocked in multiplayer for safety: direct Tree/Prop create/move/delete and Terrain brush writes;
 - not yet claimed complete: Terrain authority, Tree/Prop authority, Event/Campus/DLC-specific systems, full Citizen/Vehicle/Path authority, production-authenticated Internet transport.
 

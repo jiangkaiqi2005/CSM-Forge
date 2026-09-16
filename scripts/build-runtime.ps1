@@ -90,18 +90,35 @@ Get-ChildItem -LiteralPath $stage -File | Sort-Object Name | ForEach-Object {
 $manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding UTF8
 
 $notice = @'
-CSM-Forge V3 development package
+CSM-Forge V3 minimum-playable Alpha
 
 This package intentionally does NOT contain Cities: Skylines, Unity, Steam, or other game-owned assemblies.
 It also does not bundle Harmony's implementation DLL; install/enable CitiesHarmony separately.
-It currently uses the development LiteNetLib room-key transport. This is suitable for controlled LAN/development testing, not a claim of production-authenticated Internet transport.
+It currently uses the development LiteNetLib room-key transport. Use it for controlled LAN/development testing, not as a production-authenticated Internet transport.
 
 Windows install target:
 %LOCALAPPDATA%\Colossal Order\Cities_Skylines\Addons\Mods\CSM-Forge
 
 Copy the CONTENTS of this package's CSM-Forge folder so that CSM.Forge.Runtime.Cities1.dll is directly inside that directory. Enable CSM-Forge and CitiesHarmony in Content Manager, then restart the game.
 
-Install/test only against a backed-up city. The repository acceptance gates remain authoritative; a successful build is not gameplay acceptance.
+Minimum-playable Alpha scope:
+- supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand and weather authority;
+- recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
+- diagnostic-only projection audit logs local drift without automatically kicking/resyncing a client;
+- temporarily blocked in multiplayer for safety: direct Tree/Prop create/move/delete and Terrain brush writes;
+- not yet claimed complete: Terrain authority, Tree/Prop authority, Event/Campus/DLC-specific systems, full Citizen/Vehicle/Path authority, production-authenticated Internet transport.
+
+First two-machine test:
+1. Back up the Host city and install the exact same Alpha ZIP + CitiesHarmony on both machines.
+2. Enter a city on both machines. Host opens CSM-Forge settings and chooses Host current save.
+3. Client enters Host IPv4, same UDP port and temporary room key, then chooses Join Host snapshot.
+4. Wait until Client status is ClientLive before editing.
+5. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
+6. Do NOT use Tree/Prop/Terrain tools in this Alpha; they are fail-closed intentionally.
+7. Test a second client join/rejoin while the first client and Host remain live.
+8. If a Forge projection-drift warning appears, preserve the game log and note the action immediately before it.
+
+A successful build proves compilation/package integrity, not multi-hour gameplay acceptance. Keep using backed-up saves until the E4 multiplayer gates pass.
 '@
 $notice | Set-Content -LiteralPath (Join-Path $stage 'README-DEV.txt') -Encoding UTF8
 

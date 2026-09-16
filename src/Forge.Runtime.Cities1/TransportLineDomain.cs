@@ -23,16 +23,10 @@ namespace CsmForge.Runtime.Cities1
             return info;
         }
 
-        public static TransportLineStateV2 Capture(EntityIdentityV2 entity, ushort lineId)
+        private static TransportStopV2[] CaptureStops(ushort lineId, out bool complete)
         {
-            if (!entity.IsValid || !Live(lineId)) throw new InvalidOperationException("Transport line is not live.");
             TransportLine line = TransportManager.instance.m_lines.m_buffer[lineId];
-            TransportInfo info = line.Info;
-            if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Transport line prefab is unavailable.");
-            Color32 color = line.m_color;
-            bool day = (line.m_flags & TransportLine.Flags.DisabledDay) == TransportLine.Flags.None;
-            bool night = (line.m_flags & TransportLine.Flags.DisabledNight) == TransportLine.Flags.None;
-            bool complete = (line.m_flags & TransportLine.Flags.Complete) != TransportLine.Flags.None;
+            complete = (line.m_flags & TransportLine.Flags.Complete) != TransportLine.Flags.None;
             int count = line.CountStops(lineId);
             if (count < 0 || count > 512) throw new InvalidOperationException("Transport line stop count exceeds Forge bounds.");
             List<TransportStopV2> stops = new List<TransportStopV2>(count);
@@ -44,8 +38,35 @@ namespace CsmForge.Runtime.Cities1
                 stops.Add(new TransportStopV2(position.x, position.y, position.z, false));
                 node = TransportLine.GetNextStop(node);
             }
+            return stops.ToArray();
+        }
+
+        public static TransportLineStateV2 Capture(EntityIdentityV2 entity, ushort lineId)
+        {
+            if (!entity.IsValid || !Live(lineId)) throw new InvalidOperationException("Transport line is not live.");
+            TransportLine line = TransportManager.instance.m_lines.m_buffer[lineId];
+            TransportInfo info = line.Info;
+            if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Transport line prefab is unavailable.");
+            Color32 color = line.m_color;
+            bool day = (line.m_flags & TransportLine.Flags.DisabledDay) == TransportLine.Flags.None;
+            bool night = (line.m_flags & TransportLine.Flags.DisabledNight) == TransportLine.Flags.None;
+            bool complete; TransportStopV2[] stops = CaptureStops(lineId, out complete);
             return new TransportLineStateV2(entity, info.name, color.r, color.g, color.b, color.a,
-                line.m_budget, line.m_ticketPrice, day, night, complete, stops.ToArray());
+                line.m_budget, line.m_ticketPrice, day, night, complete, stops);
+        }
+
+        public static TransportLineIntentV2 CaptureCreateIntent(ushort lineId)
+        {
+            if (!Live(lineId)) throw new InvalidOperationException("Pending transport line is not live.");
+            TransportLine line = TransportManager.instance.m_lines.m_buffer[lineId];
+            TransportInfo info = line.Info;
+            if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Pending transport prefab is unavailable.");
+            Color32 color = line.m_color;
+            bool day = (line.m_flags & TransportLine.Flags.DisabledDay) == TransportLine.Flags.None;
+            bool night = (line.m_flags & TransportLine.Flags.DisabledNight) == TransportLine.Flags.None;
+            bool complete; TransportStopV2[] stops = CaptureStops(lineId, out complete);
+            return TransportLineIntentV2.CreateLine(info.name, color.r, color.g, color.b, color.a,
+                line.m_budget, line.m_ticketPrice, day, night, complete, stops);
         }
 
         public static void ApplyProperties(LoadIdentity load, ushort lineId, TransportLineIntentV2 value)
@@ -88,6 +109,32 @@ namespace CsmForge.Runtime.Cities1
             return result;
         }
 
+        public static ushort CreateAuthority(LoadIdentity load, TransportLineIntentV2 intent)
+        {
+            if (intent == null || intent.Kind != TransportLineIntentKindV2.Create) throw new ArgumentException("Expected transport create intent.", "intent");
+            TransportManager manager = TransportManager.instance; SimulationManager simulation = SimulationManager.instance;
+            if (manager == null || simulation == null) throw new InvalidOperationException("Transport services are unavailable.");
+            TransportInfo info = ResolvePrefab(intent.PrefabKey); ushort lineId;
+            using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id))
+            {
+                if (!manager.CreateLine(out lineId, ref simulation.m_randomizer, info, true)) return 0;
+            }
+            try
+            {
+                EntityIdentityV2 temporary = new EntityIdentityV2(ulong.MaxValue, 1);
+                TransportLineStateV2 desired = new TransportLineStateV2(temporary, intent.PrefabKey,
+                    intent.Red, intent.Green, intent.Blue, intent.Alpha, intent.Budget, intent.TicketPrice,
+                    intent.Day, intent.Night, intent.Complete, intent.Stops);
+                ApplyRawState(load, lineId, desired);
+                return lineId;
+            }
+            catch
+            {
+                try { using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id)) manager.ReleaseLine(lineId); } catch { }
+                throw;
+            }
+        }
+
         public static ushort CreateReplica(LoadIdentity load, TransportLineStateV2 state)
         {
             TransportManager manager = TransportManager.instance; SimulationManager simulation = SimulationManager.instance;
@@ -97,31 +144,35 @@ namespace CsmForge.Runtime.Cities1
             {
                 if (!manager.CreateLine(out lineId, ref random, info, true)) throw new InvalidOperationException("CS1 rejected replica line creation.");
             }
-            ApplyState(load, lineId, state);
+            ApplyRawState(load, lineId, state);
             return lineId;
         }
 
         public static void ApplyState(LoadIdentity load, ushort lineId, TransportLineStateV2 state)
         {
-            TransportLineIntentV2 properties = new TransportLineIntentV2(TransportLineIntentKindV2.SetProperties, state.Entity,
-                state.Red, state.Green, state.Blue, state.Alpha, state.Budget, state.TicketPrice, state.Day, state.Night);
-            ApplyProperties(load, lineId, properties);
-            RebuildRoute(load, lineId, state);
+            ApplyRawState(load, lineId, state);
         }
 
-        private static void RebuildRoute(LoadIdentity load, ushort lineId, TransportLineStateV2 state)
+        private static void ApplyRawState(LoadIdentity load, ushort lineId, TransportLineStateV2 state)
         {
+            if (!RuntimeServices.Lifecycle.IsCurrent(load) || !Live(lineId)) throw new InvalidOperationException("Transport state apply is stale or missing.");
             TransportManager manager = TransportManager.instance;
             using (RuntimeScopeGuard.EnterApply(load, TransportLineAuthorityDomain.Id))
             {
+                TransportLine line = manager.m_lines.m_buffer[lineId];
+                line.m_color = new Color32(state.Red, state.Green, state.Blue, state.Alpha);
+                line.m_flags |= TransportLine.Flags.CustomColor;
+                line.m_budget = state.Budget; line.m_ticketPrice = state.TicketPrice;
+                line.SetActive(state.Day, state.Night); manager.m_lines.m_buffer[lineId] = line;
+
                 int guard = 0;
                 while (manager.m_lines.m_buffer[lineId].m_stops != 0 && guard++ < 600)
                 {
                     if (!manager.m_lines.m_buffer[lineId].RemoveStop(lineId, 0))
-                        throw new InvalidOperationException("Could not clear replica transport route.");
+                        throw new InvalidOperationException("Could not clear transport route.");
                 }
                 if (manager.m_lines.m_buffer[lineId].m_stops != 0)
-                    throw new InvalidOperationException("Replica transport route clear guard exhausted.");
+                    throw new InvalidOperationException("Transport route clear guard exhausted.");
                 for (int i = 0; i < state.Stops.Length; i++)
                 {
                     TransportStopV2 stop = state.Stops[i]; Vector3 pos = new Vector3(stop.X, stop.Y, stop.Z);
@@ -132,7 +183,7 @@ namespace CsmForge.Runtime.Cities1
                 {
                     TransportStopV2 first = state.Stops[0];
                     if (!manager.m_lines.m_buffer[lineId].AddStop(lineId, -1, new Vector3(first.X, first.Y, first.Z), first.FixedPlatform))
-                        throw new InvalidOperationException("Could not close replica transport route.");
+                        throw new InvalidOperationException("Could not close transport route.");
                 }
                 manager.UpdateLine(lineId);
             }
@@ -223,6 +274,7 @@ namespace CsmForge.Runtime.Cities1
                 EntityIdentityV2 entity;
                 if (!Ids.TryGetIdentity(native, out entity))
                 {
+                    if (RuntimeServices.Multiplayer.IsPendingLocalTransportLine(native)) continue;
                     entity = Ids.Allocate(native); upserts.Add(TransportLineGameAccess.Capture(entity, native));
                 }
             }
@@ -262,6 +314,16 @@ namespace CsmForge.Runtime.Cities1
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return DomainExecutionV2.Rejected();
             TransportLineIntentV2 intent; try { intent = TransportLineDomainCodecV2.DecodeIntent(payload); } catch { return DomainExecutionV2.Rejected(); }
+            if (intent.Kind == TransportLineIntentKindV2.Create)
+            {
+                ushort created = TransportLineGameAccess.CreateAuthority(Load, intent);
+                if (created == 0) return DomainExecutionV2.Rejected();
+                EntityIdentityV2 entity = Ids.Allocate(created);
+                TransportLineStateV2 state = TransportLineGameAccess.Capture(entity, created);
+                RefreshCommitted();
+                return DomainExecutionV2.Success(TransportLineDomainCodecV2.EncodeMutation(
+                    new TransportLineMutationV2(new[] { state }, new EntityIdentityV2[0])), StateRoot);
+            }
             uint native; if (!Ids.TryGetNative(intent.Target, out native) || native == 0 || native > ushort.MaxValue) return DomainExecutionV2.Rejected();
             ushort lineId = (ushort)native;
             if (intent.Kind == TransportLineIntentKindV2.Release)
@@ -312,7 +374,15 @@ namespace CsmForge.Runtime.Cities1
                 TransportLineStateV2 state = mutation.Upserts[i]; uint native;
                 if (!Ids.TryGetNative(state.Entity, out native))
                 {
-                    ushort created = TransportLineGameAccess.CreateReplica(Load, state); Ids.BindKnown(state.Entity, created); native = created;
+                    ushort pending;
+                    if (RuntimeServices.Multiplayer.TryTakeCommittedPendingTransportLine(out pending))
+                    {
+                        Ids.BindKnown(state.Entity, pending); native = pending; TransportLineGameAccess.ApplyState(Load, pending, state);
+                    }
+                    else
+                    {
+                        ushort created = TransportLineGameAccess.CreateReplica(Load, state); Ids.BindKnown(state.Entity, created); native = created;
+                    }
                 }
                 else TransportLineGameAccess.ApplyState(Load, (ushort)native, state);
                 TransportLineStateV2 actual = TransportLineGameAccess.Capture(state.Entity, (ushort)native);

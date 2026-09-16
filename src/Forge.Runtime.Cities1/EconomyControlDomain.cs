@@ -258,14 +258,16 @@ namespace CsmForge.Runtime.Cities1
     {
         public const ushort Id = 6;
         private readonly LoadIdentity load;
+        private Hash256 committedRoot;
         public ushort DomainId { get { return Id; } }
         public Hash256 StateRoot { get { return EconomyControlGameAccess.Capture().Root; } }
+        internal Hash256 CommittedRoot { get { return committedRoot; } }
 
         public EconomyControlAuthorityDomain(LoadIdentity load)
         {
             if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
             this.load = load;
-            EconomyControlGameAccess.Capture();
+            committedRoot = EconomyControlGameAccess.Capture().Root;
         }
 
         public DomainExecutionV2 ExecutePlayer(byte[] payload)
@@ -280,7 +282,14 @@ namespace CsmForge.Runtime.Cities1
             try { actual = EconomyControlGameAccess.Execute(load, intent); }
             catch { return DomainExecutionV2.Rejected(); }
             if (actual.Root.Equals(before)) return DomainExecutionV2.Rejected();
+            committedRoot = actual.Root;
             return DomainExecutionV2.Success(EconomyControlCodecV2.EncodeState(actual), actual.Root);
+        }
+
+        internal void MarkObservedCommitted(Hash256 root)
+        {
+            if (root == null) throw new ArgumentNullException("root");
+            committedRoot = root;
         }
     }
 

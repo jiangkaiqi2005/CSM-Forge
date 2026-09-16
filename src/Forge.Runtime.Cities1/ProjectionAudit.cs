@@ -87,7 +87,7 @@ namespace CsmForge.Runtime.Cities1
 
             try
             {
-                Hash256 actual = domain.StateRoot;
+                Hash256 actual = CaptureActualProjectionRoot(domain);
                 if (actual == null || expected.Equals(actual)) return;
                 string detail = "diagnostic-only projection drift: domain=" + domain.DomainId +
                     ", revision=" + replica.Revision + ", expected=" + ShortHash(expected) + ", actual=" + ShortHash(actual);
@@ -99,6 +99,15 @@ namespace CsmForge.Runtime.Cities1
                 events.Record(RuntimeEventCode.Error, load.Generation,
                     "diagnostic-only projection audit failed: domain=" + domain.DomainId + ", error=" + error.GetType().Name);
             }
+        }
+
+        private static Hash256 CaptureActualProjectionRoot(IReplicaDomainV2 domain)
+        {
+            if (domain.DomainId == EconomyCashAuthorityDomain.Id)
+                return EconomyCashGameAccess.Capture().Root;
+            if (domain.DomainId == EconomyControlAuthorityDomain.Id)
+                return EconomyControlGameAccess.Capture().Root;
+            return domain.StateRoot;
         }
 
         private static string ShortHash(Hash256 value)

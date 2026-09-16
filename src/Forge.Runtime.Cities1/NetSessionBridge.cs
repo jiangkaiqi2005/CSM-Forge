@@ -22,7 +22,8 @@ namespace CsmForge.Runtime.Cities1
             hostNet = new NetAuthorityDomain(identity);
             hostZones = new ZoneAuthorityDomain(identity, hostNet);
             hostDistricts = new DistrictAuthorityDomain(identity);
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostBuildings, hostNet, hostZones, hostDistricts };
+            hostClock = new SimulationClockAuthorityDomain(identity);
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostBuildings, hostNet, hostZones, hostDistricts, hostClock };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -36,7 +37,8 @@ namespace CsmForge.Runtime.Cities1
             clientNet = new NetReplicaDomain(identity);
             clientZones = new ZoneReplicaDomain(identity, clientNet);
             clientDistricts = new DistrictReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientBuildings, clientNet, clientZones, clientDistricts };
+            clientClock = new SimulationClockReplicaDomain(identity);
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientBuildings, clientNet, clientZones, clientDistricts, clientClock };
         }
 
         internal bool IsHostNetAuthorityActive

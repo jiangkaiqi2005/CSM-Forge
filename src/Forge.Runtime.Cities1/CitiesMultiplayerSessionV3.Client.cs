@@ -109,19 +109,8 @@ namespace CsmForge.Runtime.Cities1
             {
                 lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
                 RuntimeServices.EntityMaps.SuspendCurrent();
-                ClearDistrictClientPending();
-                ClearTransportClientPending();
                 replica = null;
-                clientWater = null;
-                clientDemand = null;
-                clientTaxes = null;
-                clientBudgets = null;
-                clientBuildings = null;
-                clientNet = null;
-                clientZones = null;
-                clientDistricts = null;
-                clientClock = null;
-                clientTransport = null;
+                ClearClientDomainReferences();
             }
             if (clientSnapshot != null) clientSnapshot.Dispose();
             string path = Path.Combine(Path.GetTempPath(), "csm-forge-snapshot-" + offer.TransferId.ToString("N") + ".crp");

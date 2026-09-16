@@ -59,7 +59,7 @@ namespace CsmForge.Runtime.Cities1
 
     internal sealed class WeatherAuthorityDomain : IAuthorityDomainV2
     {
-        public const ushort Id = 10;
+        public const ushort Id = 90;
         private readonly LoadIdentity load;
         public ushort DomainId { get { return Id; } }
         public Hash256 StateRoot { get { return WeatherGameAccess.Capture().TargetRoot; } }

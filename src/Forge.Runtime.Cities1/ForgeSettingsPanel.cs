@@ -72,6 +72,11 @@ namespace CsmForge.Runtime.Cities1
                 status.text = "已提交停止请求。 " + StatusText();
             });
             group.AddButton("刷新状态", delegate { status.text = StatusText(); });
+            group.AddButton("写入诊断日志", delegate
+            {
+                RuntimeDiagnostics.DumpToGameLog("settings-button");
+                status.text = "诊断快照已写入游戏日志；若测试失败，请随后运行包内 COLLECT-ALPHA-DIAGNOSTICS.ps1。 " + StatusText();
+            });
         }
 
         private static bool RuntimeReadyForStart()

@@ -53,16 +53,18 @@ namespace CsmForge.Runtime.Cities1
 
             group.AddButton("Host 当前存档", delegate
             {
-                bool ok = RuntimeServices.Multiplayer.RequestHost(settings.Port.value, roomKey, settings.DisplayName.value);
-                status.text = (ok ? "已提交 Host 请求。" : "Host 请求失败：请确认已进入城市且当前没有 Forge 会话。") + " " + StatusText();
+                bool ok = RuntimeReadyForStart() &&
+                    RuntimeServices.Multiplayer.RequestHost(settings.Port.value, roomKey, settings.DisplayName.value);
+                status.text = (ok ? "已提交 Host 请求。" :
+                    "Host 请求失败：请确认已进入城市、CitiesHarmony/Forge patches 已就绪且当前没有 Forge 会话。") + " " + StatusText();
             });
             group.AddButton("Join Host 快照", delegate
             {
                 IPAddress ip;
-                bool ok = IPAddress.TryParse(settings.HostAddress.value, out ip) &&
+                bool ok = RuntimeReadyForStart() && IPAddress.TryParse(settings.HostAddress.value, out ip) &&
                     RuntimeServices.Multiplayer.RequestJoinCurrentWorld(new IPEndPoint(ip, settings.Port.value), roomKey, settings.DisplayName.value);
                 status.text = (ok ? "已提交 Join 请求；兼容检查通过后会自动下载并加载 Host 快照。" :
-                    "Join 请求失败：仅支持有效 IPv4，且当前需先进入任意城市启动 Runtime。") + " " + StatusText();
+                    "Join 请求失败：需已进入城市、patches 已就绪、IPv4 有效且当前没有 Forge 会话。") + " " + StatusText();
             });
             group.AddButton("停止 Forge 会话", delegate
             {
@@ -72,11 +74,20 @@ namespace CsmForge.Runtime.Cities1
             group.AddButton("刷新状态", delegate { status.text = StatusText(); });
         }
 
+        private static bool RuntimeReadyForStart()
+        {
+            return RuntimeServices.Patches.Installed && RuntimeServices.Lifecycle.Current.IsValid &&
+                RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.SinglePlayer;
+        }
+
         private static string StatusText()
         {
             MultiplayerStatusSnapshot status = RuntimeServices.Multiplayer.Status;
             return "状态: " + status.Mode + " | revision=" + status.Revision +
-                   " | peers=" + status.ConnectedPeers + " | " + status.Detail;
+                   " | peers=" + status.ConnectedPeers +
+                   " | role=" + RuntimeServices.Lifecycle.Role +
+                   " | patches=" + (RuntimeServices.Patches.Installed ? "ready" : "not-ready") +
+                   " | " + status.Detail;
         }
     }
 }

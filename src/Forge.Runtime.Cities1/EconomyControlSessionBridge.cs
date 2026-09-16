@@ -31,6 +31,7 @@ namespace CsmForge.Runtime.Cities1
                 AuthoritySubmitResultV2 result = authority.Submit(hostLocalBinding, intent);
                 if (result.Decision != AuthoritySubmitDecisionV2.Committed || result.Batch == null)
                 { FenceSession("host-economy-control-rejected:" + result.Decision); return; }
+                committedEconomyControlRoot = result.Batch.AfterRoot;
                 BroadcastBatch(result.Batch);
                 return;
             }
@@ -53,32 +54,20 @@ namespace CsmForge.Runtime.Cities1
                 return;
             EconomyControlStateV2 actual = EconomyControlGameAccess.Capture();
             Hash256 after = actual.Root;
-            if (committedEconomyControlRoot == null)
-            {
-                committedEconomyControlRoot = after;
-                return;
-            }
-            if (committedEconomyControlRoot.Equals(after)) return;
+            Hash256 before = hostEconomyControl.CommittedRoot;
+            committedEconomyControlRoot = before;
+            if (before.Equals(after)) return;
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation,
-                EconomyControlAuthorityDomain.Id, committedEconomyControlRoot, after,
+                EconomyControlAuthorityDomain.Id, before, after,
                 EconomyControlCodecV2.EncodeState(actual));
             if (batch == null || authority.IsFenced)
             {
                 FenceSession("observed-economy-control-change-could-not-commit");
                 return;
             }
+            hostEconomyControl.MarkObservedCommitted(after);
+            committedEconomyControlRoot = after;
             BroadcastBatch(batch);
-        }
-
-        private void ObserveCommittedDomainBatch(AuthorityBatch batch)
-        {
-            if (batch == null) return;
-            if (batch.DomainId == EconomyControlAuthorityDomain.Id)
-                committedEconomyControlRoot = batch.AfterRoot;
-            else if (batch.DomainId == EconomyCashAuthorityDomain.Id)
-                committedCashRoot = batch.AfterRoot;
-            else if (batch.DomainId == DemandAuthorityDomain.Id)
-                committedDemandRoot = batch.AfterRoot;
         }
     }
 }

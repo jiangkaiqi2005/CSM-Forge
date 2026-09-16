@@ -51,6 +51,17 @@ namespace CsmForge.Runtime.Cities1
                 0, 0, 0, 0, 0, 0, false, false));
         }
 
+        internal bool TryQueueTransportRoute(ushort nativeId, TransportLineIntentKindV2 kind, int index,
+            float x, float y, float z, bool fixedPlatform)
+        {
+            if (kind != TransportLineIntentKindV2.AddStop && kind != TransportLineIntentKindV2.RemoveStop &&
+                kind != TransportLineIntentKindV2.MoveStop) return false;
+            EntityIdentityV2 entity;
+            if (!TryResolveClientTransportLine(nativeId, out entity)) return false;
+            TransportStopV2 stop = kind == TransportLineIntentKindV2.RemoveStop ? null : new TransportStopV2(x, y, z, fixedPlatform);
+            return SubmitTransportIntent(new TransportLineIntentV2(kind, entity, index, stop));
+        }
+
         private bool SubmitTransportIntent(TransportLineIntentV2 value)
         {
             if (value == null || snapshotSave != null) return false;

@@ -29,7 +29,6 @@ namespace CsmForge.Runtime.Cities1
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, IForgeStateAdapterV1> Adapters =
             new Dictionary<string, IForgeStateAdapterV1>(StringComparer.Ordinal);
-        private static bool frozen;
 
         public static void Register(IForgeStateAdapterV1 adapter)
         {
@@ -38,7 +37,7 @@ namespace CsmForge.Runtime.Cities1
             if (adapter.SchemaVersion == 0) throw new ArgumentOutOfRangeException("adapter", "SchemaVersion must be non-zero.");
             lock (Gate)
             {
-                if (frozen) throw new InvalidOperationException("Forge state adapter registration is frozen for the active multiplayer session.");
+                EnsureSessionMutable();
                 IForgeStateAdapterV1 existing;
                 if (Adapters.TryGetValue(adapter.AdapterId, out existing))
                 {
@@ -56,7 +55,7 @@ namespace CsmForge.Runtime.Cities1
             if (string.IsNullOrEmpty(adapterId)) return false;
             lock (Gate)
             {
-                if (frozen) return false;
+                if (RuntimeServices.Multiplayer.Status.Mode != MultiplayerSessionMode.Offline) return false;
                 return Adapters.Remove(adapterId);
             }
         }
@@ -72,26 +71,6 @@ namespace CsmForge.Runtime.Cities1
                     Array.Sort(result, StringComparer.Ordinal);
                     return result;
                 }
-            }
-        }
-
-        internal static ForgeStateAdapterRegistration[] FreezeForSession()
-        {
-            lock (Gate)
-            {
-                frozen = true;
-                List<ForgeStateAdapterRegistration> result = new List<ForgeStateAdapterRegistration>();
-                foreach (KeyValuePair<string, IForgeStateAdapterV1> pair in Adapters)
-                    result.Add(new ForgeStateAdapterRegistration
-                    {
-                        Adapter = pair.Value,
-                        AdapterId = pair.Key,
-                        SchemaVersion = pair.Value.SchemaVersion,
-                        Assembly = pair.Value.GetType().Assembly
-                    });
-                result.Sort(delegate(ForgeStateAdapterRegistration a, ForgeStateAdapterRegistration b)
-                { return StringComparer.Ordinal.Compare(a.AdapterId, b.AdapterId); });
-                return result.ToArray();
             }
         }
 
@@ -114,9 +93,10 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
-        internal static void UnfreezeAfterSession()
+        private static void EnsureSessionMutable()
         {
-            lock (Gate) frozen = false;
+            if (RuntimeServices.Multiplayer.Status.Mode != MultiplayerSessionMode.Offline)
+                throw new InvalidOperationException("Forge state adapter registration is frozen for the active multiplayer session.");
         }
 
         private static void ValidateId(string value)

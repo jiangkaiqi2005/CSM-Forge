@@ -36,6 +36,7 @@ namespace CsmForge.Runtime.Cities1
                 UnityEngine.Debug.Log("[CSM-Forge] level loaded; world=" + identity.WorldId +
                     "; epoch=" + identity.Epoch + "; generation=" + identity.Generation +
                     "; load=" + mode + "; compatibilityEntries=" + manifest.Entries.Length +
+                    "; adapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length +
                     "; gameBuild=" + BuildConfig.applicationVersion +
                     "; managedRuntime=" + Environment.Version +
                     "; unity=" + UnityEngine.Application.unityVersion +
@@ -86,7 +87,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION.");
         }
     }
 
@@ -115,6 +116,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostCash();
                 RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.PollObservedHostWeather();
+                RuntimeServices.Multiplayer.PollObservedHostExtensions();
                 RuntimeServices.Multiplayer.RestoreClientWeatherTargets();
                 RuntimeServices.Multiplayer.AuditClientProjection();
                 RuntimeServices.Multiplayer.AfterSimulationTick();

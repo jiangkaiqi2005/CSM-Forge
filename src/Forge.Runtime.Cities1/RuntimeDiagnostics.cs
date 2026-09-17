@@ -12,6 +12,17 @@ namespace CsmForge.Runtime.Cities1
                 LoadIdentity identity = RuntimeServices.Lifecycle.Current;
                 RuntimeEvent[] entries = RuntimeServices.Events.Read();
                 string source = string.IsNullOrEmpty(reason) ? "manual" : reason;
+                CompatibilityManifest manifest = null;
+                CompatibilityCapabilityReport capabilities = null;
+                try
+                {
+                    manifest = CitiesCompatibilityCollector.Collect();
+                    capabilities = CompatibilityCapabilityReport.From(manifest);
+                }
+                catch (Exception error)
+                {
+                    UnityEngine.Debug.LogWarning("[CSM-Forge] diagnostic compatibility collection failed: " + error.GetType().Name);
+                }
 
                 UnityEngine.Debug.Log("[CSM-Forge] diagnostic dump begin; source=" + source +
                     "; mode=" + status.Mode + "; detail=" + status.Detail +
@@ -22,6 +33,15 @@ namespace CsmForge.Runtime.Cities1
                     "; epoch=" + (identity.IsValid ? identity.Epoch.ToString() : "0") +
                     "; generation=" + (identity.IsValid ? identity.Generation.ToString() : "0") +
                     "; events=" + entries.Length + ".");
+
+                if (capabilities != null)
+                {
+                    UnityEngine.Debug.Log("[CSM-Forge] diagnostic compatibility; " + capabilities.Summary());
+                    for (int i = 0; i < capabilities.BlockedIds.Length; i++)
+                        UnityEngine.Debug.LogWarning("[CSM-Forge] diagnostic blocked component; id=" + capabilities.BlockedIds[i]);
+                    for (int i = 0; i < capabilities.AdapterIds.Length; i++)
+                        UnityEngine.Debug.Log("[CSM-Forge] diagnostic state adapter; id=" + capabilities.AdapterIds[i]);
+                }
 
                 for (int i = 0; i < entries.Length; i++)
                 {

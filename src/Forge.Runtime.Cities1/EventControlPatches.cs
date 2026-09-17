@@ -57,6 +57,24 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Lifecycle.Fence("Event color could not be routed through Host authority");
             return false;
         }
+
+        internal static bool RouteClientActivate(ushort native)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading ||
+                role == CitiesRuntimeRole.HostLive) return true;
+            if (role != CitiesRuntimeRole.ClientReplicaLive) return false;
+            EntityIdentityV2 identity;
+            if (!TryResolve(native, out identity))
+            {
+                RuntimeServices.Lifecycle.Fence("Event activation referenced an unknown stable entity");
+                return false;
+            }
+            if (!ForgeExtensionApi.TrySubmitIntent(EventStateAdapter.Adapter, EventStateAdapter.EncodeActivateIntent(identity)))
+                RuntimeServices.Lifecycle.Fence("Event activation could not be routed through Host authority");
+            return false;
+        }
     }
 
     [HarmonyPatch(typeof(EventAI), "SetSecurityBudget")]
@@ -89,6 +107,40 @@ namespace CsmForge.Runtime.Cities1
         public static bool Prefix(ushort eventID, ref EventData data, Color32 newColor)
         {
             return EventControlPatchRouter.RouteColor(eventID, newColor);
+        }
+    }
+
+    [HarmonyPatch(typeof(EventAI), "Activate")]
+    internal static class EventActivateAuthorityPatch
+    {
+        public static bool Prefix(ushort eventID, ref EventData data)
+        {
+            return EventControlPatchRouter.RouteClientActivate(eventID);
+        }
+    }
+
+    [HarmonyPatch(typeof(EventManager), "CreateEvent")]
+    internal static class EventCreateSlotBarrierPatch
+    {
+        public static bool Prefix(ref ushort eventIndex, ref bool __result)
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.Unloading ||
+                role == CitiesRuntimeRole.HostLive) return true;
+            eventIndex = 0; __result = false; return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(EventManager), "ReleaseEvent")]
+    internal static class EventReleaseSlotBarrierPatch
+    {
+        public static bool Prefix()
+        {
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            return role == CitiesRuntimeRole.SinglePlayer || role == CitiesRuntimeRole.Disabled ||
+                role == CitiesRuntimeRole.Unloading || role == CitiesRuntimeRole.HostLive;
         }
     }
 }

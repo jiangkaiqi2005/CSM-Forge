@@ -19,7 +19,8 @@ namespace CsmForge.Runtime.Cities1
         private static readonly string[] ClientOnlyModTypes =
         {
             "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
-            "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod", "AchieveIt.ModInfo"
+            "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod", "AchieveIt.ModInfo",
+            "ACME.Mod"
         };
 
         public static CompatibilityManifest Collect()

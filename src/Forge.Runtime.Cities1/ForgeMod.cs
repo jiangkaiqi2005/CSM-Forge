@@ -20,6 +20,7 @@ namespace CsmForge.Runtime.Cities1
             ForgeExtensionApi.Register(new EventStateAdapter());
             ForgeExtensionApi.Register(new DisasterStateAdapter());
             ForgeExtensionApi.Register(new ParkGridStateAdapter());
+            KnownModBridgeRegistry.RegisterAvailable();
             RuntimeServices.Enable();
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
         }
@@ -43,6 +44,8 @@ namespace CsmForge.Runtime.Cities1
                 LoadIdentity identity = RuntimeServices.Lifecycle.LevelLoaded(mode,
                     RuntimeServices.Metadata.PendingWorldId, RuntimeServices.Metadata.PendingEpoch);
                 RuntimeServices.Metadata.Attach(identity);
+                KnownModBridgeRegistry.RegisterAvailable();
+                RuntimeServices.Patches.RefreshOptionalBridges();
                 CompatibilityManifest manifest = CitiesCompatibilityCollector.Collect();
                 UnityEngine.Debug.Log("[CSM-Forge] level loaded; world=" + identity.WorldId +
                     "; epoch=" + identity.Epoch + "; generation=" + identity.Generation +
@@ -98,7 +101,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION-DISTRICTPARK-PARKGRID-DISTRICTPARKCONTROLS-DISTRICTPARKDEEP-CAMPUSDEEP-EVENTS-DISASTERS.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION-DISTRICTPARK-PARKGRID-DISTRICTPARKCONTROLS-DISTRICTPARKDEEP-CAMPUSDEEP-EVENTS-DISASTERS-KNOWNMODBRIDGES.");
         }
     }
 

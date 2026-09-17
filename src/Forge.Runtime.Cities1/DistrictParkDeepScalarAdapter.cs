@@ -103,7 +103,8 @@ namespace CsmForge.Runtime.Cities1
             for (int i = 0; i < fields.Length; i++)
             {
                 FieldInfo field = fields[i];
-                if (field.IsStatic || field.IsNotSerialized || UnsafeName(field.Name)) continue;
+                if (field.IsStatic || field.IsInitOnly || field.IsLiteral || field.IsSpecialName ||
+                    field.IsNotSerialized || UnsafeName(field.Name)) continue;
                 string pathName = string.IsNullOrEmpty(name) ? field.Name : name + "." + field.Name;
                 Type leaf = field.FieldType;
                 List<FieldInfo> chain = new List<FieldInfo>(prefix); chain.Add(field);

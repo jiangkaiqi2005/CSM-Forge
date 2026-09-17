@@ -11,7 +11,12 @@ namespace CsmForge.Runtime.Cities1
         public static readonly ForgeSettings Settings = new ForgeSettings();
         public string Name { get { return "CSM-Forge V3"; } }
         public string Description { get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; } }
-        public void OnEnabled() { RuntimeServices.Enable(); UnityEngine.Debug.Log("[CSM-Forge] runtime enabled."); }
+        public void OnEnabled()
+        {
+            BuiltInDlcAdapters.RegisterAll();
+            RuntimeServices.Enable();
+            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
+        }
         public void OnDisabled() { RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
         public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
@@ -87,7 +92,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION-DISTRICTPARK.");
         }
     }
 

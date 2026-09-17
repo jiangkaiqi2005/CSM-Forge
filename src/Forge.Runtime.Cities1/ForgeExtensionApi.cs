@@ -21,11 +21,6 @@ namespace CsmForge.Runtime.Cities1
         void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state);
     }
 
-    /// <summary>
-    /// Interactive adapters validate and execute semantic player intents on the Host. Client code
-    /// must cancel the local mutation and call ForgeExtensionApi.TrySubmitIntent instead.
-    /// Forge broadcasts only the resulting absolute adapter state.
-    /// </summary>
     public interface IForgeInteractiveStateAdapterV1 : IForgeStateAdapterV2
     {
         bool ExecuteIntent(IForgeAdapterContextV1 context, byte[] intent);
@@ -39,6 +34,7 @@ namespace CsmForge.Runtime.Cities1
         EntityIdentityV2 GetOrAllocateIdentity(uint nativeId);
         void BindKnownIdentity(EntityIdentityV2 identity, uint nativeId);
         bool RetireIdentity(EntityIdentityV2 identity);
+        EntityMapEntryV2[] SnapshotMappings();
     }
 
     internal sealed class ForgeStateAdapterRegistration
@@ -64,6 +60,7 @@ namespace CsmForge.Runtime.Cities1
 
         public bool TryGetIdentity(uint nativeId, out EntityIdentityV2 identity) { return ids.TryGetIdentity(nativeId, out identity); }
         public bool TryGetNative(EntityIdentityV2 identity, out uint nativeId) { return ids.TryGetNative(identity, out nativeId); }
+        public EntityMapEntryV2[] SnapshotMappings() { return ids.SnapshotEntries(); }
 
         public EntityIdentityV2 GetOrAllocateIdentity(uint nativeId)
         {
@@ -119,8 +116,7 @@ namespace CsmForge.Runtime.Cities1
                 lock (Gate)
                 {
                     ForgeStateAdapterRegistration registration;
-                    if (!Adapters.TryGetValue(adapterId, out registration) ||
-                        !(registration.AdapterV2 is IForgeInteractiveStateAdapterV1)) return false;
+                    if (!Adapters.TryGetValue(adapterId, out registration) || !(registration.AdapterV2 is IForgeInteractiveStateAdapterV1)) return false;
                 }
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
                 if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;

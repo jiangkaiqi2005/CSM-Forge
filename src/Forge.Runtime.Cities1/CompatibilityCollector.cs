@@ -39,7 +39,7 @@ namespace CsmForge.Runtime.Cities1
                     if (assembly == null) continue;
                     string category = ModCategory(typeName, assembly);
                     string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
-                    Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
+                    Add(entries, seen, id, BinaryHash(assembly), ModConfigurationHash(typeName, assembly));
                 }
 
                 if (assemblies.Count == 0 && userMod != null)
@@ -47,7 +47,7 @@ namespace CsmForge.Runtime.Cities1
                     Assembly assembly = userMod.GetType().Assembly;
                     string category = ModCategory(typeName, assembly);
                     string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
-                    Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
+                    Add(entries, seen, id, BinaryHash(assembly), ModConfigurationHash(typeName, assembly));
                 }
             }
 
@@ -108,6 +108,23 @@ namespace CsmForge.Runtime.Cities1
             for (int i = 0; i < ClientOnlyModTypes.Length; i++)
                 if (typeName == ClientOnlyModTypes[i]) return "client-mod";
             return "mod";
+        }
+
+        private static Hash256 ModConfigurationHash(string typeName, Assembly assembly)
+        {
+            string baseline = assembly.GetName().Version + "|enabled=1";
+            try
+            {
+                if (typeName == "GameAnarchy.Mod" && GameAnarchyBridge.IsAvailable)
+                    return ConfigHash(baseline + "|forge-shared=" + Hash256.Compute(new GameAnarchyBridgeAdapter().CaptureAbsolute()).ToString());
+                if (typeName == "EightyOne2.Mod" && EightyOne2Bridge.IsAvailable)
+                    return ConfigHash(baseline + "|forge-shared=" + Hash256.Compute(new EightyOne2BridgeAdapter().CaptureAbsolute()).ToString());
+            }
+            catch (Exception error)
+            {
+                throw new InvalidOperationException("Could not fingerprint shared settings for known Mod " + (typeName ?? assembly.GetName().Name) + ".", error);
+            }
+            return ConfigHash(baseline);
         }
 
         private static void Add(List<ComponentFingerprint> entries, HashSet<string> seen, string id,

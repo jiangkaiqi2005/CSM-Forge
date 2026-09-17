@@ -94,7 +94,10 @@ namespace CsmForge.Runtime.Cities1
                 switch (declared)
                 {
                     case ForgeModCompatibilityKind.ClientOnly: return "client-mod";
-                    case ForgeModCompatibilityKind.ForgeSynchronized: return "sync-mod";
+                    case ForgeModCompatibilityKind.ForgeSynchronized:
+                        if (!ForgeExtensionApi.HasRegistrationFromAssembly(assembly))
+                            throw new InvalidOperationException("ForgeSynchronized mod declaration has no state adapter: " + assembly.GetName().Name);
+                        return "sync-mod";
                     case ForgeModCompatibilityKind.Blocked: return "blocked-mod";
                     default: return "mod";
                 }

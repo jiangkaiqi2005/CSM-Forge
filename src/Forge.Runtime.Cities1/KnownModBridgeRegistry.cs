@@ -17,8 +17,13 @@ namespace CsmForge.Runtime.Cities1
                     ForgeExtensionApi.Register(new DemandControllerBridgeAdapter());
                 if (GameAnarchyBridge.IsAvailable && !Registered(GameAnarchyBridgeAdapter.Adapter))
                     ForgeExtensionApi.Register(new GameAnarchyBridgeAdapter());
-                if (InfiniteGoodsBridge.IsAvailable && !Registered(InfiniteGoodsBridgeAdapter.Adapter))
-                    ForgeExtensionApi.Register(new InfiniteGoodsBridgeAdapter());
+                if (InfiniteGoodsBridge.IsAvailable)
+                {
+                    if (!Registered(InfiniteGoodsBridgeAdapter.Adapter))
+                        ForgeExtensionApi.Register(new InfiniteGoodsBridgeAdapter());
+                    if (!Registered(InfiniteGoodsBuildingBufferAdapter.Adapter))
+                        ForgeExtensionApi.Register(new InfiniteGoodsBuildingBufferAdapter());
+                }
                 if (EightyOne2Bridge.IsAvailable && !Registered(EightyOne2BridgeAdapter.Adapter))
                     ForgeExtensionApi.Register(new EightyOne2BridgeAdapter());
             }

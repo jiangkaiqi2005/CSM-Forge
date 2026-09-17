@@ -8,6 +8,9 @@ namespace CsmForge.Runtime.Cities1
     {
         private readonly ForgeStateAdapterRegistration[] adapters;
         private readonly ForgeAdapterContextV1[] contexts;
+        private readonly Dictionary<string, int> indexByAdapter = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        public int Count { get { return adapters.Length; } }
 
         public CitiesExtensionStateRegistry(ForgeStateAdapterRegistration[] registrations, bool authoritative)
         {
@@ -19,54 +22,60 @@ namespace CsmForge.Runtime.Cities1
                 if (i > 0 && StringComparer.Ordinal.Compare(adapters[i - 1].AdapterId, adapters[i].AdapterId) >= 0)
                     throw new ArgumentException("Forge adapter registrations must be unique and canonically ordered.", "registrations");
                 contexts[i] = new ForgeAdapterContextV1(adapters[i].AdapterId, authoritative);
+                indexByAdapter.Add(adapters[i].AdapterId, i);
             }
         }
 
-        public ExtensionStateSnapshotV2 Capture(LoadIdentity load)
+        public ExtensionStateEntryV2[] CaptureAll(LoadIdentity load)
+        {
+            ExtensionStateEntryV2[] entries = new ExtensionStateEntryV2[adapters.Length];
+            for (int i = 0; i < entries.Length; i++) entries[i] = CaptureOne(load, i);
+            return entries;
+        }
+
+        public ExtensionStateEntryV2 CaptureOne(LoadIdentity load, int index)
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension capture belongs to a stale load.");
-            List<ExtensionStateEntryV2> entries = new List<ExtensionStateEntryV2>(adapters.Length);
+            if (index < 0 || index >= adapters.Length) throw new ArgumentOutOfRangeException("index");
+            byte[] state;
             using (RuntimeScopeGuard.EnterCapture(load))
             {
-                for (int i = 0; i < adapters.Length; i++)
-                {
-                    byte[] state = adapters[i].AdapterV2 != null
-                        ? adapters[i].AdapterV2.CaptureAbsolute(contexts[i])
-                        : adapters[i].AdapterV1.CaptureAbsolute();
-                    if (state == null) throw new InvalidOperationException("Forge adapter returned a null absolute state: " + adapters[i].AdapterId);
-                    entries.Add(new ExtensionStateEntryV2(adapters[i].AdapterId, "state", state));
-                }
+                state = adapters[index].AdapterV2 != null
+                    ? adapters[index].AdapterV2.CaptureAbsolute(contexts[index])
+                    : adapters[index].AdapterV1.CaptureAbsolute();
             }
-            return new ExtensionStateSnapshotV2(entries);
+            if (state == null) throw new InvalidOperationException("Forge adapter returned a null absolute state: " + adapters[index].AdapterId);
+            return new ExtensionStateEntryV2(adapters[index].AdapterId, "state", state);
         }
 
-        public ExtensionStateSnapshotV2 Apply(LoadIdentity load, ExtensionStateSnapshotV2 snapshot)
+        public ExtensionStateEntryV2 ApplyOne(LoadIdentity load, ExtensionStateEntryV2 requested)
         {
-            if (snapshot == null) throw new ArgumentNullException("snapshot");
+            if (requested == null) throw new ArgumentNullException("requested");
+            if (requested.Key != "state") throw new InvalidOperationException("Extension delta uses an unsupported state key.");
+            int index;
+            if (!indexByAdapter.TryGetValue(requested.AdapterId, out index))
+                throw new InvalidOperationException("Extension delta references an unaccepted adapter: " + requested.AdapterId);
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension apply belongs to a stale load.");
-            ExtensionStateEntryV2[] entries = snapshot.Entries;
-            if (entries.Length != adapters.Length) throw new InvalidOperationException("Extension adapter set differs from the accepted compatibility manifest.");
-            Dictionary<string, ExtensionStateEntryV2> byAdapter = new Dictionary<string, ExtensionStateEntryV2>(StringComparer.Ordinal);
-            for (int i = 0; i < entries.Length; i++)
-            {
-                if (entries[i].Key != "state" || byAdapter.ContainsKey(entries[i].AdapterId))
-                    throw new InvalidOperationException("Extension snapshot contains an invalid adapter entry.");
-                byAdapter.Add(entries[i].AdapterId, entries[i]);
-            }
-
             using (RuntimeScopeGuard.EnterApply(load, ExtensionStateAuthorityDomain.Id))
             {
-                for (int i = 0; i < adapters.Length; i++)
-                {
-                    ExtensionStateEntryV2 entry;
-                    if (!byAdapter.TryGetValue(adapters[i].AdapterId, out entry))
-                        throw new InvalidOperationException("Extension snapshot is missing adapter: " + adapters[i].AdapterId);
-                    if (adapters[i].AdapterV2 != null) adapters[i].AdapterV2.ApplyAbsolute(contexts[i], entry.Payload);
-                    else adapters[i].AdapterV1.ApplyAbsolute(entry.Payload);
-                }
+                if (adapters[index].AdapterV2 != null) adapters[index].AdapterV2.ApplyAbsolute(contexts[index], requested.Payload);
+                else adapters[index].AdapterV1.ApplyAbsolute(requested.Payload);
             }
-            return Capture(load);
+            return CaptureOne(load, index);
         }
+
+        public int FindIndex(string adapterId)
+        {
+            int index;
+            return adapterId != null && indexByAdapter.TryGetValue(adapterId, out index) ? index : -1;
+        }
+    }
+
+    internal sealed class ExtensionObservedChange
+    {
+        public Hash256 BeforeRoot;
+        public Hash256 AfterRoot;
+        public byte[] Delta;
     }
 
     internal sealed class ExtensionStateAuthorityDomain : IAuthorityDomainV2
@@ -74,29 +83,41 @@ namespace CsmForge.Runtime.Cities1
         public const ushort Id = 120;
         private readonly LoadIdentity load;
         private readonly CitiesExtensionStateRegistry registry;
-        private ExtensionStateSnapshotV2 committed;
+        private readonly ExtensionStateEntryV2[] committed;
+        private int observationCursor;
 
         public ushort DomainId { get { return Id; } }
-        public Hash256 StateRoot { get { return committed.Root; } }
+        public Hash256 StateRoot { get { return ExtensionStateSnapshotV2.ComputeAggregateRoot(committed); } }
 
         public ExtensionStateAuthorityDomain(LoadIdentity load, CitiesExtensionStateRegistry registry)
         {
             if (!load.IsValid || registry == null) throw new ArgumentException("Extension authority initialization is incomplete.");
             this.load = load;
             this.registry = registry;
-            committed = registry.Capture(load);
+            committed = registry.CaptureAll(load);
         }
 
         public DomainExecutionV2 ExecutePlayer(byte[] payload) { return DomainExecutionV2.Rejected(); }
 
-        public byte[] ObserveHost(out Hash256 beforeRoot, out Hash256 afterRoot)
+        public ExtensionObservedChange ObserveNextHostChange()
         {
-            beforeRoot = committed.Root;
-            ExtensionStateSnapshotV2 actual = registry.Capture(load);
-            afterRoot = actual.Root;
-            if (beforeRoot.Equals(afterRoot)) return null;
-            committed = actual;
-            return ExtensionStateCodecV2.Encode(actual);
+            if (committed.Length == 0) return null;
+            for (int scanned = 0; scanned < committed.Length; scanned++)
+            {
+                int index = observationCursor++ % committed.Length;
+                ExtensionStateEntryV2 actual = registry.CaptureOne(load, index);
+                if (committed[index].PayloadRoot.Equals(actual.PayloadRoot)) continue;
+                Hash256 before = StateRoot;
+                committed[index] = actual;
+                Hash256 after = StateRoot;
+                return new ExtensionObservedChange
+                {
+                    BeforeRoot = before,
+                    AfterRoot = after,
+                    Delta = ExtensionStateCodecV2.EncodeDelta(actual)
+                };
+            }
+            return null;
         }
     }
 
@@ -104,30 +125,36 @@ namespace CsmForge.Runtime.Cities1
     {
         private readonly LoadIdentity load;
         private readonly CitiesExtensionStateRegistry registry;
-        private ExtensionStateSnapshotV2 committed;
+        private readonly ExtensionStateEntryV2[] committed;
 
         public ushort DomainId { get { return ExtensionStateAuthorityDomain.Id; } }
-        public Hash256 StateRoot { get { return committed.Root; } }
+        public Hash256 StateRoot { get { return ExtensionStateSnapshotV2.ComputeAggregateRoot(committed); } }
 
         public ExtensionStateReplicaDomain(LoadIdentity load, CitiesExtensionStateRegistry registry)
         {
             if (!load.IsValid || registry == null) throw new ArgumentException("Extension replica initialization is incomplete.");
             this.load = load;
             this.registry = registry;
-            committed = registry.Capture(load);
+            committed = registry.CaptureAll(load);
         }
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
             if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
-            ExtensionStateSnapshotV2 requested = ExtensionStateCodecV2.Decode(absoluteDelta);
-            ExtensionStateSnapshotV2 actual = registry.Apply(load, requested);
-            if (!actual.Root.Equals(requested.Root)) throw new InvalidOperationException("Extension adapter absolute projection did not reproduce the requested root.");
-            committed = actual;
+            ExtensionStateEntryV2 requested = ExtensionStateCodecV2.DecodeDelta(absoluteDelta);
+            int index = registry.FindIndex(requested.AdapterId);
+            if (index < 0 || index >= committed.Length) throw new InvalidOperationException("Extension delta references an unknown adapter.");
+            ExtensionStateEntryV2 actual = registry.ApplyOne(load, requested);
+            if (!actual.PayloadRoot.Equals(requested.PayloadRoot))
+                throw new InvalidOperationException("Extension adapter absolute projection did not reproduce the requested payload root.");
+            committed[index] = actual;
             if (!StateRoot.Equals(expectedAfterRoot)) throw new InvalidOperationException("Extension replica root mismatch.");
         }
 
-        public Hash256 CaptureActualRoot() { return registry.Capture(load).Root; }
+        public Hash256 CaptureActualRoot()
+        {
+            return ExtensionStateSnapshotV2.ComputeAggregateRoot(registry.CaptureAll(load));
+        }
     }
 
     public sealed partial class CitiesMultiplayerSessionV3
@@ -138,18 +165,21 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostExtensions()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostExtensions == null || authority == null || snapshotSave != null) return;
-            Hash256 before;
-            Hash256 after;
-            byte[] payload = hostExtensions.ObserveHost(out before, out after);
-            if (payload == null) return;
-            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ExtensionStateAuthorityDomain.Id,
-                before, after, payload);
-            if (batch == null || authority.IsFenced)
+            // Bound work per simulation tick. Each observed adapter is committed before observing the next,
+            // so AuthorityCoordinator sees the exact intermediate domain root for every batch.
+            for (int i = 0; i < 8; i++)
             {
-                FenceSession("observed-extension-change-could-not-commit");
-                return;
+                ExtensionObservedChange change = hostExtensions.ObserveNextHostChange();
+                if (change == null) return;
+                AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ExtensionStateAuthorityDomain.Id,
+                    change.BeforeRoot, change.AfterRoot, change.Delta);
+                if (batch == null || authority.IsFenced)
+                {
+                    FenceSession("observed-extension-change-could-not-commit");
+                    return;
+                }
+                BroadcastBatch(batch);
             }
-            BroadcastBatch(batch);
         }
     }
 }

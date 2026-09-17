@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Reflection;
 using CsmForge.Core;
-using HarmonyLib;
 
 namespace CsmForge.Runtime.Cities1
 {
@@ -167,52 +166,6 @@ namespace CsmForge.Runtime.Cities1
         private static void ValidateDemand(int value)
         {
             if (value < 0 || value > 100) throw new InvalidDataException("Demand Controller value is outside 0..100.");
-        }
-    }
-
-    internal static class KnownModBridgeRegistry
-    {
-        private static readonly object Gate = new object();
-        private static bool demandControllerPatched;
-
-        internal static void RegisterAvailable()
-        {
-            if (!DemandControllerBridge.IsAvailable) return;
-            string[] adapters = ForgeExtensionApi.RegisteredAdapterIds;
-            for (int i = 0; i < adapters.Length; i++) if (adapters[i] == DemandControllerBridgeAdapter.Adapter) return;
-            ForgeExtensionApi.Register(new DemandControllerBridgeAdapter());
-        }
-
-        internal static void InstallOptionalPatches(Harmony harmony)
-        {
-            if (harmony == null) throw new ArgumentNullException("harmony");
-            MethodInfo original = DemandControllerBridge.ResolveRefresh();
-            if (original == null) return;
-            lock (Gate)
-            {
-                if (demandControllerPatched) return;
-                MethodInfo prefix = typeof(KnownModBridgeRegistry).GetMethod("DemandControllerRefreshPrefix",
-                    BindingFlags.Static | BindingFlags.NonPublic);
-                if (prefix == null) throw new MissingMethodException("Demand Controller bridge prefix is unavailable.");
-                harmony.Patch(original, new HarmonyMethod(prefix));
-                demandControllerPatched = true;
-            }
-        }
-
-        internal static void ResetOptionalPatchState()
-        {
-            lock (Gate) demandControllerPatched = false;
-        }
-
-        private static bool DemandControllerRefreshPrefix()
-        {
-            if (RuntimeScopeGuard.IsApplying) return true;
-            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
-            if (role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientRecovering ||
-                role == CitiesRuntimeRole.ClientReplicaLive) return false;
-            return role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.SinglePlayer ||
-                role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
-                role == CitiesRuntimeRole.Unloading;
         }
     }
 }

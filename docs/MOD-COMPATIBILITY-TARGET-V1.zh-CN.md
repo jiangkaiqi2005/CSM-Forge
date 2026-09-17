@@ -6,15 +6,15 @@
 |---|---|---|---|
 | Demand Controller | 2916710759 | Host-owned bridge + Demand Authority | `bridge.demandcontroller` 同步控制配置；Client 本地 `Refresh()` 被阻断，实际 RCI 值继续由 Demand domain absolute projection |
 | Network Multitool 1.3.9 | 2560782729 | Net Authority target | 已确认其工具最终调用 `NetManager.CreateNode/CreateSegment/Release*`；Host direct mutations可进入现有 Net observer，Client 复杂工具语义仍需专用 intent/shim |
-| Infinite Goods | 725555912 | Host simulation target | 已确认每 tick 按本地 Building slot 调 `BuildingAI.ModifyMaterialBuffer`；不能让 Client 独立运行，后续必须 Host-only + Stable Building state bridge |
+| Infinite Goods | 725555912 | Host-only simulation bridge | `bridge.infinitegoods` 同步 Host 配置；Client 原始 `TransferMonitor.OnAfterSimulationTick` 被阻断，避免 process-local Building slot 写入。完整兼容仍需 Building material-buffer absolute projection |
 | ACME | algernon-A/ACME | ClientOnly | 已审计为相机/FPS表现层并加入 `client-mod` 白名单 |
 | New Place | Map | CONTENT | 地图/资产 fingerprint；无独立 shared-simulation adapter |
 | Precision Engineering (Harmony) | `PrecisionEngineering.Mod` | ClientOnly | 已从公开源码确认 IUserMod type；只提供建造测量/吸附辅助，加入 `client-mod` 白名单 |
 | CSLModernMap: Map&Metro Export | Workshop | ClientOnly/ReadOnly candidate | 仅在确认实际 IUserMod type 后进入白名单；未知 type 不猜、不放宽 |
-| Game Anarchy 1.3.1 | 2781804786 | Host settings/simulation target | 已确认其 `ModSetting` 含经济、解锁、污染/死亡/垃圾/犯罪、资源、退款、火灾等共享模拟开关；需要 Host-owned settings bridge |
+| Game Anarchy 1.3.1 | 2781804786 | Host-owned settings bridge | `bridge.gameanarchy` 规范同步共享模拟配置；Client 共享配置 setter 与手工/周期经济修改被阻断，UI-only 设置排除在网络状态外 |
 | TM:PE 11.9.4.1 | 1637663252 | Dedicated synchronized adapter | 当前继续 `blocked-mod`；在 Stable Net rule adapter + Vehicle/Path authority 完成前不允许静默加入 |
 | Harmony 2.2.2-0 | dependency | Dependency | Forge 使用 CitiesHarmony；作为运行依赖进入 manifest |
-| 81 Tiles 2 1.0.5 | 2862121823 | Area + utility simulation target | Area 可复用 Forge Area authority；已确认它还替换/扩展 Water/Electricity/District/Disaster/Terrain 等 Manager 行为，需单独配置/模拟闭环 |
+| 81 Tiles 2 1.0.5 | 2862121823 | Area + utility config bridge | `bridge.eightyone2` 同步七个共享开关并阻断 Client 本地改写；Area 可复用 Forge Authority。expanded Water/Electricity 等运行态仍需进一步 authority closure |
 
 ## 原则
 

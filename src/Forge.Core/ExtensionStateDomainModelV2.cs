@@ -11,6 +11,7 @@ namespace CsmForge.Core
         public string AdapterId { get; private set; }
         public string Key { get; private set; }
         public byte[] Payload { get { return (byte[])payload.Clone(); } }
+        public Hash256 PayloadRoot { get { return Hash256.Compute(payload); } }
 
         public ExtensionStateEntryV2(string adapterId, string key, byte[] bytes)
         {
@@ -36,12 +37,18 @@ namespace CsmForge.Core
     public sealed class ExtensionStateSnapshotV2
     {
         private readonly ExtensionStateEntryV2[] entries;
-        public ExtensionStateEntryV2[] Entries { get { return (ExtensionStateEntryV2[])entries.Clone(); } }
+        public ExtensionStateEntryV2[] Entries { get { return CloneEntries(entries); } }
         public Hash256 Root { get; private set; }
 
         public ExtensionStateSnapshotV2(IEnumerable<ExtensionStateEntryV2> values)
         {
             if (values == null) throw new ArgumentNullException("values");
+            entries = Normalize(values);
+            Root = ComputeAggregateRoot(entries);
+        }
+
+        internal static ExtensionStateEntryV2[] Normalize(IEnumerable<ExtensionStateEntryV2> values)
+        {
             List<ExtensionStateEntryV2> collected = new List<ExtensionStateEntryV2>();
             foreach (ExtensionStateEntryV2 value in values)
             {
@@ -57,8 +64,43 @@ namespace CsmForge.Core
             for (int i = 1; i < collected.Count; i++)
                 if (collected[i - 1].AdapterId == collected[i].AdapterId && collected[i - 1].Key == collected[i].Key)
                     throw new ArgumentException("Duplicate extension state identity.", "values");
-            entries = collected.ToArray();
-            Root = Hash256.Compute(ExtensionStateCodecV2.EncodeEntries(entries));
+            return collected.ToArray();
+        }
+
+        public static Hash256 ComputeAggregateRoot(IEnumerable<ExtensionStateEntryV2> values)
+        {
+            ExtensionStateEntryV2[] normalized = Normalize(values);
+            using (MemoryStream stream = new MemoryStream())
+            using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))
+            {
+                writer.Write(0x32525846u); // FXR2 - root descriptor, not a network frame
+                writer.Write((ushort)normalized.Length);
+                for (int i = 0; i < normalized.Length; i++)
+                {
+                    WriteRootToken(writer, normalized[i].AdapterId);
+                    WriteRootToken(writer, normalized[i].Key);
+                    byte[] payload = normalized[i].UnsafePayload;
+                    writer.Write(payload.Length);
+                    writer.Write(Hash256.Compute(payload).ToArray());
+                }
+                writer.Flush();
+                stream.Position = 0;
+                return Hash256.Compute(stream);
+            }
+        }
+
+        private static ExtensionStateEntryV2[] CloneEntries(ExtensionStateEntryV2[] source)
+        {
+            ExtensionStateEntryV2[] result = new ExtensionStateEntryV2[source.Length];
+            for (int i = 0; i < source.Length; i++) result[i] = new ExtensionStateEntryV2(source[i].AdapterId, source[i].Key, source[i].Payload);
+            return result;
+        }
+
+        private static void WriteRootToken(BinaryWriter writer, string value)
+        {
+            byte[] bytes = Encoding.ASCII.GetBytes(value);
+            writer.Write((byte)bytes.Length);
+            writer.Write(bytes);
         }
     }
 
@@ -67,10 +109,25 @@ namespace CsmForge.Core
         public const int MaximumEntries = 256;
         private const uint Magic = 0x32584546; // FEX2
 
+        /// <summary>Full snapshot encoding is retained for tools/tests; it is not used for multi-adapter live deltas.</summary>
         public static byte[] Encode(ExtensionStateSnapshotV2 snapshot)
         {
             if (snapshot == null) throw new ArgumentNullException("snapshot");
             return EncodeEntries(snapshot.Entries);
+        }
+
+        public static byte[] EncodeDelta(ExtensionStateEntryV2 entry)
+        {
+            if (entry == null) throw new ArgumentNullException("entry");
+            return EncodeEntries(new[] { entry });
+        }
+
+        public static ExtensionStateEntryV2 DecodeDelta(byte[] bytes)
+        {
+            ExtensionStateSnapshotV2 snapshot = Decode(bytes);
+            ExtensionStateEntryV2[] entries = snapshot.Entries;
+            if (entries.Length != 1) throw new InvalidDataException("Extension delta must contain exactly one absolute adapter entry.");
+            return entries[0];
         }
 
         internal static byte[] EncodeEntries(ExtensionStateEntryV2[] entries)
@@ -89,7 +146,7 @@ namespace CsmForge.Core
                     writer.Write(payload);
                 }
                 writer.Flush();
-                if (stream.Length > Limits.FramePayloadBytes) throw new ArgumentException("Extension state snapshot exceeds one authority frame.", "entries");
+                if (stream.Length > Limits.FramePayloadBytes) throw new ArgumentException("Extension state frame exceeds one authority frame.", "entries");
                 return stream.ToArray();
             }
         }

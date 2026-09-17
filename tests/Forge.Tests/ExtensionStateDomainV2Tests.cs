@@ -19,6 +19,17 @@ namespace CsmForge.Tests
         }
 
         [Case]
+        public static void AggregateRootIsNotLimitedByOneNetworkFrame()
+        {
+            ExtensionStateEntryV2[] entries = new ExtensionStateEntryV2[3];
+            for (int i = 0; i < entries.Length; i++) entries[i] = new ExtensionStateEntryV2("adapter" + i, "state", new byte[30000]);
+            ExtensionStateSnapshotV2 snapshot = new ExtensionStateSnapshotV2(entries);
+            Assert.True(snapshot.Root != null);
+            Assert.Throws<ArgumentException>(delegate { ExtensionStateCodecV2.Encode(snapshot); });
+            Assert.True(ExtensionStateCodecV2.EncodeDelta(entries[0]).Length < Limits.FramePayloadBytes);
+        }
+
+        [Case]
         public static void SnapshotRoundTripsCanonically()
         {
             ExtensionStateSnapshotV2 value = new ExtensionStateSnapshotV2(new[]
@@ -30,6 +41,20 @@ namespace CsmForge.Tests
             ExtensionStateSnapshotV2 copy = ExtensionStateCodecV2.Decode(encoded);
             Assert.Equal(value.Root, copy.Root);
             Assert.Equal(encoded.Length, ExtensionStateCodecV2.Encode(copy).Length);
+        }
+
+        [Case]
+        public static void DeltaRoundTripsExactlyOneAdapter()
+        {
+            ExtensionStateEntryV2 entry = new ExtensionStateEntryV2("tmpe", "state", new byte[] { 7, 8, 9 });
+            ExtensionStateEntryV2 copy = ExtensionStateCodecV2.DecodeDelta(ExtensionStateCodecV2.EncodeDelta(entry));
+            Assert.Equal(entry.AdapterId, copy.AdapterId);
+            Assert.Equal(entry.Key, copy.Key);
+            Assert.Equal(entry.PayloadRoot, copy.PayloadRoot);
+            Assert.Throws<InvalidDataException>(delegate
+            {
+                ExtensionStateCodecV2.DecodeDelta(ExtensionStateCodecV2.Encode(new ExtensionStateSnapshotV2(new ExtensionStateEntryV2[0])));
+            });
         }
 
         [Case]
@@ -45,7 +70,7 @@ namespace CsmForge.Tests
         }
 
         [Case]
-        public static void DuplicateAndOversizeStateFailsClosed()
+        public static void DuplicateStateFailsClosed()
         {
             Assert.Throws<ArgumentException>(delegate
             {
@@ -54,13 +79,6 @@ namespace CsmForge.Tests
                     new ExtensionStateEntryV2("a", "same", new byte[] { 1 }),
                     new ExtensionStateEntryV2("a", "same", new byte[] { 2 })
                 });
-            });
-            Assert.Throws<ArgumentException>(delegate
-            {
-                ExtensionStateEntryV2[] entries = new ExtensionStateEntryV2[3];
-                for (int i = 0; i < entries.Length; i++)
-                    entries[i] = new ExtensionStateEntryV2("a", "k" + i, new byte[30000]);
-                ExtensionStateCodecV2.Encode(new ExtensionStateSnapshotV2(entries));
             });
         }
 

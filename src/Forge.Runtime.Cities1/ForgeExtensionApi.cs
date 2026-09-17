@@ -188,6 +188,22 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        internal static bool HasRegistrationFromAssembly(Assembly assembly)
+        {
+            if (assembly == null) return false;
+            string fullName = assembly.FullName;
+            lock (Gate)
+            {
+                foreach (ForgeStateAdapterRegistration registration in Adapters.Values)
+                {
+                    if (registration.Assembly == assembly) return true;
+                    if (registration.Assembly != null && !string.IsNullOrEmpty(fullName) &&
+                        string.Equals(registration.Assembly.FullName, fullName, StringComparison.Ordinal)) return true;
+                }
+                return false;
+            }
+        }
+
         private static void RegisterCore(string adapterId, uint schemaVersion, Assembly assembly,
             IForgeStateAdapterV1 v1, IForgeStateAdapterV2 v2, IForgeShardedStateAdapterV1 sharded)
         {

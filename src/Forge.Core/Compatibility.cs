@@ -60,8 +60,9 @@ namespace CsmForge.Core
 
     /// <summary>
     /// Approved required components and optional local-only components are a trusted room
-    /// policy built from audited adapter support, NOT an automatic copy of the host mod list.
-    /// Unknown extras fail closed even when both peers happen to have them installed.
+    /// policy built from audited adapter support. Unknown mods fail closed. The v3 ultimate
+    /// manifest also uses audited component categories: extra client DLC/assets are harmless,
+    /// known client-only mods may differ, and blocked mods fence room creation.
     /// </summary>
     public sealed class CompatibilityPolicy
     {
@@ -91,19 +92,43 @@ namespace CsmForge.Core
             Dictionary<string, ComponentFingerprint> actual = CompatibilityManifest.Collect(manifest.Entries);
             foreach (KeyValuePair<string, ComponentFingerprint> pair in required)
             {
+                if (IsPrefix(pair.Key, "blocked-mod:"))
+                {
+                    errors.Add("host-unsupported:" + pair.Key);
+                    continue;
+                }
+                if (IsPrefix(pair.Key, "client-mod:")) continue;
+
                 ComponentFingerprint value;
                 if (!actual.TryGetValue(pair.Key, out value)) errors.Add("missing:" + pair.Key);
                 else if (!pair.Value.Matches(value)) errors.Add("fingerprint-mismatch:" + pair.Key);
             }
             foreach (KeyValuePair<string, ComponentFingerprint> pair in actual)
             {
-                if (required.ContainsKey(pair.Key)) continue;
+                ComponentFingerprint expected;
+                if (required.TryGetValue(pair.Key, out expected))
+                {
+                    if (IsPrefix(pair.Key, "client-mod:")) continue;
+                    continue;
+                }
+                if (AllowsClientExtra(pair.Key)) continue;
+
                 ComponentFingerprint approved;
                 if (!optionalLocal.TryGetValue(pair.Key, out approved)) errors.Add("unsupported:" + pair.Key);
                 else if (!approved.Matches(pair.Value)) errors.Add("local-fingerprint-mismatch:" + pair.Key);
             }
             errors.Sort(StringComparer.Ordinal);
             return errors.ToArray();
+        }
+
+        private static bool AllowsClientExtra(string id)
+        {
+            return IsPrefix(id, "dlc:") || IsPrefix(id, "asset:") || IsPrefix(id, "client-mod:");
+        }
+
+        private static bool IsPrefix(string value, string prefix)
+        {
+            return value != null && value.StartsWith(prefix, StringComparison.Ordinal);
         }
     }
 }

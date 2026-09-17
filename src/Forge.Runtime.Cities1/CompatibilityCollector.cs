@@ -16,6 +16,11 @@ namespace CsmForge.Runtime.Cities1
     public static class CitiesCompatibilityCollector
     {
         private const int EntryLimit = 4096;
+        private static readonly string[] ClientOnlyModTypes =
+        {
+            "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
+            "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod", "AchieveIt.ModInfo"
+        };
 
         public static CompatibilityManifest Collect()
         {
@@ -25,19 +30,20 @@ namespace CsmForge.Runtime.Cities1
             foreach (PluginManager.PluginInfo plugin in Singleton<PluginManager>.instance.GetPluginsInfo())
             {
                 if (plugin == null || !plugin.isEnabled) continue;
+                IUserMod userMod = plugin.userModInstance as IUserMod;
+                string category = ModCategory(userMod == null ? null : userMod.GetType().FullName);
                 List<Assembly> assemblies = plugin.GetAssemblies();
                 foreach (Assembly assembly in assemblies)
                 {
                     if (assembly == null) continue;
-                    string id = "mod:" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
+                    string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
                     Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
                 }
 
-                IUserMod userMod = plugin.userModInstance as IUserMod;
                 if (assemblies.Count == 0 && userMod != null)
                 {
                     Assembly assembly = userMod.GetType().Assembly;
-                    string id = "mod:" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
+                    string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
                     Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
                 }
             }
@@ -51,9 +57,40 @@ namespace CsmForge.Runtime.Cities1
                 Add(entries, seen, id, ConfigHash(checksum), ConfigHash(asset.fullName + "|enabled=1"));
             }
 
+            AddOwnedDlcBits(entries, seen, "dlc:expansion:", Convert.ToUInt64(SteamHelper.GetOwnedExpansionMask(), CultureInfo.InvariantCulture));
+            AddOwnedDlcBits(entries, seen, "dlc:modderpack:", Convert.ToUInt64(SteamHelper.GetOwnedModderPackMask(), CultureInfo.InvariantCulture));
+
+            ForgeStateAdapterRegistration[] adapters = ForgeExtensionApi.SnapshotRegistrations();
+            for (int i = 0; i < adapters.Length; i++)
+            {
+                ForgeStateAdapterRegistration adapter = adapters[i];
+                string id = "adapter:" + adapter.AdapterId + ":v" + adapter.SchemaVersion.ToString(CultureInfo.InvariantCulture);
+                Add(entries, seen, id, BinaryHash(adapter.Assembly), ConfigHash("schema=" + adapter.SchemaVersion.ToString(CultureInfo.InvariantCulture)));
+            }
+
             Hash256 build = GameBuildHash();
-            Hash256 schema = ConfigHash("csm-forge-v3-schema:1|core=" + typeof(CompatibilityManifest).Assembly.GetName().Version);
+            Hash256 schema = ConfigHash("csm-forge-v3-schema:2|core=" + typeof(CompatibilityManifest).Assembly.GetName().Version);
             return new CompatibilityManifest(build, schema, entries);
+        }
+
+        private static void AddOwnedDlcBits(List<ComponentFingerprint> entries, HashSet<string> seen, string prefix, ulong mask)
+        {
+            for (int bit = 0; bit < 64; bit++)
+            {
+                ulong flag = 1UL << bit;
+                if ((mask & flag) == 0) continue;
+                string id = prefix + bit.ToString(CultureInfo.InvariantCulture);
+                Add(entries, seen, id, ConfigHash(id), ConfigHash("owned=1"));
+            }
+        }
+
+        private static string ModCategory(string typeName)
+        {
+            if (typeName == "CitiesHarmony.Mod") return "dependency-mod";
+            if (typeName == "TrafficManager.Lifecycle.TrafficManagerMod") return "blocked-mod";
+            for (int i = 0; i < ClientOnlyModTypes.Length; i++)
+                if (typeName == ClientOnlyModTypes[i]) return "client-mod";
+            return "mod";
         }
 
         private static void Add(List<ComponentFingerprint> entries, HashSet<string> seen, string id,

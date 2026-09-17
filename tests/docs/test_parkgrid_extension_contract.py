@@ -17,7 +17,12 @@ class ParkGridExtensionContractTests(unittest.TestCase):
         ]:
             self.assertIn(value, source)
         self.assertNotIn("CommandReceiver", source)
-        self.assertNotIn("ParkId", source)
+        # Native park slots may appear as local variables/comments, but the wire dictionary must
+        # be keyed by the stable entity identity rather than serializing the local slot itself.
+        self.assertIn("writer.Write(value.Identity.EntityId)", source)
+        self.assertIn("writer.Write(value.Identity.Generation)", source)
+        self.assertNotIn("writer.Write(value.NativeId)", source)
+        self.assertNotIn("writer.Write(native)", source)
 
     def test_client_park_tool_routes_through_extension_intent(self) -> None:
         source = (RUNTIME / "ParkGridPatches.cs").read_text(encoding="utf-8-sig")

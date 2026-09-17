@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
-    /// <summary>
-    /// Public result-state integration point for third-party mods. Adapters expose absolute
-    /// state only; Forge never accepts command/tool replay through this API.
-    /// </summary>
+    /// <summary>V1 for global/non-entity absolute state. No command replay is accepted.</summary>
     public interface IForgeStateAdapterV1
     {
         string AdapterId { get; }
@@ -16,38 +14,95 @@ namespace CsmForge.Runtime.Cities1
         void ApplyAbsolute(byte[] state);
     }
 
+    /// <summary>
+    /// V2 for entity-bearing state. Adapters must encode Forge EntityIdentityV2 values in their
+    /// payload rather than process-local manager indices. The context owns the native-ID mapping.
+    /// </summary>
+    public interface IForgeStateAdapterV2
+    {
+        string AdapterId { get; }
+        uint SchemaVersion { get; }
+        byte[] CaptureAbsolute(IForgeAdapterContextV1 context);
+        void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state);
+    }
+
+    public interface IForgeAdapterContextV1
+    {
+        bool IsAuthoritative { get; }
+        bool TryGetIdentity(uint nativeId, out EntityIdentityV2 identity);
+        bool TryGetNative(EntityIdentityV2 identity, out uint nativeId);
+        EntityIdentityV2 GetOrAllocateIdentity(uint nativeId);
+        void BindKnownIdentity(EntityIdentityV2 identity, uint nativeId);
+        bool RetireIdentity(EntityIdentityV2 identity);
+    }
+
     internal sealed class ForgeStateAdapterRegistration
     {
-        public IForgeStateAdapterV1 Adapter;
+        public IForgeStateAdapterV1 AdapterV1;
+        public IForgeStateAdapterV2 AdapterV2;
         public string AdapterId;
         public uint SchemaVersion;
         public Assembly Assembly;
     }
 
+    internal sealed class ForgeAdapterContextV1 : IForgeAdapterContextV1
+    {
+        private readonly EntityIdMapV2 ids;
+        public bool IsAuthoritative { get; private set; }
+
+        public ForgeAdapterContextV1(string adapterId, bool authoritative)
+        {
+            if (string.IsNullOrEmpty(adapterId)) throw new ArgumentException("Adapter id is missing.", "adapterId");
+            IsAuthoritative = authoritative;
+            ids = ExtensionIdentityServices.Maps.GetOrAttach(adapterId);
+        }
+
+        public bool TryGetIdentity(uint nativeId, out EntityIdentityV2 identity)
+        {
+            return ids.TryGetIdentity(nativeId, out identity);
+        }
+
+        public bool TryGetNative(EntityIdentityV2 identity, out uint nativeId)
+        {
+            return ids.TryGetNative(identity, out nativeId);
+        }
+
+        public EntityIdentityV2 GetOrAllocateIdentity(uint nativeId)
+        {
+            if (!IsAuthoritative) throw new InvalidOperationException("Replica adapters cannot allocate authoritative Forge identities.");
+            EntityIdentityV2 existing;
+            if (ids.TryGetIdentity(nativeId, out existing)) return existing;
+            return ids.Allocate(nativeId);
+        }
+
+        public void BindKnownIdentity(EntityIdentityV2 identity, uint nativeId)
+        {
+            if (IsAuthoritative) throw new InvalidOperationException("Host adapters cannot bind identities supplied by a replica projection.");
+            ids.BindKnown(identity, nativeId);
+        }
+
+        public bool RetireIdentity(EntityIdentityV2 identity)
+        {
+            return ids.Retire(identity);
+        }
+    }
+
     public static class ForgeExtensionApi
     {
         private static readonly object Gate = new object();
-        private static readonly Dictionary<string, IForgeStateAdapterV1> Adapters =
-            new Dictionary<string, IForgeStateAdapterV1>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, ForgeStateAdapterRegistration> Adapters =
+            new Dictionary<string, ForgeStateAdapterRegistration>(StringComparer.Ordinal);
 
         public static void Register(IForgeStateAdapterV1 adapter)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
-            ValidateId(adapter.AdapterId);
-            if (adapter.SchemaVersion == 0) throw new ArgumentOutOfRangeException("adapter", "SchemaVersion must be non-zero.");
-            lock (Gate)
-            {
-                EnsureSessionMutable();
-                IForgeStateAdapterV1 existing;
-                if (Adapters.TryGetValue(adapter.AdapterId, out existing))
-                {
-                    if (existing.GetType() != adapter.GetType()) throw new InvalidOperationException("A different adapter already owns this AdapterId.");
-                    Adapters[adapter.AdapterId] = adapter;
-                    return;
-                }
-                if (Adapters.Count >= 128) throw new InvalidOperationException("Forge state adapter limit exceeded.");
-                Adapters.Add(adapter.AdapterId, adapter);
-            }
+            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, adapter, null);
+        }
+
+        public static void Register(IForgeStateAdapterV2 adapter)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, adapter);
         }
 
         public static bool Unregister(string adapterId)
@@ -78,18 +133,41 @@ namespace CsmForge.Runtime.Cities1
         {
             lock (Gate)
             {
-                List<ForgeStateAdapterRegistration> result = new List<ForgeStateAdapterRegistration>();
-                foreach (KeyValuePair<string, IForgeStateAdapterV1> pair in Adapters)
-                    result.Add(new ForgeStateAdapterRegistration
-                    {
-                        Adapter = pair.Value,
-                        AdapterId = pair.Key,
-                        SchemaVersion = pair.Value.SchemaVersion,
-                        Assembly = pair.Value.GetType().Assembly
-                    });
-                result.Sort(delegate(ForgeStateAdapterRegistration a, ForgeStateAdapterRegistration b)
+                ForgeStateAdapterRegistration[] result = new ForgeStateAdapterRegistration[Adapters.Count];
+                int index = 0;
+                foreach (ForgeStateAdapterRegistration registration in Adapters.Values) result[index++] = registration;
+                Array.Sort(result, delegate(ForgeStateAdapterRegistration a, ForgeStateAdapterRegistration b)
                 { return StringComparer.Ordinal.Compare(a.AdapterId, b.AdapterId); });
-                return result.ToArray();
+                return result;
+            }
+        }
+
+        private static void RegisterCore(string adapterId, uint schemaVersion, Assembly assembly,
+            IForgeStateAdapterV1 v1, IForgeStateAdapterV2 v2)
+        {
+            ValidateId(adapterId);
+            if (schemaVersion == 0) throw new ArgumentOutOfRangeException("schemaVersion", "SchemaVersion must be non-zero.");
+            if (assembly == null) throw new ArgumentNullException("assembly");
+            lock (Gate)
+            {
+                EnsureSessionMutable();
+                ForgeStateAdapterRegistration existing;
+                if (Adapters.TryGetValue(adapterId, out existing))
+                {
+                    Type oldType = existing.AdapterV2 != null ? existing.AdapterV2.GetType() : existing.AdapterV1.GetType();
+                    Type newType = v2 != null ? v2.GetType() : v1.GetType();
+                    if (oldType != newType || existing.SchemaVersion != schemaVersion)
+                        throw new InvalidOperationException("A different adapter or schema already owns this AdapterId.");
+                }
+                else if (Adapters.Count >= 128) throw new InvalidOperationException("Forge state adapter limit exceeded.");
+                Adapters[adapterId] = new ForgeStateAdapterRegistration
+                {
+                    AdapterId = adapterId,
+                    SchemaVersion = schemaVersion,
+                    Assembly = assembly,
+                    AdapterV1 = v1,
+                    AdapterV2 = v2
+                };
             }
         }
 

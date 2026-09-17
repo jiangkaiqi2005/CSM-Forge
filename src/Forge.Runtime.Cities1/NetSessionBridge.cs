@@ -38,7 +38,7 @@ namespace CsmForge.Runtime.Cities1
             hostWeather = new WeatherAuthorityDomain(identity);
             committedWeatherRoot = hostWeather.StateRoot;
             hostExtensions = new ExtensionStateAuthorityDomain(identity,
-                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations()));
+                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations(), true));
             return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames, hostCityName, hostWeather, hostExtensions };
         }
 
@@ -64,7 +64,7 @@ namespace CsmForge.Runtime.Cities1
             clientCityName = new CityNameReplicaDomain(identity);
             clientWeather = new WeatherReplicaDomain(identity);
             clientExtensions = new ExtensionStateReplicaDomain(identity,
-                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations()));
+                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations(), false));
             return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames, clientCityName, clientWeather, clientExtensions };
         }
 

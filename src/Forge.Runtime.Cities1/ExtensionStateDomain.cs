@@ -7,14 +7,19 @@ namespace CsmForge.Runtime.Cities1
     internal sealed class CitiesExtensionStateRegistry
     {
         private readonly ForgeStateAdapterRegistration[] adapters;
+        private readonly ForgeAdapterContextV1[] contexts;
 
-        public CitiesExtensionStateRegistry(ForgeStateAdapterRegistration[] registrations)
+        public CitiesExtensionStateRegistry(ForgeStateAdapterRegistration[] registrations, bool authoritative)
         {
             if (registrations == null) throw new ArgumentNullException("registrations");
             adapters = (ForgeStateAdapterRegistration[])registrations.Clone();
-            for (int i = 1; i < adapters.Length; i++)
-                if (StringComparer.Ordinal.Compare(adapters[i - 1].AdapterId, adapters[i].AdapterId) >= 0)
+            contexts = new ForgeAdapterContextV1[adapters.Length];
+            for (int i = 0; i < adapters.Length; i++)
+            {
+                if (i > 0 && StringComparer.Ordinal.Compare(adapters[i - 1].AdapterId, adapters[i].AdapterId) >= 0)
                     throw new ArgumentException("Forge adapter registrations must be unique and canonically ordered.", "registrations");
+                contexts[i] = new ForgeAdapterContextV1(adapters[i].AdapterId, authoritative);
+            }
         }
 
         public ExtensionStateSnapshotV2 Capture(LoadIdentity load)
@@ -25,7 +30,9 @@ namespace CsmForge.Runtime.Cities1
             {
                 for (int i = 0; i < adapters.Length; i++)
                 {
-                    byte[] state = adapters[i].Adapter.CaptureAbsolute();
+                    byte[] state = adapters[i].AdapterV2 != null
+                        ? adapters[i].AdapterV2.CaptureAbsolute(contexts[i])
+                        : adapters[i].AdapterV1.CaptureAbsolute();
                     if (state == null) throw new InvalidOperationException("Forge adapter returned a null absolute state: " + adapters[i].AdapterId);
                     entries.Add(new ExtensionStateEntryV2(adapters[i].AdapterId, "state", state));
                 }
@@ -54,7 +61,8 @@ namespace CsmForge.Runtime.Cities1
                     ExtensionStateEntryV2 entry;
                     if (!byAdapter.TryGetValue(adapters[i].AdapterId, out entry))
                         throw new InvalidOperationException("Extension snapshot is missing adapter: " + adapters[i].AdapterId);
-                    adapters[i].Adapter.ApplyAbsolute(entry.Payload);
+                    if (adapters[i].AdapterV2 != null) adapters[i].AdapterV2.ApplyAbsolute(contexts[i], entry.Payload);
+                    else adapters[i].AdapterV1.ApplyAbsolute(entry.Payload);
                 }
             }
             return Capture(load);

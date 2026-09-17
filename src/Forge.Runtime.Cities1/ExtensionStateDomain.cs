@@ -52,9 +52,8 @@ namespace CsmForge.Runtime.Cities1
         {
             if (requested == null) throw new ArgumentNullException("requested");
             if (requested.Key != "state") throw new InvalidOperationException("Extension delta uses an unsupported state key.");
-            int index;
-            if (!indexByAdapter.TryGetValue(requested.AdapterId, out index))
-                throw new InvalidOperationException("Extension delta references an unaccepted adapter: " + requested.AdapterId);
+            int index = FindIndex(requested.AdapterId);
+            if (index < 0) throw new InvalidOperationException("Extension delta references an unaccepted adapter: " + requested.AdapterId);
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension apply belongs to a stale load.");
             using (RuntimeScopeGuard.EnterApply(load, ExtensionStateAuthorityDomain.Id))
             {
@@ -62,6 +61,22 @@ namespace CsmForge.Runtime.Cities1
                 else adapters[index].AdapterV1.ApplyAbsolute(requested.Payload);
             }
             return CaptureOne(load, index);
+        }
+
+        public bool ExecutePlayer(LoadIdentity load, ExtensionPlayerIntentV2 request,
+            out int index, out ExtensionStateEntryV2 actual)
+        {
+            index = FindIndex(request == null ? null : request.AdapterId);
+            actual = null;
+            if (index < 0 || request == null || !RuntimeServices.Lifecycle.IsCurrent(load)) return false;
+            IForgeInteractiveStateAdapterV1 interactive = adapters[index].AdapterV2 as IForgeInteractiveStateAdapterV1;
+            if (interactive == null || !contexts[index].IsAuthoritative) return false;
+            bool applied;
+            using (RuntimeScopeGuard.EnterApply(load, ExtensionStateAuthorityDomain.Id))
+                applied = interactive.ExecuteIntent(contexts[index], request.Payload);
+            if (!applied) return false;
+            actual = CaptureOne(load, index);
+            return true;
         }
 
         public int FindIndex(string adapterId)
@@ -97,7 +112,19 @@ namespace CsmForge.Runtime.Cities1
             committed = registry.CaptureAll(load);
         }
 
-        public DomainExecutionV2 ExecutePlayer(byte[] payload) { return DomainExecutionV2.Rejected(); }
+        public DomainExecutionV2 ExecutePlayer(byte[] payload)
+        {
+            ExtensionPlayerIntentV2 request;
+            try { request = ExtensionIntentCodecV2.Decode(payload); }
+            catch { return DomainExecutionV2.Rejected(); }
+            int index;
+            ExtensionStateEntryV2 actual;
+            if (!registry.ExecutePlayer(load, request, out index, out actual) || index < 0 || index >= committed.Length || actual == null)
+                return DomainExecutionV2.Rejected();
+            if (committed[index].PayloadRoot.Equals(actual.PayloadRoot)) return DomainExecutionV2.Rejected();
+            committed[index] = actual;
+            return DomainExecutionV2.Success(ExtensionStateCodecV2.EncodeDelta(actual), StateRoot);
+        }
 
         public ExtensionObservedChange ObserveNextHostChange()
         {
@@ -110,12 +137,7 @@ namespace CsmForge.Runtime.Cities1
                 Hash256 before = StateRoot;
                 committed[index] = actual;
                 Hash256 after = StateRoot;
-                return new ExtensionObservedChange
-                {
-                    BeforeRoot = before,
-                    AfterRoot = after,
-                    Delta = ExtensionStateCodecV2.EncodeDelta(actual)
-                };
+                return new ExtensionObservedChange { BeforeRoot = before, AfterRoot = after, Delta = ExtensionStateCodecV2.EncodeDelta(actual) };
             }
             return null;
         }
@@ -151,10 +173,7 @@ namespace CsmForge.Runtime.Cities1
             if (!StateRoot.Equals(expectedAfterRoot)) throw new InvalidOperationException("Extension replica root mismatch.");
         }
 
-        public Hash256 CaptureActualRoot()
-        {
-            return ExtensionStateSnapshotV2.ComputeAggregateRoot(registry.CaptureAll(load));
-        }
+        public Hash256 CaptureActualRoot() { return ExtensionStateSnapshotV2.ComputeAggregateRoot(registry.CaptureAll(load)); }
     }
 
     public sealed partial class CitiesMultiplayerSessionV3
@@ -165,8 +184,6 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostExtensions()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostExtensions == null || authority == null || snapshotSave != null) return;
-            // Bound work per simulation tick. Each observed adapter is committed before observing the next,
-            // so AuthorityCoordinator sees the exact intermediate domain root for every batch.
             for (int i = 0; i < 8; i++)
             {
                 ExtensionObservedChange change = hostExtensions.ObserveNextHostChange();

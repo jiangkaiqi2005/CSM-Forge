@@ -5,7 +5,6 @@ using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
-    /// <summary>V1 for global/non-entity absolute state. No command replay is accepted.</summary>
     public interface IForgeStateAdapterV1
     {
         string AdapterId { get; }
@@ -14,16 +13,22 @@ namespace CsmForge.Runtime.Cities1
         void ApplyAbsolute(byte[] state);
     }
 
-    /// <summary>
-    /// V2 for entity-bearing state. Adapters must encode Forge EntityIdentityV2 values in their
-    /// payload rather than process-local manager indices. The context owns the native-ID mapping.
-    /// </summary>
     public interface IForgeStateAdapterV2
     {
         string AdapterId { get; }
         uint SchemaVersion { get; }
         byte[] CaptureAbsolute(IForgeAdapterContextV1 context);
         void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state);
+    }
+
+    /// <summary>
+    /// Interactive adapters validate and execute semantic player intents on the Host. Client code
+    /// must cancel the local mutation and call ForgeExtensionApi.TrySubmitIntent instead.
+    /// Forge broadcasts only the resulting absolute adapter state.
+    /// </summary>
+    public interface IForgeInteractiveStateAdapterV1 : IForgeStateAdapterV2
+    {
+        bool ExecuteIntent(IForgeAdapterContextV1 context, byte[] intent);
     }
 
     public interface IForgeAdapterContextV1
@@ -57,15 +62,8 @@ namespace CsmForge.Runtime.Cities1
             ids = ExtensionIdentityServices.Maps.GetOrAttach(adapterId);
         }
 
-        public bool TryGetIdentity(uint nativeId, out EntityIdentityV2 identity)
-        {
-            return ids.TryGetIdentity(nativeId, out identity);
-        }
-
-        public bool TryGetNative(EntityIdentityV2 identity, out uint nativeId)
-        {
-            return ids.TryGetNative(identity, out nativeId);
-        }
+        public bool TryGetIdentity(uint nativeId, out EntityIdentityV2 identity) { return ids.TryGetIdentity(nativeId, out identity); }
+        public bool TryGetNative(EntityIdentityV2 identity, out uint nativeId) { return ids.TryGetNative(identity, out nativeId); }
 
         public EntityIdentityV2 GetOrAllocateIdentity(uint nativeId)
         {
@@ -81,10 +79,7 @@ namespace CsmForge.Runtime.Cities1
             ids.BindKnown(identity, nativeId);
         }
 
-        public bool RetireIdentity(EntityIdentityV2 identity)
-        {
-            return ids.Retire(identity);
-        }
+        public bool RetireIdentity(EntityIdentityV2 identity) { return ids.Retire(identity); }
     }
 
     public static class ForgeExtensionApi
@@ -113,6 +108,31 @@ namespace CsmForge.Runtime.Cities1
                 if (RuntimeServices.Multiplayer.Status.Mode != MultiplayerSessionMode.Offline) return false;
                 return Adapters.Remove(adapterId);
             }
+        }
+
+        public static bool TrySubmitIntent(string adapterId, byte[] intentPayload)
+        {
+            try
+            {
+                ValidateId(adapterId);
+                ExtensionPlayerIntentV2 request = new ExtensionPlayerIntentV2(adapterId, intentPayload);
+                lock (Gate)
+                {
+                    ForgeStateAdapterRegistration registration;
+                    if (!Adapters.TryGetValue(adapterId, out registration) ||
+                        !(registration.AdapterV2 is IForgeInteractiveStateAdapterV1)) return false;
+                }
+                MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                LoadIdentity load = RuntimeServices.Lifecycle.Current;
+                if (!load.IsValid) return false;
+                byte[] copied = request.Payload;
+                return RuntimeServices.Scheduler.QueueSimulation(load, delegate
+                {
+                    RuntimeServices.Multiplayer.SubmitExtensionIntentOnSimulation(adapterId, copied);
+                });
+            }
+            catch { return false; }
         }
 
         public static string[] RegisteredAdapterIds

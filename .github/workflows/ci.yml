@@ -98,6 +98,16 @@ jobs:
           if ($ui.Count -eq 1) { Copy-Item -LiteralPath $ui[0].FullName -Destination (Join-Path $managed 'UnityEngine.UI.dll') }
           "CS1_MANAGED=$managed" >> $env:GITHUB_ENV
           "REFERENCE_ARCHIVE_SHA256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())" >> $env:GITHUB_ENV
+      - name: Probe CS1 DLC manager metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          dotnet run --project tools/Forge.MetadataProbe/Forge.MetadataProbe.csproj -c Release -- \
+            (Join-Path $env:CS1_MANAGED 'Assembly-CSharp.dll') \
+            EventManager EventData EventAI DisasterManager DisasterData DisasterAI DistrictPark \
+            2>&1 | Tee-Object -FilePath artifacts/cs1-dlc-metadata.txt
+          if ($LASTEXITCODE -ne 0) { throw "CS1 metadata probe failed: $LASTEXITCODE" }
       - name: Build and stage installable Forge runtime
         shell: pwsh
         run: |
@@ -149,5 +159,6 @@ jobs:
             ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip.sha256
             ${{ runner.temp }}/forge-runtime/CSM-Forge/BUILD_INFO.json
             ${{ runner.temp }}/forge-runtime/CSM-Forge/SHA256SUMS.txt
+            artifacts/cs1-dlc-metadata.txt
           if-no-files-found: error
           retention-days: 30

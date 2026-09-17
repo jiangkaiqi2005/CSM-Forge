@@ -208,6 +208,8 @@ namespace CsmForge.Runtime.Cities1
         {
             if (RuntimeScopeGuard.IsApplying) return true;
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientRecovering ||
+                role == CitiesRuntimeRole.ClientReplicaLive) return false;
             return role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.SinglePlayer ||
                 role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
                 role == CitiesRuntimeRole.Unloading;

@@ -9,7 +9,7 @@
 | Infinite Goods | 725555912 | Host simulation target | 已确认每 tick 按本地 Building slot 调 `BuildingAI.ModifyMaterialBuffer`；不能让 Client 独立运行，后续必须 Host-only + Stable Building state bridge |
 | ACME | algernon-A/ACME | ClientOnly | 已审计为相机/FPS表现层并加入 `client-mod` 白名单 |
 | New Place | Map | CONTENT | 地图/资产 fingerprint；无独立 shared-simulation adapter |
-| Precision Engineering (Harmony) | Workshop | ClientOnly candidate | 仅在确认实际 IUserMod type 后进入白名单；未知 type 不猜、不放宽 |
+| Precision Engineering (Harmony) | `PrecisionEngineering.Mod` | ClientOnly | 已从公开源码确认 IUserMod type；只提供建造测量/吸附辅助，加入 `client-mod` 白名单 |
 | CSLModernMap: Map&Metro Export | Workshop | ClientOnly/ReadOnly candidate | 仅在确认实际 IUserMod type 后进入白名单；未知 type 不猜、不放宽 |
 | Game Anarchy 1.3.1 | 2781804786 | Host settings/simulation target | 已确认其 `ModSetting` 含经济、解锁、污染/死亡/垃圾/犯罪、资源、退款、火灾等共享模拟开关；需要 Host-owned settings bridge |
 | TM:PE 11.9.4.1 | 1637663252 | Dedicated synchronized adapter | 当前继续 `blocked-mod`；在 Stable Net rule adapter + Vehicle/Path authority 完成前不允许静默加入 |

@@ -28,9 +28,10 @@ class KnownModBridgeContractTests(unittest.TestCase):
         self.assertIn("KnownModBridgeRegistry.InstallOptionalPatches", patches)
         self.assertIn("KnownModBridgeRegistry.ResetOptionalPatchState", patches)
 
-    def test_acme_is_audited_client_only(self) -> None:
+    def test_audited_visual_helpers_are_client_only(self) -> None:
         source = (RUNTIME / "CompatibilityCollector.cs").read_text(encoding="utf-8-sig")
         self.assertIn('"ACME.Mod"', source)
+        self.assertIn('"PrecisionEngineering.Mod"', source)
         self.assertIn('return "client-mod"', source)
 
 

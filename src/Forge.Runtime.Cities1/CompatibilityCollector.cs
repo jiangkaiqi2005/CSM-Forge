@@ -20,7 +20,7 @@ namespace CsmForge.Runtime.Cities1
         {
             "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
             "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod", "AchieveIt.ModInfo",
-            "ACME.Mod"
+            "ACME.Mod", "PrecisionEngineering.Mod"
         };
 
         public static CompatibilityManifest Collect()

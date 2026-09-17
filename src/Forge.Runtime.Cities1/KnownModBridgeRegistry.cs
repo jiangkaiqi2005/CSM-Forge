@@ -13,6 +13,8 @@ namespace CsmForge.Runtime.Cities1
         {
             lock (Gate)
             {
+                if (!Registered(TreeStateAdapter.Adapter)) ForgeExtensionApi.Register(new TreeStateAdapter());
+                if (!Registered(PropStateAdapter.Adapter)) ForgeExtensionApi.Register(new PropStateAdapter());
                 if (DemandControllerBridge.IsAvailable && !Registered(DemandControllerBridgeAdapter.Adapter))
                     ForgeExtensionApi.Register(new DemandControllerBridgeAdapter());
                 if (GameAnarchyBridge.IsAvailable && !Registered(GameAnarchyBridgeAdapter.Adapter))

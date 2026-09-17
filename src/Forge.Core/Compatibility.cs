@@ -79,10 +79,14 @@ namespace CsmForge.Core
             this.required = CompatibilityManifest.Collect(required);
             optionalLocal = CompatibilityManifest.Collect(approvedLocalOnly);
             foreach (string id in this.required.Keys)
+            {
                 if (optionalLocal.ContainsKey(id)) throw new ArgumentException("Required components cannot be downgraded to optional.");
+                if (IsPrefix(id, "blocked-mod:"))
+                    throw new InvalidOperationException("Host contains an unsupported shared-simulation mod without a Forge adapter: " + id);
+            }
         }
 
-        // Validate host AND every client before registering a transport connection in HostSession.
+        // Validate every client before registering a transport connection in HostSession.
         public string[] Evaluate(CompatibilityManifest manifest)
         {
             if (manifest == null) throw new ArgumentNullException("manifest");
@@ -92,13 +96,7 @@ namespace CsmForge.Core
             Dictionary<string, ComponentFingerprint> actual = CompatibilityManifest.Collect(manifest.Entries);
             foreach (KeyValuePair<string, ComponentFingerprint> pair in required)
             {
-                if (IsPrefix(pair.Key, "blocked-mod:"))
-                {
-                    errors.Add("host-unsupported:" + pair.Key);
-                    continue;
-                }
                 if (IsPrefix(pair.Key, "client-mod:")) continue;
-
                 ComponentFingerprint value;
                 if (!actual.TryGetValue(pair.Key, out value)) errors.Add("missing:" + pair.Key);
                 else if (!pair.Value.Matches(value)) errors.Add("fingerprint-mismatch:" + pair.Key);
@@ -106,11 +104,7 @@ namespace CsmForge.Core
             foreach (KeyValuePair<string, ComponentFingerprint> pair in actual)
             {
                 ComponentFingerprint expected;
-                if (required.TryGetValue(pair.Key, out expected))
-                {
-                    if (IsPrefix(pair.Key, "client-mod:")) continue;
-                    continue;
-                }
+                if (required.TryGetValue(pair.Key, out expected)) continue;
                 if (AllowsClientExtra(pair.Key)) continue;
 
                 ComponentFingerprint approved;

@@ -1,4 +1,5 @@
 using System;
+using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {

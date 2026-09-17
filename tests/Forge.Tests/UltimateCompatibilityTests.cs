@@ -1,3 +1,4 @@
+using System;
 using CsmForge.Core;
 
 namespace CsmForge.Tests
@@ -27,12 +28,13 @@ namespace CsmForge.Tests
         }
 
         [Case]
-        public static void LegacyRoomPolicyRejectsBlockedHostMod()
+        public static void LegacyRoomPolicyRejectsBlockedHostModAtRoomCreation()
         {
-            CompatibilityPolicy policy = new CompatibilityPolicy(Build(), Schema(),
-                new[] { Entry("blocked-mod:1637663252:trafficmanager", 1) }, new ComponentFingerprint[0]);
-            string[] errors = policy.Evaluate(new CompatibilityManifest(Build(), Schema(), new ComponentFingerprint[0]));
-            Assert.True(Contains(errors, "host-unsupported:blocked-mod:1637663252:trafficmanager"));
+            Assert.Throws<InvalidOperationException>(delegate
+            {
+                new CompatibilityPolicy(Build(), Schema(),
+                    new[] { Entry("blocked-mod:1637663252:trafficmanager", 1) }, new ComponentFingerprint[0]);
+            });
         }
 
         private static ComponentFingerprint Entry(string id, byte marker)
@@ -41,10 +43,5 @@ namespace CsmForge.Tests
         }
         private static Hash256 Build() { return Hash256.Compute(new byte[] { 1 }); }
         private static Hash256 Schema() { return Hash256.Compute(new byte[] { 2 }); }
-        private static bool Contains(string[] values, string expected)
-        {
-            for (int i = 0; i < values.Length; i++) if (values[i] == expected) return true;
-            return false;
-        }
     }
 }

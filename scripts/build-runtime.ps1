@@ -83,7 +83,7 @@ foreach ($name in $forbidden) {
 }
 
 $notice = @'
-CSM-Forge V3 minimum-playable Alpha
+CSM-Forge V3 minimum-playable Alpha / Ultimate Framework development candidate
 
 This package intentionally does NOT contain Cities: Skylines, Unity, Steam, or other game-owned assemblies.
 It also does not bundle Harmony's implementation DLL; install/enable CitiesHarmony separately.
@@ -99,26 +99,34 @@ Before testing on each machine:
 2. Confirm it reports PASS.
 3. Confirm source_commit and manifest_sha256 are identical on every Host/Client machine.
 
-Minimum-playable Alpha scope:
+Minimum-playable Alpha scope retained:
 - supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand and weather authority;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
 - diagnostic-only projection audit logs projection-drift/local drift without automatically kicking/resyncing a client;
 - temporarily blocked in multiplayer for safety: direct Tree/Prop create/move/delete and Terrain brush writes;
-- not yet claimed complete: Terrain authority, Tree/Prop authority, Event/Campus/DLC-specific systems, full Citizen/Vehicle/Path authority, production-authenticated Internet transport.
+- still outside this framework milestone: full Tree/Prop/Terrain authority, full Citizen/Vehicle/Path authority, production-authenticated Internet transport, and broad real-world Mod/DLC soak certification.
+
+Ultimate Framework code coverage in this candidate:
+- official gameplay DLC are classified to core authority or dedicated absolute-state adapters; see docs/DLC-COVERAGE-V1.zh-CN.md in the repository;
+- Parklife / Industries / Campus / Airports / pedestrian-area systems use stable DistrictPark identities, sharded park-grid state, controls, Campus deep state, and conservative deep value-state projection;
+- Match Day / Concerts use Event Stable IDs, Building Stable-ID references, local Event slot materialization and Host absolute lifecycle/result projection;
+- Natural Disasters use Disaster Stable IDs and local Disaster slot materialization; Client persistent disaster creation/release/random-start paths are fail-closed;
+- third-party Mods can declare ExactMatch / ClientOnly / ForgeSynchronized / Blocked and can register absolute/sharded/interactive Forge adapters;
+- ForgeSynchronized declarations without a state adapter fail closed; unknown simulation-changing Mods remain exact-match by default.
 
 First two-machine test:
-1. Back up the Host city and install the exact same Alpha ZIP + CitiesHarmony on both machines.
+1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
 3. Enter a city on both machines. Host opens CSM-Forge settings and chooses Host current save.
 4. Client enters Host IPv4, same UDP port and temporary room key, then chooses Join Host snapshot.
 5. Wait until Client status is ClientLive before editing.
 6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
-7. Do NOT use Tree/Prop/Terrain tools in this Alpha; they are fail-closed intentionally.
-8. Test a second client join/rejoin while the first client and Host remain live.
-9. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city.
-10. Run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine and keep the generated ZIPs together with the action that immediately preceded the failure.
+7. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
+8. Do NOT use Tree/Prop/Terrain tools; they remain fail-closed intentionally.
+9. Test a second client join/rejoin while the first client and Host remain live.
+10. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
 
-A successful build proves compilation/package integrity, not multi-hour gameplay acceptance. Keep using backed-up saves until the E4 multiplayer gates pass.
+A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until the E4/RC multiplayer gates pass.
 '@
 $notice | Set-Content -LiteralPath (Join-Path $stage 'README-DEV.txt') -Encoding UTF8
 

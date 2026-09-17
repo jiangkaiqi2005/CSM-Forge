@@ -35,6 +35,13 @@ namespace CsmForge.Runtime.Cities1
                     "; generation=" + (identity.IsValid ? identity.Generation.ToString() : "0") +
                     "; events=" + entries.Length + ".");
 
+                UnityEngine.Debug.Log("[CSM-Forge] diagnostic dlc coverage; " + OfficialDlcCoverage.Summary() +
+                    "; districtpark-deep-fields=" + DistrictParkDeepScalarAdapter.SynchronizedFieldPaths.Length + ".");
+                DlcAuthorityCoverageEntry[] dlc = OfficialDlcCoverage.Entries;
+                for (int i = 0; i < dlc.Length; i++)
+                    UnityEngine.Debug.Log("[CSM-Forge] diagnostic dlc; name=" + dlc[i].Name +
+                        "; kind=" + dlc[i].Kind + "; authority=" + dlc[i].Authority);
+
                 if (capabilities != null)
                 {
                     UnityEngine.Debug.Log("[CSM-Forge] diagnostic compatibility; " + capabilities.Summary());

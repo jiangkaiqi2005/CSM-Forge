@@ -11,6 +11,7 @@ namespace CsmForge.Runtime.Cities1
         public int Assets;
         public int DependencyMods;
         public int ClientOnlyMods;
+        public int SynchronizedMods;
         public int ExactMods;
         public int BlockedMods;
         public int StateAdapters;
@@ -31,6 +32,7 @@ namespace CsmForge.Runtime.Cities1
                 else if (Prefix(id, "asset:")) report.Assets++;
                 else if (Prefix(id, "dependency-mod:")) report.DependencyMods++;
                 else if (Prefix(id, "client-mod:")) report.ClientOnlyMods++;
+                else if (Prefix(id, "sync-mod:")) report.SynchronizedMods++;
                 else if (Prefix(id, "blocked-mod:")) { report.BlockedMods++; blocked.Add(id); }
                 else if (Prefix(id, "mod:")) report.ExactMods++;
                 else if (Prefix(id, "adapter:")) report.StateAdapters++;
@@ -48,6 +50,7 @@ namespace CsmForge.Runtime.Cities1
                 "; assets=" + Assets +
                 "; dependency-mods=" + DependencyMods +
                 "; client-only-mods=" + ClientOnlyMods +
+                "; synchronized-mods=" + SynchronizedMods +
                 "; exact-mods=" + ExactMods +
                 "; blocked-mods=" + BlockedMods +
                 "; state-adapters=" + StateAdapters +

@@ -12,20 +12,23 @@ class UltimateExtensionContractTests(unittest.TestCase):
     def test_extension_api_requires_absolute_state_and_stable_identity(self) -> None:
         source = (RUNTIME / "ForgeExtensionApi.cs").read_text(encoding="utf-8-sig")
         for value in [
-            "IForgeStateAdapterV2", "IForgeInteractiveStateAdapterV1", "IForgeAdapterContextV1",
-            "EntityIdentityV2", "GetOrAllocateIdentity", "BindKnownIdentity", "TrySubmitIntent",
+            "IForgeStateAdapterV2", "IForgeShardedStateAdapterV1", "IForgeInteractiveStateAdapterV1",
+            "IForgeAdapterContextV1", "EntityIdentityV2", "GetOrAllocateIdentity", "BindKnownIdentity",
+            "TrySubmitIntent", "CaptureShard", "ApplyShard",
         ]:
             self.assertIn(value, source)
         self.assertNotIn("CommandReceiver", source)
         self.assertNotIn("CommandReplay", source)
 
-    def test_extension_domain_uses_authority_batch_path(self) -> None:
+    def test_extension_domain_uses_authority_batch_path_and_bounded_polling(self) -> None:
         source = (RUNTIME / "ExtensionStateDomain.cs").read_text(encoding="utf-8-sig")
         self.assertIn("IAuthorityDomainV2", source)
         self.assertIn("IReplicaDomainV2", source)
         self.assertIn("AuthorityOriginKind.Simulation", source)
         self.assertIn("PublishObserved", source)
         self.assertIn("ExtensionStateCodecV2.EncodeDelta", source)
+        self.assertIn("PollNextHostEntry", source)
+        self.assertNotIn("for (int scanned = 0; scanned < committed.Length", source)
 
     def test_named_identity_maps_are_persisted(self) -> None:
         source = (RUNTIME / "SaveMetadata.cs").read_text(encoding="utf-8-sig")

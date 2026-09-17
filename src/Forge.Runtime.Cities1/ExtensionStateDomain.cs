@@ -1,89 +1,148 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
     internal sealed class CitiesExtensionStateRegistry
     {
+        private sealed class EntryDescriptor
+        {
+            public int AdapterIndex;
+            public int ShardIndex;
+            public string Key;
+        }
+
         private readonly ForgeStateAdapterRegistration[] adapters;
         private readonly ForgeAdapterContextV1[] contexts;
-        private readonly Dictionary<string, int> indexByAdapter = new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly EntryDescriptor[] entries;
+        private readonly Dictionary<string, int> adapterIndexById = new Dictionary<string, int>(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> entryIndexByIdentity = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        public int Count { get { return adapters.Length; } }
+        public int Count { get { return entries.Length; } }
 
         public CitiesExtensionStateRegistry(ForgeStateAdapterRegistration[] registrations, bool authoritative)
         {
             if (registrations == null) throw new ArgumentNullException("registrations");
             adapters = (ForgeStateAdapterRegistration[])registrations.Clone();
             contexts = new ForgeAdapterContextV1[adapters.Length];
+            List<EntryDescriptor> descriptors = new List<EntryDescriptor>();
             for (int i = 0; i < adapters.Length; i++)
             {
                 if (i > 0 && StringComparer.Ordinal.Compare(adapters[i - 1].AdapterId, adapters[i].AdapterId) >= 0)
                     throw new ArgumentException("Forge adapter registrations must be unique and canonically ordered.", "registrations");
                 contexts[i] = new ForgeAdapterContextV1(adapters[i].AdapterId, authoritative);
-                indexByAdapter.Add(adapters[i].AdapterId, i);
+                adapterIndexById.Add(adapters[i].AdapterId, i);
+                if (adapters[i].Sharded == null)
+                {
+                    descriptors.Add(new EntryDescriptor { AdapterIndex = i, ShardIndex = -1, Key = "state" });
+                }
+                else
+                {
+                    int count = adapters[i].Sharded.ShardCount;
+                    if (count <= 0 || count > 1024) throw new InvalidOperationException("Invalid sharded adapter size: " + adapters[i].AdapterId);
+                    for (int shard = 0; shard < count; shard++)
+                        descriptors.Add(new EntryDescriptor
+                        {
+                            AdapterIndex = i,
+                            ShardIndex = shard,
+                            Key = "shard:" + shard.ToString("D4", CultureInfo.InvariantCulture)
+                        });
+                }
+            }
+            if (descriptors.Count > ExtensionStateCodecV2.MaximumEntries)
+                throw new InvalidOperationException("Extension state entry limit exceeded by registered adapters.");
+            entries = descriptors.ToArray();
+            for (int i = 0; i < entries.Length; i++)
+            {
+                string adapterId = adapters[entries[i].AdapterIndex].AdapterId;
+                entryIndexByIdentity.Add(EntryIdentity(adapterId, entries[i].Key), i);
             }
         }
 
         public ExtensionStateEntryV2[] CaptureAll(LoadIdentity load)
         {
-            ExtensionStateEntryV2[] entries = new ExtensionStateEntryV2[adapters.Length];
-            for (int i = 0; i < entries.Length; i++) entries[i] = CaptureOne(load, i);
-            return entries;
+            ExtensionStateEntryV2[] result = new ExtensionStateEntryV2[entries.Length];
+            for (int i = 0; i < result.Length; i++) result[i] = CaptureOne(load, i);
+            return result;
         }
 
-        public ExtensionStateEntryV2 CaptureOne(LoadIdentity load, int index)
+        public ExtensionStateEntryV2 CaptureOne(LoadIdentity load, int entryIndex)
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension capture belongs to a stale load.");
-            if (index < 0 || index >= adapters.Length) throw new ArgumentOutOfRangeException("index");
+            if (entryIndex < 0 || entryIndex >= entries.Length) throw new ArgumentOutOfRangeException("entryIndex");
+            EntryDescriptor descriptor = entries[entryIndex];
+            ForgeStateAdapterRegistration registration = adapters[descriptor.AdapterIndex];
             byte[] state;
             using (RuntimeScopeGuard.EnterCapture(load))
             {
-                state = adapters[index].AdapterV2 != null
-                    ? adapters[index].AdapterV2.CaptureAbsolute(contexts[index])
-                    : adapters[index].AdapterV1.CaptureAbsolute();
+                if (registration.Sharded != null)
+                    state = registration.Sharded.CaptureShard(contexts[descriptor.AdapterIndex], descriptor.ShardIndex);
+                else if (registration.AdapterV2 != null)
+                    state = registration.AdapterV2.CaptureAbsolute(contexts[descriptor.AdapterIndex]);
+                else state = registration.AdapterV1.CaptureAbsolute();
             }
-            if (state == null) throw new InvalidOperationException("Forge adapter returned a null absolute state: " + adapters[index].AdapterId);
-            return new ExtensionStateEntryV2(adapters[index].AdapterId, "state", state);
+            if (state == null) throw new InvalidOperationException("Forge adapter returned a null absolute state: " + registration.AdapterId);
+            return new ExtensionStateEntryV2(registration.AdapterId, descriptor.Key, state);
         }
 
         public ExtensionStateEntryV2 ApplyOne(LoadIdentity load, ExtensionStateEntryV2 requested)
         {
             if (requested == null) throw new ArgumentNullException("requested");
-            if (requested.Key != "state") throw new InvalidOperationException("Extension delta uses an unsupported state key.");
-            int index = FindIndex(requested.AdapterId);
-            if (index < 0) throw new InvalidOperationException("Extension delta references an unaccepted adapter: " + requested.AdapterId);
+            int entryIndex = FindEntryIndex(requested.AdapterId, requested.Key);
+            if (entryIndex < 0) throw new InvalidOperationException("Extension delta references an unaccepted adapter state entry.");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension apply belongs to a stale load.");
+            EntryDescriptor descriptor = entries[entryIndex];
+            ForgeStateAdapterRegistration registration = adapters[descriptor.AdapterIndex];
             using (RuntimeScopeGuard.EnterApply(load, ExtensionStateAuthorityDomain.Id))
             {
-                if (adapters[index].AdapterV2 != null) adapters[index].AdapterV2.ApplyAbsolute(contexts[index], requested.Payload);
-                else adapters[index].AdapterV1.ApplyAbsolute(requested.Payload);
+                if (registration.Sharded != null)
+                    registration.Sharded.ApplyShard(contexts[descriptor.AdapterIndex], descriptor.ShardIndex, requested.Payload);
+                else if (registration.AdapterV2 != null)
+                    registration.AdapterV2.ApplyAbsolute(contexts[descriptor.AdapterIndex], requested.Payload);
+                else registration.AdapterV1.ApplyAbsolute(requested.Payload);
             }
-            return CaptureOne(load, index);
+            return CaptureOne(load, entryIndex);
         }
 
-        public bool ExecutePlayer(LoadIdentity load, ExtensionPlayerIntentV2 request,
-            out int index, out ExtensionStateEntryV2 actual)
+        public bool ExecutePlayer(LoadIdentity load, ExtensionPlayerIntentV2 request, out int adapterIndex)
         {
-            index = FindIndex(request == null ? null : request.AdapterId);
-            actual = null;
-            if (index < 0 || request == null || !RuntimeServices.Lifecycle.IsCurrent(load)) return false;
-            IForgeInteractiveStateAdapterV1 interactive = adapters[index].AdapterV2 as IForgeInteractiveStateAdapterV1;
-            if (interactive == null || !contexts[index].IsAuthoritative) return false;
+            adapterIndex = FindAdapterIndex(request == null ? null : request.AdapterId);
+            if (adapterIndex < 0 || request == null || !RuntimeServices.Lifecycle.IsCurrent(load)) return false;
+            ForgeStateAdapterRegistration registration = adapters[adapterIndex];
+            if (!contexts[adapterIndex].IsAuthoritative) return false;
             bool applied;
             using (RuntimeScopeGuard.EnterApply(load, ExtensionStateAuthorityDomain.Id))
-                applied = interactive.ExecuteIntent(contexts[index], request.Payload);
-            if (!applied) return false;
-            actual = CaptureOne(load, index);
-            return true;
+            {
+                IForgeInteractiveStateAdapterV1 normal = registration.AdapterV2 as IForgeInteractiveStateAdapterV1;
+                IForgeInteractiveShardedStateAdapterV1 sharded = registration.Sharded as IForgeInteractiveShardedStateAdapterV1;
+                if (normal != null) applied = normal.ExecuteIntent(contexts[adapterIndex], request.Payload);
+                else if (sharded != null) applied = sharded.ExecuteIntent(contexts[adapterIndex], request.Payload);
+                else return false;
+            }
+            return applied;
         }
 
-        public int FindIndex(string adapterId)
+        public int FindAdapterIndex(string adapterId)
         {
             int index;
-            return adapterId != null && indexByAdapter.TryGetValue(adapterId, out index) ? index : -1;
+            return adapterId != null && adapterIndexById.TryGetValue(adapterId, out index) ? index : -1;
         }
+
+        public int FindEntryIndex(string adapterId, string key)
+        {
+            int index;
+            return adapterId != null && key != null && entryIndexByIdentity.TryGetValue(EntryIdentity(adapterId, key), out index) ? index : -1;
+        }
+
+        public int EntryAdapterIndex(int entryIndex)
+        {
+            if (entryIndex < 0 || entryIndex >= entries.Length) throw new ArgumentOutOfRangeException("entryIndex");
+            return entries[entryIndex].AdapterIndex;
+        }
+
+        private static string EntryIdentity(string adapterId, string key) { return adapterId + "\n" + key; }
     }
 
     internal sealed class ExtensionObservedChange
@@ -117,29 +176,37 @@ namespace CsmForge.Runtime.Cities1
             ExtensionPlayerIntentV2 request;
             try { request = ExtensionIntentCodecV2.Decode(payload); }
             catch { return DomainExecutionV2.Rejected(); }
-            int index;
-            ExtensionStateEntryV2 actual;
-            if (!registry.ExecutePlayer(load, request, out index, out actual) || index < 0 || index >= committed.Length || actual == null)
-                return DomainExecutionV2.Rejected();
-            if (committed[index].PayloadRoot.Equals(actual.PayloadRoot)) return DomainExecutionV2.Rejected();
-            committed[index] = actual;
-            return DomainExecutionV2.Success(ExtensionStateCodecV2.EncodeDelta(actual), StateRoot);
+            int adapterIndex;
+            if (!registry.ExecutePlayer(load, request, out adapterIndex)) return DomainExecutionV2.Rejected();
+            for (int i = 0; i < committed.Length; i++)
+            {
+                if (registry.EntryAdapterIndex(i) != adapterIndex) continue;
+                ExtensionStateEntryV2 actual = registry.CaptureOne(load, i);
+                if (committed[i].PayloadRoot.Equals(actual.PayloadRoot)) continue;
+                committed[i] = actual;
+                return DomainExecutionV2.Success(ExtensionStateCodecV2.EncodeDelta(actual), StateRoot);
+            }
+            return DomainExecutionV2.Rejected();
         }
 
-        public ExtensionObservedChange ObserveNextHostChange()
+        /// <summary>Poll exactly one bounded entry; caller controls per-tick work.</summary>
+        public bool PollNextHostEntry(out ExtensionObservedChange change)
         {
-            if (committed.Length == 0) return null;
-            for (int scanned = 0; scanned < committed.Length; scanned++)
+            change = null;
+            if (committed.Length == 0) return false;
+            int index = observationCursor++ % committed.Length;
+            ExtensionStateEntryV2 actual = registry.CaptureOne(load, index);
+            if (committed[index].PayloadRoot.Equals(actual.PayloadRoot)) return true;
+            Hash256 before = StateRoot;
+            committed[index] = actual;
+            Hash256 after = StateRoot;
+            change = new ExtensionObservedChange
             {
-                int index = observationCursor++ % committed.Length;
-                ExtensionStateEntryV2 actual = registry.CaptureOne(load, index);
-                if (committed[index].PayloadRoot.Equals(actual.PayloadRoot)) continue;
-                Hash256 before = StateRoot;
-                committed[index] = actual;
-                Hash256 after = StateRoot;
-                return new ExtensionObservedChange { BeforeRoot = before, AfterRoot = after, Delta = ExtensionStateCodecV2.EncodeDelta(actual) };
-            }
-            return null;
+                BeforeRoot = before,
+                AfterRoot = after,
+                Delta = ExtensionStateCodecV2.EncodeDelta(actual)
+            };
+            return true;
         }
     }
 
@@ -164,8 +231,8 @@ namespace CsmForge.Runtime.Cities1
         {
             if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
             ExtensionStateEntryV2 requested = ExtensionStateCodecV2.DecodeDelta(absoluteDelta);
-            int index = registry.FindIndex(requested.AdapterId);
-            if (index < 0 || index >= committed.Length) throw new InvalidOperationException("Extension delta references an unknown adapter.");
+            int index = registry.FindEntryIndex(requested.AdapterId, requested.Key);
+            if (index < 0 || index >= committed.Length) throw new InvalidOperationException("Extension delta references an unknown adapter state entry.");
             ExtensionStateEntryV2 actual = registry.ApplyOne(load, requested);
             if (!actual.PayloadRoot.Equals(requested.PayloadRoot))
                 throw new InvalidOperationException("Extension adapter absolute projection did not reproduce the requested payload root.");
@@ -186,8 +253,9 @@ namespace CsmForge.Runtime.Cities1
             if (mode != MultiplayerSessionMode.Hosting || hostExtensions == null || authority == null || snapshotSave != null) return;
             for (int i = 0; i < 8; i++)
             {
-                ExtensionObservedChange change = hostExtensions.ObserveNextHostChange();
-                if (change == null) return;
+                ExtensionObservedChange change;
+                if (!hostExtensions.PollNextHostEntry(out change)) return;
+                if (change == null) continue;
                 AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ExtensionStateAuthorityDomain.Id,
                     change.BeforeRoot, change.AfterRoot, change.Delta);
                 if (batch == null || authority.IsFenced)

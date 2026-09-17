@@ -73,7 +73,7 @@ namespace CsmForge.Core
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))
             {
-                writer.Write(0x32525846u); // FXR2 - root descriptor, not a network frame
+                writer.Write(0x32525846u);
                 writer.Write((ushort)normalized.Length);
                 for (int i = 0; i < normalized.Length; i++)
                 {
@@ -106,10 +106,9 @@ namespace CsmForge.Core
 
     public static class ExtensionStateCodecV2
     {
-        public const int MaximumEntries = 256;
-        private const uint Magic = 0x32584546; // FEX2
+        public const int MaximumEntries = 2048;
+        private const uint Magic = 0x32584546;
 
-        /// <summary>Full snapshot encoding is retained for tools/tests; it is not used for multi-adapter live deltas.</summary>
         public static byte[] Encode(ExtensionStateSnapshotV2 snapshot)
         {
             if (snapshot == null) throw new ArgumentNullException("snapshot");

@@ -21,7 +21,25 @@ namespace CsmForge.Runtime.Cities1
         void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state);
     }
 
+    /// <summary>
+    /// Large result-state systems split their absolute state into deterministic shards. Each shard
+    /// is independently bounded by one Forge frame while the aggregate domain root covers all shards.
+    /// </summary>
+    public interface IForgeShardedStateAdapterV1
+    {
+        string AdapterId { get; }
+        uint SchemaVersion { get; }
+        int ShardCount { get; }
+        byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex);
+        void ApplyShard(IForgeAdapterContextV1 context, int shardIndex, byte[] state);
+    }
+
     public interface IForgeInteractiveStateAdapterV1 : IForgeStateAdapterV2
+    {
+        bool ExecuteIntent(IForgeAdapterContextV1 context, byte[] intent);
+    }
+
+    public interface IForgeInteractiveShardedStateAdapterV1 : IForgeShardedStateAdapterV1
     {
         bool ExecuteIntent(IForgeAdapterContextV1 context, byte[] intent);
     }
@@ -41,6 +59,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public IForgeStateAdapterV1 AdapterV1;
         public IForgeStateAdapterV2 AdapterV2;
+        public IForgeShardedStateAdapterV1 Sharded;
         public string AdapterId;
         public uint SchemaVersion;
         public Assembly Assembly;
@@ -88,13 +107,21 @@ namespace CsmForge.Runtime.Cities1
         public static void Register(IForgeStateAdapterV1 adapter)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
-            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, adapter, null);
+            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, adapter, null, null);
         }
 
         public static void Register(IForgeStateAdapterV2 adapter)
         {
             if (adapter == null) throw new ArgumentNullException("adapter");
-            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, adapter);
+            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, adapter, null);
+        }
+
+        public static void Register(IForgeShardedStateAdapterV1 adapter)
+        {
+            if (adapter == null) throw new ArgumentNullException("adapter");
+            if (adapter.ShardCount <= 0 || adapter.ShardCount > 1024)
+                throw new ArgumentOutOfRangeException("adapter", "ShardCount must be 1..1024.");
+            RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, null, adapter);
         }
 
         public static bool Unregister(string adapterId)
@@ -116,7 +143,10 @@ namespace CsmForge.Runtime.Cities1
                 lock (Gate)
                 {
                     ForgeStateAdapterRegistration registration;
-                    if (!Adapters.TryGetValue(adapterId, out registration) || !(registration.AdapterV2 is IForgeInteractiveStateAdapterV1)) return false;
+                    if (!Adapters.TryGetValue(adapterId, out registration)) return false;
+                    bool interactive = registration.AdapterV2 is IForgeInteractiveStateAdapterV1 ||
+                        registration.Sharded is IForgeInteractiveShardedStateAdapterV1;
+                    if (!interactive) return false;
                 }
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
                 if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
@@ -159,32 +189,42 @@ namespace CsmForge.Runtime.Cities1
         }
 
         private static void RegisterCore(string adapterId, uint schemaVersion, Assembly assembly,
-            IForgeStateAdapterV1 v1, IForgeStateAdapterV2 v2)
+            IForgeStateAdapterV1 v1, IForgeStateAdapterV2 v2, IForgeShardedStateAdapterV1 sharded)
         {
             ValidateId(adapterId);
             if (schemaVersion == 0) throw new ArgumentOutOfRangeException("schemaVersion", "SchemaVersion must be non-zero.");
             if (assembly == null) throw new ArgumentNullException("assembly");
+            int implementations = (v1 == null ? 0 : 1) + (v2 == null ? 0 : 1) + (sharded == null ? 0 : 1);
+            if (implementations != 1) throw new ArgumentException("Exactly one adapter state surface must be registered.");
             lock (Gate)
             {
                 EnsureSessionMutable();
                 ForgeStateAdapterRegistration existing;
                 if (Adapters.TryGetValue(adapterId, out existing))
                 {
-                    Type oldType = existing.AdapterV2 != null ? existing.AdapterV2.GetType() : existing.AdapterV1.GetType();
-                    Type newType = v2 != null ? v2.GetType() : v1.GetType();
+                    Type oldType = RegisteredType(existing);
+                    Type newType = v1 != null ? v1.GetType() : v2 != null ? v2.GetType() : sharded.GetType();
                     if (oldType != newType || existing.SchemaVersion != schemaVersion)
                         throw new InvalidOperationException("A different adapter or schema already owns this AdapterId.");
                 }
-                else if (Adapters.Count >= 128) throw new InvalidOperationException("Forge state adapter limit exceeded.");
+                else if (Adapters.Count >= 512) throw new InvalidOperationException("Forge state adapter limit exceeded.");
                 Adapters[adapterId] = new ForgeStateAdapterRegistration
                 {
                     AdapterId = adapterId,
                     SchemaVersion = schemaVersion,
                     Assembly = assembly,
                     AdapterV1 = v1,
-                    AdapterV2 = v2
+                    AdapterV2 = v2,
+                    Sharded = sharded
                 };
             }
+        }
+
+        private static Type RegisteredType(ForgeStateAdapterRegistration value)
+        {
+            if (value.AdapterV2 != null) return value.AdapterV2.GetType();
+            if (value.AdapterV1 != null) return value.AdapterV1.GetType();
+            return value.Sharded.GetType();
         }
 
         private static void EnsureSessionMutable()

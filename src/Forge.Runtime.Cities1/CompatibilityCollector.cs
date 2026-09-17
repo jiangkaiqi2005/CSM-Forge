@@ -31,11 +31,12 @@ namespace CsmForge.Runtime.Cities1
             {
                 if (plugin == null || !plugin.isEnabled) continue;
                 IUserMod userMod = plugin.userModInstance as IUserMod;
-                string category = ModCategory(userMod == null ? null : userMod.GetType().FullName);
+                string typeName = userMod == null ? null : userMod.GetType().FullName;
                 List<Assembly> assemblies = plugin.GetAssemblies();
                 foreach (Assembly assembly in assemblies)
                 {
                     if (assembly == null) continue;
+                    string category = ModCategory(typeName, assembly);
                     string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
                     Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
                 }
@@ -43,6 +44,7 @@ namespace CsmForge.Runtime.Cities1
                 if (assemblies.Count == 0 && userMod != null)
                 {
                     Assembly assembly = userMod.GetType().Assembly;
+                    string category = ModCategory(typeName, assembly);
                     string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
                     Add(entries, seen, id, BinaryHash(assembly), ConfigHash(assembly.GetName().Version + "|enabled=1"));
                 }
@@ -84,8 +86,19 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
-        private static string ModCategory(string typeName)
+        private static string ModCategory(string typeName, Assembly assembly)
         {
+            ForgeModCompatibilityKind declared;
+            if (ForgeCompatibilityApi.TryGet(assembly, out declared))
+            {
+                switch (declared)
+                {
+                    case ForgeModCompatibilityKind.ClientOnly: return "client-mod";
+                    case ForgeModCompatibilityKind.ForgeSynchronized: return "sync-mod";
+                    case ForgeModCompatibilityKind.Blocked: return "blocked-mod";
+                    default: return "mod";
+                }
+            }
             if (typeName == "CitiesHarmony.Mod") return "dependency-mod";
             if (typeName == "TrafficManager.Lifecycle.TrafficManagerMod") return "blocked-mod";
             for (int i = 0; i < ClientOnlyModTypes.Length; i++)

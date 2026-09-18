@@ -35,8 +35,10 @@ namespace CsmForge.Runtime.Cities1
                     if (!Registered(EightyOne2WaterGridAdapter.Adapter))
                         ForgeExtensionApi.Register(new EightyOne2WaterGridAdapter());
                 }
-                if (TmpePersistentRulesBridge.IsAvailable && !Registered(TmpePersistentRulesAdapter.Adapter))
-                    ForgeExtensionApi.Register(new TmpePersistentRulesAdapter());
+                // TM:PE remains a blocked-mod.  Keep its audited bridge code dormant until the
+                // UI-write audit and real multi-machine validation promote it to Supported.
+                // A blocked mod must not be patched or registered merely because its assembly is
+                // present: doing so mutates TM:PE's live simulation path even in single-player.
             }
         }
 
@@ -58,7 +60,7 @@ namespace CsmForge.Runtime.Cities1
                 InfiniteGoodsBridge.InstallOptionalPatches(harmony);
                 EightyOne2Bridge.InstallOptionalPatches(harmony);
                 NetworkMultitoolBridge.InstallOptionalPatches(harmony);
-                TmpeDynamicAuthorityBridge.InstallOptionalPatches(harmony);
+                // TM:PE is intentionally not patched while its compatibility kind is blocked-mod.
             }
         }
 
@@ -71,7 +73,6 @@ namespace CsmForge.Runtime.Cities1
                 InfiniteGoodsBridge.ResetPatchState();
                 EightyOne2Bridge.ResetPatchState();
                 NetworkMultitoolBridge.ResetPatchState();
-                TmpeDynamicAuthorityBridge.ResetPatchState();
             }
         }
 

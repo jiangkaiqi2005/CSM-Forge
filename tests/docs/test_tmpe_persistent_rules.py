@@ -25,7 +25,9 @@ class TmpePersistentRulesContractTests(unittest.TestCase):
             'RemoveNodeFromSimulation',
         ]:
             self.assertIn(marker, bridge)
-        self.assertIn('ForgeExtensionApi.Register(new TmpePersistentRulesAdapter())', registry)
+        self.assertNotIn('ForgeExtensionApi.Register(new TmpePersistentRulesAdapter())', registry)
+        self.assertNotIn('TmpeDynamicAuthorityBridge.InstallOptionalPatches(harmony)', registry)
+        self.assertIn('TM:PE remains a blocked-mod', registry)
 
     def test_tmpe_remains_blocked_until_dynamic_authority_closure(self) -> None:
         collector = (REPO / "src" / "Forge.Runtime.Cities1" / "CompatibilityCollector.cs").read_text(encoding="utf-8-sig")

@@ -553,6 +553,7 @@ namespace CsmForge.Runtime.Cities1
         private void AbortStart(string reason)
         {
             ForgeSteamRichPresence.Clear();
+            UnityEngine.Debug.LogError("[CSM-Forge] multiplayer start aborted: " + reason);
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }

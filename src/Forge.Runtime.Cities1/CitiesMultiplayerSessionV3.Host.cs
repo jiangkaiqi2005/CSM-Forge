@@ -35,7 +35,10 @@ namespace CsmForge.Runtime.Cities1
                     ForgeMultiplayerUi.LocalIpv4(), port, roomKey), 1);
                 lock (gate) { mode = MultiplayerSessionMode.Hosting; detail = "hosting-development-transport:" + port; }
             }
-            catch (Exception error) { AbortStart("host-start:" + error.GetType().Name); }
+            catch (Exception error)
+            {
+                AbortStart("host-start:" + error.GetType().Name + ":" + error.Message);
+            }
         }
 
         private void DrainServerEvents()

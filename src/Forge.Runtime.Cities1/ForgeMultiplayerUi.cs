@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using ColossalFramework.PlatformServices;
 using ColossalFramework.UI;
@@ -77,6 +78,12 @@ namespace CsmForge.Runtime.Cities1
             button.eventClick += delegate
             {
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
+                ClosePauseMenu();
+                if (mode == MultiplayerSessionMode.Faulted)
+                {
+                    RuntimeServices.Multiplayer.StopImmediately();
+                    mode = MultiplayerSessionMode.Offline;
+                }
                 if (mode == MultiplayerSessionMode.Offline || mode == MultiplayerSessionMode.Faulted)
                     ShowPanel<ForgeHostGamePanel>();
                 else ShowPanel<ForgeSessionPanel>();
@@ -145,6 +152,19 @@ namespace CsmForge.Runtime.Cities1
                 view.gameObject.AddComponent<ForgePlayerPresenceUi>();
         }
 
+        private static void ClosePauseMenu()
+        {
+            try
+            {
+                MethodInfo resume = AccessTools.Method(typeof(PauseMenu), "Resume");
+                if (resume != null) resume.Invoke(new PauseMenu(), new object[0]);
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.LogError("[CSM-Forge] could not close pause menu before opening multiplayer UI: " + error);
+            }
+        }
+
         private static T ShowPanel<T>() where T : UIComponent
         {
             UIView view = UIView.GetAView(); if (view == null) return null;
@@ -194,8 +214,8 @@ namespace CsmForge.Runtime.Cities1
 
         protected void Configure(string title, float panelHeight)
         {
-            backgroundSprite = "GenericPanel"; color = new Color32(40, 40, 48, 245);
-            width = 520; height = panelHeight;
+            backgroundSprite = "GenericPanel"; color = new Color32(110, 110, 110, 250);
+            width = 360; height = panelHeight;
             UIView view = GetUIView();
             relativePosition = new Vector3(view.GetScreenResolution().x / 2f - width / 2f,
                 view.GetScreenResolution().y / 2f - height / 2f);
@@ -207,13 +227,13 @@ namespace CsmForge.Runtime.Cities1
         protected UILabel Label(string text, float y)
         {
             UILabel label = AddUIComponent<UILabel>(); label.text = text; label.textScale = 0.9f;
-            label.relativePosition = new Vector3(20, y); return label;
+            label.width = 340; label.wordWrap = true; label.relativePosition = new Vector3(10, y); return label;
         }
 
         protected UITextField Field(string text, float y, bool numeric)
         {
-            UITextField field = AddUIComponent<UITextField>(); field.text = text; field.width = 480; field.height = 32;
-            field.relativePosition = new Vector3(20, y); field.normalBgSprite = "TextFieldPanel";
+            UITextField field = AddUIComponent<UITextField>(); field.text = text; field.width = 340; field.height = 32;
+            field.relativePosition = new Vector3(10, y); field.normalBgSprite = "TextFieldPanel";
             field.hoveredBgSprite = "TextFieldPanelHovered"; field.focusedBgSprite = "TextFieldPanelFocused";
             field.padding = new RectOffset(8, 8, 7, 7); field.builtinKeyNavigation = true; field.numericalOnly = numeric;
             return field;
@@ -221,8 +241,8 @@ namespace CsmForge.Runtime.Cities1
 
         protected UIButton Button(string text, float y, Action action)
         {
-            UIButton button = AddUIComponent<UIButton>(); button.text = text; button.width = 480; button.height = 42;
-            button.relativePosition = new Vector3(20, y); button.normalBgSprite = "ButtonMenu";
+            UIButton button = AddUIComponent<UIButton>(); button.text = text; button.width = 340; button.height = 42;
+            button.relativePosition = new Vector3(10, y); button.normalBgSprite = "ButtonMenu";
             button.hoveredBgSprite = "ButtonMenuHovered"; button.pressedBgSprite = "ButtonMenuPressed";
             button.eventClick += delegate { action(); }; return button;
         }
@@ -239,6 +259,12 @@ namespace CsmForge.Runtime.Cities1
         {
             MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
             return value.Mode + " | peers=" + value.ConnectedPeers + " | revision=" + value.Revision + " | " + value.Detail;
+        }
+
+        public override void Update()
+        {
+            if (isVisible && Input.GetKeyDown(KeyCode.Escape)) isVisible = false;
+            base.Update();
         }
     }
 
@@ -307,17 +333,18 @@ namespace CsmForge.Runtime.Cities1
         private UITextField keyField;
         private UITextField nameField;
         private UILabel players;
+        private string feedback;
 
         public override void Start()
         {
-            Configure("创建 CSM-Forge 房间", 560);
+            Configure("创建 CSM-Forge 房间", 510);
             Label("显示名", 58); nameField = Field(ForgeMod.Settings.DisplayName.value, 82, false);
             Label("UDP 端口", 124); portField = Field(ForgeMod.Settings.Port.value.ToString(), 148, true);
             Label("临时房间口令", 190); keyField = Field(ForgeMultiplayerUi.RoomKey, 214, false);
-            Status = Label(StatusText(), 260);
-            players = Label("房间尚未创建", 285);
-            Button("创建房间（当前城市作为房主）", 320, CreateRoom);
-            Button("关闭", 390, delegate { isVisible = false; });
+            Status = Label("设置完成后点击创建房间。", 260);
+            players = Label("直连地址：" + ForgeMultiplayerUi.LocalIpv4(), 300);
+            Button("创建房间（当前城市作为房主）", 350, CreateRoom);
+            Button("取消", 410, delegate { isVisible = false; });
             base.Start();
         }
 
@@ -326,9 +353,11 @@ namespace CsmForge.Runtime.Cities1
             if (isVisible)
             {
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
-                Status.text = StatusText();
+                if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
+                    Status.text = value.Mode == MultiplayerSessionMode.Offline ?
+                        "设置完成后点击创建房间。" : StatusText();
                 players.text = value.Mode == MultiplayerSessionMode.Hosting ?
-                    "房间已创建，正在打开会话管理……" : "房间尚未创建";
+                    "房间已创建，正在打开会话管理……" : "直连地址：" + ForgeMultiplayerUi.LocalIpv4();
                 if (value.Mode == MultiplayerSessionMode.Hosting)
                 {
                     isVisible = false;
@@ -342,15 +371,20 @@ namespace CsmForge.Runtime.Cities1
         {
             int port; string display = (nameField.text ?? string.Empty).Trim(); string key = keyField.text ?? string.Empty;
             if (!int.TryParse(portField.text, out port) || port < 1 || port > 65535)
-            { Status.text = "端口必须是 1–65535。"; return; }
+            { SetFeedback("端口必须是 1–65535。"); return; }
             if (display.Length == 0 || display.Length > 32 || Encoding.UTF8.GetByteCount(display) > 64 ||
                 key.Length == 0 || key.Length > 64)
-            { Status.text = "显示名需为 1–32 个字符（UTF-8 最多 64 字节），房间口令需为 1–64 个字符。"; return; }
+            { SetFeedback("显示名需为 1–32 个字符（UTF-8 最多 64 字节），房间口令需为 1–64 个字符。"); return; }
+            if (!RuntimeServices.Patches.Installed)
+            { SetFeedback("Forge patches 尚未就绪。请确认 CitiesHarmony 已启用，然后重启游戏。"); return; }
             ForgeMod.Settings.DisplayName.value = display; ForgeMod.Settings.Port.value = port;
             ForgeMultiplayerUi.RoomKey = key;
-            bool ok = RuntimeServices.Patches.Installed && RuntimeServices.Multiplayer.RequestHost(port, key, display);
-            Status.text = ok ? "正在创建房间……" : "创建失败：请确认已经进入城市且当前没有 Forge 会话。";
+            bool ok = RuntimeServices.Multiplayer.RequestHost(port, key, display);
+            SetFeedback(ok ? "正在创建房间……" :
+                "创建失败：当前城市会话不可用或已有 Forge 会话。请关闭此页后重试。");
         }
+
+        private void SetFeedback(string value) { feedback = value; Status.text = value; }
     }
 
     internal sealed class ForgeSessionPanel : ForgePanelBase
@@ -424,7 +458,8 @@ namespace CsmForge.Runtime.Cities1
             {
                 int row = i;
                 names[i] = Label(string.Empty, 60 + i * 34);
-                kick[i] = SmallButton("移出", 390, 55 + i * 34, 90, delegate { Kick(row); });
+                names[i].width = 240;
+                kick[i] = SmallButton("移出", 260, 55 + i * 34, 90, delegate { Kick(row); });
             }
             Button("关闭", 380, delegate { isVisible = false; });
             base.Start();
@@ -465,11 +500,11 @@ namespace CsmForge.Runtime.Cities1
         public override void Start()
         {
             Configure("多人聊天", 430);
-            log = Label("按 T 可以随时打开聊天。", 55); log.width = 480; log.height = 240;
+            log = Label("按 T 可以随时打开聊天。", 55); log.width = 340; log.height = 240;
             log.wordWrap = true; log.autoHeight = false;
             input = Field(string.Empty, 305, false);
-            SmallButton("发送", 20, 350, 300, Send);
-            SmallButton("关闭", 330, 350, 170, delegate { isVisible = false; });
+            SmallButton("发送", 10, 350, 205, Send);
+            SmallButton("关闭", 225, 350, 125, delegate { isVisible = false; });
             input.eventKeyDown += delegate(UIComponent component, UIKeyEventParameter parameter)
             {
                 if (parameter.keycode == KeyCode.Return || parameter.keycode == KeyCode.KeypadEnter)

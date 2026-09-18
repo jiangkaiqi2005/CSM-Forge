@@ -14,6 +14,26 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn('text = "FORGE 联机"', source)
         self.assertIn('text = "FORGE 多人联机"', source)
 
+    def test_pause_menu_is_closed_before_the_host_panel_takes_input(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        pause_method = source.index("internal static void EnsurePauseMenuEntry()")
+        click = source[source.index("button.eventClick += delegate", pause_method):]
+        self.assertIn("ClosePauseMenu();", click)
+        self.assertLess(click.index("ClosePauseMenu();"), click.index("ShowPanel<ForgeHostGamePanel>()"))
+
+    def test_host_creation_feedback_is_not_overwritten_while_offline(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        host = source[source.index("internal sealed class ForgeHostGamePanel"):source.index("internal sealed class ForgeSessionPanel")]
+        self.assertIn("private string feedback", host)
+        self.assertIn("string.IsNullOrEmpty(feedback)", host)
+        self.assertIn("Forge patches 尚未就绪", host)
+
+    def test_steam_shutdown_unhooks_before_platform_native_state_disappears(self):
+        source = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
+        self.assertIn("PlatformService.eventPlatformServiceShutdown += OnPlatformServiceShutdown", source)
+        self.assertIn("PlatformService.eventPlatformServiceShutdown -= OnPlatformServiceShutdown", source)
+        self.assertIn("private static void OnPlatformServiceShutdown()", source)
+
     def test_main_menu_join_does_not_require_a_loaded_world(self):
         source = (RUNTIME / "CitiesMultiplayerSessionV3.cs").read_text(encoding="utf-8")
         client = (RUNTIME / "CitiesMultiplayerSessionV3.Client.cs").read_text(encoding="utf-8")

@@ -50,6 +50,7 @@ namespace CsmForge.Runtime.Cities1
         private static bool use64 = true;
         private static bool initialized;
         private static bool commandLineChecked;
+        private static bool platformShutdownSubscribed;
 
         internal static void Initialize()
         {
@@ -57,6 +58,11 @@ namespace CsmForge.Runtime.Cities1
             if (initialized || !PlatformService.active) return;
             try
             {
+                if (!platformShutdownSubscribed)
+                {
+                    PlatformService.eventPlatformServiceShutdown += OnPlatformServiceShutdown;
+                    platformShutdownSubscribed = true;
+                }
                 int user = GetHSteamUser(); int pipe = GetHSteamPipe(); IntPtr client = GetSteamClient();
                 if (user == 0 || pipe == 0 || client == IntPtr.Zero) return;
                 friends = GetFriends(client, user, pipe, "SteamFriends015");
@@ -100,15 +106,32 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void Clear()
         {
-            if (friends != IntPtr.Zero) try { ClearPresence(); } catch { }
+            if (friends != IntPtr.Zero && PlatformService.active) try { ClearPresence(); } catch { }
         }
 
         internal static void Shutdown()
         {
-            Clear();
+            if (platformShutdownSubscribed)
+            {
+                PlatformService.eventPlatformServiceShutdown -= OnPlatformServiceShutdown;
+                platformShutdownSubscribed = false;
+            }
+            bool nativeAvailable = PlatformService.active;
+            if (nativeAvailable) Clear();
+            ReleaseCallback(nativeAvailable);
+        }
+
+        private static void OnPlatformServiceShutdown()
+        {
+            ReleaseCallback(true);
+        }
+
+        private static void ReleaseCallback(bool unregisterNative)
+        {
             if (callbackHandle.IsAllocated)
             {
-                try { UnregisterCallback(callbackHandle.AddrOfPinnedObject()); } catch { }
+                if (unregisterNative && friends != IntPtr.Zero)
+                    try { UnregisterCallback(callbackHandle.AddrOfPinnedObject()); } catch { }
                 callbackHandle.Free();
             }
             if (vtableMemory != IntPtr.Zero) { Marshal.FreeHGlobal(vtableMemory); vtableMemory = IntPtr.Zero; }

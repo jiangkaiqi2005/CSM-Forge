@@ -28,10 +28,9 @@ namespace CsmForge.Runtime.Cities1
             KnownModBridgeRegistry.RegisterAvailable();
             RuntimeServices.Enable();
             ForgeMultiplayerUi.Initialize();
-            ForgeSteamRichPresence.Initialize();
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
         }
-        public void OnDisabled() { ForgeSteamRichPresence.Shutdown(); ForgeMultiplayerUi.Shutdown(); RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+        public void OnDisabled() { ForgeMultiplayerUi.Shutdown(); RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
         public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
 

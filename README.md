@@ -120,8 +120,8 @@ Windows Mod 目录：
 2. 两台机器安装**同一个 commit SHA** 的 Forge Candidate Artifact，并启用 CitiesHarmony；
 3. 两边在游戏启动前运行安装目录中的 `VERIFY-INSTALL.ps1`，确认 `source_commit` 与 `manifest_sha256` 完全一致；
 4. Host 进入要共享的城市，按 Esc，点击 **FORGE 多人联机**，通过预检后创建房间；
-5. Host 在会话页点击 **邀请 Steam 好友**；若 Steam Join 不可用，把已复制的 LAN 邀请发给 Client；
-6. Client 保持在主菜单，接受 Steam Join，或点击 **FORGE 联机**、粘贴邀请并加入；Client 不需要预先加载占位城市；
+5. Host 在会话页点击 **复制邀请码并打开 Steam 好友**，把已复制的 LAN 邀请粘贴发送给 Client；自动 Steam 点击加入因真实 CS1 原生崩溃证据而暂时停用；
+6. Client 保持在主菜单，点击 **FORGE 联机**、粘贴邀请并加入；Client 不需要预先加载占位城市；
 7. 等 Client 状态明确进入 `ClientLive` 后再操作；
 8. 按安装包中的 `E3-E4-TEST-RECORD.md` 执行矩阵；
 9. 如果出现失败或 `[CSM-Forge] diagnostic-only projection drift`，先在游戏内点击“写入诊断日志”，再在每台机器运行 `COLLECT-DIAGNOSTICS.ps1`。

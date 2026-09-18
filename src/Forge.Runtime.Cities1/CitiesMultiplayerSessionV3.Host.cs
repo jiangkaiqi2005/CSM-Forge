@@ -12,6 +12,7 @@ namespace CsmForge.Runtime.Cities1
         private void StartHostOnSimulation(LoadIdentity identity, int port, string roomKey, string displayName)
         {
             if (!lifecycle.IsCurrent(identity)) { SetOffline("stale-host-start"); return; }
+            UnityEngine.Debug.Log("[CSM-Forge] host start entered; generation=" + identity.Generation + "; port=" + port + ".");
             try
             {
                 load = identity;
@@ -31,9 +32,8 @@ namespace CsmForge.Runtime.Cities1
                 if (!lifecycle.TryTransition(load, CitiesRuntimeRole.HostLive))
                     throw new InvalidOperationException("Could not enter HostLive runtime role.");
                 RefreshHostRoster();
-                ForgeSteamRichPresence.PublishInvite(ForgeMultiplayerUi.BuildInviteCode(
-                    ForgeMultiplayerUi.LocalIpv4(), port, roomKey), 1);
                 lock (gate) { mode = MultiplayerSessionMode.Hosting; detail = "hosting-development-transport:" + port; }
+                UnityEngine.Debug.Log("[CSM-Forge] host started; generation=" + identity.Generation + "; port=" + port + ".");
             }
             catch (Exception error)
             {
@@ -380,7 +380,6 @@ namespace CsmForge.Runtime.Cities1
                 if (peer.Member.IsValid && peer.Hello != null) values.Add(new MultiplayerPlayerSnapshot
                 { Member = peer.Member, DisplayName = peer.Hello.DisplayName, IsHost = false, IsLive = peer.Live, IsLocal = false });
             lock (gate) playerSnapshots = values.ToArray();
-            ForgeSteamRichPresence.SetPlayerCount(values.Count);
         }
 
         private void BroadcastRoster()

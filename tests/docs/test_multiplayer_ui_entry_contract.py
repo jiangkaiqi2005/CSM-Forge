@@ -28,6 +28,33 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("string.IsNullOrEmpty(feedback)", host)
         self.assertIn("Forge patches 尚未就绪", host)
 
+    def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn("private static readonly Type[] ManagedPanelTypes", source)
+        self.assertIn("private static UIComponent DisplayExclusive(Type panelType)", source)
+        self.assertIn("HideManagedPanels(view, panelType);", source)
+        self.assertIn("internal static void OpenChildPanel<T>()", source)
+        self.assertIn("internal static void CloseOrBack(UIComponent panel)", source)
+        session = source[source.index("internal sealed class ForgeSessionPanel"):source.index("internal sealed class ForgePlayersPanel")]
+        self.assertIn("OpenChildPanel<ForgePlayersPanel>()", session)
+        self.assertIn("OpenChildPanel<ForgeChatPanel>()", session)
+
+    def test_primary_ui_translates_runtime_modes_into_player_facing_stages(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        for marker in [
+            "正在创建房间", "房间运行中", "正在连接并核对游戏内容",
+            "正在同步房主城市", "已加入房间", "联机已停止",
+        ]:
+            self.assertIn(marker, source)
+        self.assertNotIn('return value.Mode + " | peers="', source)
+
+    def test_session_actions_keep_feedback_separate_from_live_status(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        session = source[source.index("internal sealed class ForgeSessionPanel"):source.index("internal sealed class ForgePlayersPanel")]
+        self.assertIn("private UILabel notice", session)
+        self.assertIn('notice.text = "正在停止会话', session)
+        self.assertIn("notice.text = steamJoinReady", session)
+
     def test_steam_shutdown_unhooks_before_platform_native_state_disappears(self):
         source = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
         self.assertIn("PlatformService.eventPlatformServiceShutdown += OnPlatformServiceShutdown", source)

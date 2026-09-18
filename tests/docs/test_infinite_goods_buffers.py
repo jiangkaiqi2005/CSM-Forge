@@ -13,7 +13,8 @@ class InfiniteGoodsBufferContractTests(unittest.TestCase):
         for marker in [
             "bridge.infinitegoods-buildingbuffers", "IForgeShardedStateAdapterV1", "EntityIdentityV2",
             "StableNameTargetKindV2.Building", "TryResolveStableNameIdentity", "m_customBuffer1", "m_customBuffer2",
-            "ShardCount", "128",
+            "m_cashBuffer", "m_outgoingProblemTimer", "m_youngs", "m_teens", "m_adults", "m_seniors",
+            "m_education1", "m_education2", "SchemaVersion { get { return 2; } }", "ShardCount", "128",
         ]:
             self.assertIn(marker, source)
         self.assertNotIn("writer.Write(native", source)

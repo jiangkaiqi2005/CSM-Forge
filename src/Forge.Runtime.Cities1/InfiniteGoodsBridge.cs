@@ -40,11 +40,38 @@ namespace CsmForge.Runtime.Cities1
 
     internal static class InfiniteGoodsBridge
     {
+        private const string AssemblyName = "InfiniteGoodsMod";
+        private const string SupportedProductVersion = "6.1";
         private const string SettingsTypeName = "InfiniteGoodsMod.Settings.Settings";
         private const string SettingIdTypeName = "InfiniteGoodsMod.Settings.SettingId";
         private const string TransferMonitorTypeName = "InfiniteGoodsMod.Transfer.TransferMonitor";
+        private static readonly string[] ExpectedSettingNames =
+        {
+            "CommercialGoods", "CommercialLuxuryProducts", "SpecializedIndustryOil", "SpecializedIndustryOre",
+            "SpecializedIndustryGrain", "SpecializedIndustryLogs", "GenericIndustryPetrol", "GenericIndustryCoal",
+            "GenericIndustryFood", "GenericIndustryLumber", "ShelterGoods", "WarehouseOil", "WarehouseOre",
+            "WarehouseGrain", "WarehouseLogs", "PloppedIndustryOil", "PloppedIndustryOre", "PloppedIndustryGrain",
+            "PloppedIndustryLogs", "UniqueIndustryAnimalProducts", "UniqueIndustryFlours", "UniqueIndustryPaper",
+            "UniqueIndustryPlanedTimber", "UniqueIndustryPetroleum", "UniqueIndustryPlastics", "UniqueIndustryGlass",
+            "UniqueIndustryMetals", "UniqueIndustryGrain", "FishingHarbor", "FishingFarm", "FishingMarket",
+            "FishingProcessing", "PowerPlantCoal", "PowerPlantOil", "PedestrianServicePointGoods",
+            "PedestrianServicePointLuxuryProducts", "CargoServicePointSpecializedIndustryOil",
+            "CargoServicePointSpecializedIndustryOre", "CargoServicePointSpecializedIndustryGrain",
+            "CargoServicePointSpecializedIndustryLogs", "CargoServicePointGenericIndustryPetrol",
+            "CargoServicePointGenericIndustryCoal", "CargoServicePointGenericIndustryFood",
+            "CargoServicePointGenericIndustryLumber", "Debug"
+        };
+        private static readonly string[] UnsupportedServicePointSettings =
+        {
+            "PedestrianServicePointGoods", "PedestrianServicePointLuxuryProducts",
+            "CargoServicePointSpecializedIndustryOil", "CargoServicePointSpecializedIndustryOre",
+            "CargoServicePointSpecializedIndustryGrain", "CargoServicePointSpecializedIndustryLogs",
+            "CargoServicePointGenericIndustryPetrol", "CargoServicePointGenericIndustryCoal",
+            "CargoServicePointGenericIndustryFood", "CargoServicePointGenericIndustryLumber"
+        };
         private static byte[] clientShadow;
         private static bool patched;
+        private static Assembly compatibleAssembly;
 
         internal static byte[] ClientShadow
         {
@@ -54,7 +81,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static bool IsAvailable
         {
-            get { return ResolveType(SettingsTypeName) != null && ResolveType(SettingIdTypeName) != null; }
+            get { return FindCompatibleAssembly() != null; }
         }
 
         internal static bool IsClientReplicaRole
@@ -76,6 +103,7 @@ namespace CsmForge.Runtime.Cities1
             object settings = GetSettings(settingsType);
             PropertyInfo indexer = RequiredIndexer(settingsType, settingIdType);
             object[] ids = SortedIds(settingIdType);
+            ValidateSupportedConfiguration(settingIdType, settings, indexer);
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream))
             {
@@ -104,6 +132,9 @@ namespace CsmForge.Runtime.Cities1
                 bool[] values = new bool[ids.Length];
                 for (int i = 0; i < values.Length; i++) values[i] = reader.ReadBoolean();
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing Infinite Goods bridge bytes.");
+                for (int i = 0; i < ids.Length; i++)
+                    if (values[i] && IsUnsupportedServicePoint(Enum.GetName(settingIdType, ids[i])))
+                        throw new InvalidDataException("Infinite Goods state enables an unsupported service-point transfer.");
                 using (MemoryStream output = new MemoryStream())
                 using (BinaryWriter writer = new BinaryWriter(output))
                 {
@@ -145,6 +176,7 @@ namespace CsmForge.Runtime.Cities1
         {
             patched = false;
             clientShadow = null;
+            compatibleAssembly = null;
         }
 
         private static bool HostOnlyTickPrefix()
@@ -175,10 +207,13 @@ namespace CsmForge.Runtime.Cities1
         private static object[] SortedIds(Type enumType)
         {
             Array raw = Enum.GetValues(enumType);
+            if (raw.Length != ExpectedSettingNames.Length) throw new InvalidOperationException("Infinite Goods SettingId surface drifted.");
             List<object> values = new List<object>();
             for (int i = 0; i < raw.Length; i++)
             {
                 object value = raw.GetValue(i);
+                if (Convert.ToInt64(value) != i || !StringComparer.Ordinal.Equals(Enum.GetName(enumType, value), ExpectedSettingNames[i]))
+                    throw new InvalidOperationException("Infinite Goods SettingId surface drifted.");
                 if (StringComparer.Ordinal.Equals(Enum.GetName(enumType, value), "Debug")) continue;
                 values.Add(value);
             }
@@ -197,14 +232,67 @@ namespace CsmForge.Runtime.Cities1
             return value;
         }
 
+        private static void ValidateSupportedConfiguration(Type enumType, object settings, PropertyInfo indexer)
+        {
+            for (int i = 0; i < UnsupportedServicePointSettings.Length; i++)
+            {
+                object value = Enum.Parse(enumType, UnsupportedServicePointSettings[i], false);
+                if ((bool)indexer.GetValue(settings, new[] { value }))
+                    throw new InvalidOperationException("Infinite Goods service-point transfer is not supported in Forge multiplayer: " + UnsupportedServicePointSettings[i]);
+            }
+        }
+
+        private static bool IsUnsupportedServicePoint(string name)
+        {
+            for (int i = 0; i < UnsupportedServicePointSettings.Length; i++)
+                if (StringComparer.Ordinal.Equals(name, UnsupportedServicePointSettings[i])) return true;
+            return false;
+        }
+
         private static Type ResolveType(string name)
         {
+            Assembly assembly = FindCompatibleAssembly();
+            return assembly == null ? null : assembly.GetType(name, false);
+        }
+
+        private static Assembly FindCompatibleAssembly()
+        {
+            if (compatibleAssembly != null) return compatibleAssembly;
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             for (int i = 0; i < assemblies.Length; i++)
             {
-                Type type = assemblies[i].GetType(name, false); if (type != null) return type;
+                AssemblyName name = assemblies[i].GetName();
+                if (!StringComparer.Ordinal.Equals(name.Name, AssemblyName) || name.Version == null ||
+                    name.Version.Major != 6 || name.Version.Minor != 0) continue;
+                Type identity = assemblies[i].GetType("InfiniteGoodsMod.ModIdentity", false);
+                Type settings = assemblies[i].GetType(SettingsTypeName, false);
+                Type settingId = assemblies[i].GetType(SettingIdTypeName, false);
+                Type monitor = assemblies[i].GetType(TransferMonitorTypeName, false);
+                Type definition = assemblies[i].GetType("InfiniteGoodsMod.Transfer.TransferDefinition`1", false);
+                if (identity == null || settings == null || settingId == null || monitor == null || definition == null || !settingId.IsEnum) continue;
+                try
+                {
+                    FieldInfo version = identity.GetField("Version", BindingFlags.Static | BindingFlags.Public);
+                    if (version == null || !version.IsLiteral || !StringComparer.Ordinal.Equals((string)version.GetRawConstantValue(), SupportedProductVersion)) continue;
+                    RequiredIndexer(settings, settingId);
+                    SortedIds(settingId);
+                    RequiredMethod(monitor, "OnAfterSimulationTick", Type.EmptyTypes);
+                    Type closedDefinition = definition.MakeGenericType(typeof(BuildingAI));
+                    RequiredMethod(closedDefinition, "TransferIfMatch", new[] { typeof(ushort), typeof(bool) });
+                }
+                catch { continue; }
+                compatibleAssembly = assemblies[i];
+                return compatibleAssembly;
             }
             return null;
+        }
+
+        private static MethodInfo RequiredMethod(Type type, string name, Type[] parameters)
+        {
+            MethodInfo method = type.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, parameters, null);
+            if (method == null || method.ReturnType != typeof(void)) throw new MissingMethodException(type.FullName, name);
+            return method;
         }
     }
 }

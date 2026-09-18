@@ -13,7 +13,9 @@ class FixedSimulationModBridgeContractTests(unittest.TestCase):
         for marker in [
             "bridge.gameanarchy", "GameAnarchy.ModSettings.ModSetting", "SharedProperties",
             "SettingWritePrefix", "HostOnlyMutationPrefix", "ModEconomyManager",
-            "ClientLoading", "ClientRecovering", "ClientReplicaLive",
+            "ClientLoading", "ClientRecovering", "ClientReplicaLive", "1, 3, 1, 0",
+            "ValidateSupportedConfiguration", "CurrentUnlockMode", "OilDepletionRate",
+            "GetFireProbability", "UnsupportedManualFirePrefix",
         ]:
             self.assertIn(marker, source)
         for marker in ["AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset"]:
@@ -25,7 +27,8 @@ class FixedSimulationModBridgeContractTests(unittest.TestCase):
         for marker in [
             "bridge.infinitegoods", "InfiniteGoodsMod.Settings.Settings", "InfiniteGoodsMod.Settings.SettingId",
             "InfiniteGoodsMod.Transfer.TransferMonitor", "OnAfterSimulationTick", "HostOnlyTickPrefix",
-            "ClientShadow", "ClientReplicaLive",
+            "ClientShadow", "ClientReplicaLive", "SupportedProductVersion = \"6.1\"",
+            "ExpectedSettingNames", "UnsupportedServicePointSettings", "TransferIfMatch",
         ]:
             self.assertIn(marker, source)
         self.assertNotIn("BuildingId", source)

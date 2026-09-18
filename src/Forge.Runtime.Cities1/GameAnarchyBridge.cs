@@ -8,9 +8,9 @@ using HarmonyLib;
 namespace CsmForge.Runtime.Cities1
 {
     /// <summary>
-    /// Host-owned shared-simulation settings for Game Anarchy 1.3.x. UI-only settings and keybindings
-    /// are intentionally excluded. Both peers may execute the mod's deterministic patches, but only
-    /// the Host may change the shared configuration or perform manual money mutations.
+    /// Host-owned shared-simulation settings for the audited Game Anarchy 1.3.1 build. UI-only
+    /// settings and keybindings are intentionally excluded. Settings whose persistent writes do not
+    /// yet have a Forge authority domain are rejected explicitly instead of being allowed to diverge.
     /// </summary>
     internal sealed class GameAnarchyBridgeAdapter : IForgeStateAdapterV1
     {
@@ -25,6 +25,7 @@ namespace CsmForge.Runtime.Cities1
             if (!GameAnarchyBridge.TryGetSettings(out type, out instance))
                 throw new InvalidOperationException("Game Anarchy settings are unavailable.");
             PropertyInfo[] properties = GameAnarchyBridge.SharedProperties(type);
+            GameAnarchyBridge.ValidateSupportedConfiguration(properties, instance);
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream))
             {
@@ -49,27 +50,44 @@ namespace CsmForge.Runtime.Cities1
                 if (reader.ReadUInt32() != Magic || reader.ReadUInt32() != GameAnarchyBridge.SchemaFingerprint(properties))
                     throw new InvalidDataException("Game Anarchy bridge schema mismatch.");
                 if (reader.ReadUInt16() != properties.Length) throw new InvalidDataException("Game Anarchy bridge property count mismatch.");
+                long[] values = new long[properties.Length];
+                for (int i = 0; i < properties.Length; i++) values[i] = reader.ReadInt64();
+                if (stream.Position != stream.Length) throw new InvalidDataException("Trailing Game Anarchy bridge bytes.");
+                GameAnarchyBridge.ValidateSupportedValues(properties, values);
                 GameAnarchyBridge.BeginApply();
                 try
                 {
                     for (int i = 0; i < properties.Length; i++)
-                        properties[i].SetValue(instance, GameAnarchyBridge.FromBits(properties[i].PropertyType, reader.ReadInt64()), null);
+                        properties[i].SetValue(instance, GameAnarchyBridge.FromBits(properties[i].PropertyType, values[i]), null);
                 }
                 finally { GameAnarchyBridge.EndApply(); }
-                if (stream.Position != stream.Length) throw new InvalidDataException("Trailing Game Anarchy bridge bytes.");
             }
         }
     }
 
     internal static class GameAnarchyBridge
     {
+        private const string AssemblyName = "GameAnarchy";
+        private static readonly Version SupportedVersion = new Version(1, 3, 1, 0);
         private const string SettingsTypeName = "GameAnarchy.ModSettings.ModSetting";
         private static readonly string[] LocalOnly = { "AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset", "OptionsPanelCategoriesUpdated" };
         private static readonly string[] MoneyMutationMethods = { "OnPreSimulationFrame", "ChargeInterest", "AutoAddMoney", "SetStartMoney", "AddMoneyManually", "SubstrateMoneyManually", "ModifyMoney", "AddLoanAmount" };
+        private static readonly string[] UnsupportedBooleanSettings =
+        {
+            "UnlockInfoViews", "UnlockBasicRoads", "UnlockAllRoads", "UnlockTrainTrack", "UnlockMetroTrack",
+            "UnlockPolicies", "UnlockPublicTransport", "UnlockUniqueBuildings", "UnlockLandscaping",
+            "RemoveNoisePollution", "RemoveGroundPollution", "RemoveWaterPollution", "RemoveDeath",
+            "RemoveGarbage", "RemoveCrime", "MaximizeAttractiveness", "MaximizeEntertainment",
+            "MaximizeLandValue", "MaximizeEducationCoverage", "MaximizeFireCoverage",
+            "RemovePlayerBuildingFire", "RemoveResidentialBuildingFire", "RemoveIndustrialBuildingFire",
+            "RemoveCommercialBuildingFire", "RemoveOfficeBuildingFire", "RemoveParkBuildingFire",
+            "RemoveMuseumFire", "RemoveCampusBuildingFire", "RemoveAirportBuildingFire"
+        };
         [ThreadStatic] private static bool applying;
         private static bool patched;
+        private static Assembly compatibleAssembly;
 
-        internal static bool IsAvailable { get { return ResolveType(SettingsTypeName) != null; } }
+        internal static bool IsAvailable { get { return FindCompatibleAssembly() != null; } }
         internal static void BeginApply() { applying = true; }
         internal static void EndApply() { applying = false; }
 
@@ -102,6 +120,29 @@ namespace CsmForge.Runtime.Cities1
             result.Sort(delegate(PropertyInfo a, PropertyInfo b) { return StringComparer.Ordinal.Compare(a.Name, b.Name); });
             if (result.Count == 0 || result.Count > 128) throw new InvalidOperationException("Game Anarchy shared settings surface is invalid.");
             return result.ToArray();
+        }
+
+        internal static void ValidateSupportedConfiguration(PropertyInfo[] properties, object instance)
+        {
+            long[] values = new long[properties.Length];
+            for (int i = 0; i < properties.Length; i++) values[i] = ToBits(properties[i].PropertyType, properties[i].GetValue(instance, null));
+            ValidateSupportedValues(properties, values);
+        }
+
+        internal static void ValidateSupportedValues(PropertyInfo[] properties, long[] values)
+        {
+            if (properties == null || values == null || properties.Length != values.Length)
+                throw new InvalidDataException("Invalid Game Anarchy shared setting values.");
+            for (int i = 0; i < UnsupportedBooleanSettings.Length; i++)
+                if (RequiredValue(properties, values, UnsupportedBooleanSettings[i]) != 0L)
+                    throw new InvalidOperationException("Game Anarchy option is not supported in Forge multiplayer: " + UnsupportedBooleanSettings[i]);
+            if (RequiredValue(properties, values, "CurrentUnlockMode") != 0L || RequiredValue(properties, values, "CurrentMilestoneLevel") != 0L)
+                throw new InvalidOperationException("Game Anarchy milestone/unlock mutation is not supported in Forge multiplayer.");
+            if (RequiredValue(properties, values, "OilDepletionRate") != 100L || RequiredValue(properties, values, "OreDepletionRate") != 100L)
+                throw new InvalidOperationException("Game Anarchy oil/ore depletion overrides are not supported; both rates must be 100 for multiplayer.");
+            if (RequiredValue(properties, values, "BuildingSpreadFireProbability") != 0L ||
+                RequiredValue(properties, values, "TreeSpreadFireProbability") != 0L)
+                throw new InvalidOperationException("Game Anarchy fire-spread overrides are not supported in Forge multiplayer.");
         }
 
         internal static uint SchemaFingerprint(PropertyInfo[] properties)
@@ -157,17 +198,36 @@ namespace CsmForge.Runtime.Cities1
                     for (int m = 0; m < methods.Length; m++) if (methods[m].Name == MoneyMutationMethods[i]) harmony.Patch(methods[m], hostPrefix);
                 }
             }
+            Type fire = ResolveType("GameAnarchy.Managers.FireControlManager");
+            MethodInfo fireProbability = RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() });
+            MethodInfo putOut = RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes);
+            harmony.Patch(fireProbability, new HarmonyMethod(typeof(GameAnarchyBridge).GetMethod("FireProbabilityPrefix", BindingFlags.Static | BindingFlags.NonPublic)));
+            harmony.Patch(putOut, new HarmonyMethod(typeof(GameAnarchyBridge).GetMethod("UnsupportedManualFirePrefix", BindingFlags.Static | BindingFlags.NonPublic)));
             patched = true;
         }
 
-        internal static void ResetPatchState() { patched = false; applying = false; }
+        internal static void ResetPatchState() { patched = false; applying = false; compatibleAssembly = null; }
 
         private static bool SettingWritePrefix() { return applying || !IsClientReplicaRole(); }
         private static bool HostOnlyMutationPrefix() { return !IsClientReplicaRole(); }
+        private static bool FireProbabilityPrefix(ref bool __result)
+        {
+            if (!IsMultiplayerRole()) return true;
+            __result = true;
+            return false;
+        }
+        private static bool UnsupportedManualFirePrefix() { return !IsMultiplayerRole(); }
         private static bool IsClientReplicaRole()
         {
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             return role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientRecovering || role == CitiesRuntimeRole.ClientReplicaLive;
+        }
+        private static bool IsMultiplayerRole()
+        {
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            return role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
+                role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientRecovering ||
+                role == CitiesRuntimeRole.ClientReplicaLive || role == CitiesRuntimeRole.WorldFenced;
         }
         private static bool IsLocalOnly(string name)
         {
@@ -180,12 +240,75 @@ namespace CsmForge.Runtime.Cities1
         }
         private static Type ResolveType(string name)
         {
+            Assembly assembly = FindCompatibleAssembly();
+            return assembly == null ? null : assembly.GetType(name, false);
+        }
+
+        private static Assembly FindCompatibleAssembly()
+        {
+            if (compatibleAssembly != null) return compatibleAssembly;
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             for (int i = 0; i < assemblies.Length; i++)
             {
-                Type type = assemblies[i].GetType(name, false); if (type != null) return type;
+                AssemblyName name = assemblies[i].GetName();
+                if (!StringComparer.Ordinal.Equals(name.Name, AssemblyName) || name.Version != SupportedVersion) continue;
+                Type settings = assemblies[i].GetType(SettingsTypeName, false);
+                Type economy = assemblies[i].GetType("GameAnarchy.Managers.ModEconomyManager", false);
+                Type city = assemblies[i].GetType("GameAnarchy.Managers.CityServicesManager", false);
+                Type resources = assemblies[i].GetType("GameAnarchy.Extension.OilAndOreResourceExtension", false);
+                Type milestones = assemblies[i].GetType("GameAnarchy.Extension.MilestonesExtension", false);
+                Type fire = assemblies[i].GetType("GameAnarchy.Managers.FireControlManager", false);
+                if (settings == null || economy == null || city == null || resources == null || milestones == null || fire == null) continue;
+                try
+                {
+                    PropertyInfo[] properties = SharedProperties(settings);
+                    for (int p = 0; p < UnsupportedBooleanSettings.Length; p++) RequiredProperty(properties, UnsupportedBooleanSettings[p]);
+                    RequiredProperty(properties, "CurrentUnlockMode"); RequiredProperty(properties, "CurrentMilestoneLevel");
+                    RequiredProperty(properties, "OilDepletionRate"); RequiredProperty(properties, "OreDepletionRate");
+                    RequiredProperty(properties, "BuildingSpreadFireProbability"); RequiredProperty(properties, "TreeSpreadFireProbability");
+                    RequiredMethod(city, "OnPostSimulationFrame", Type.EmptyTypes);
+                    RequiredMethod(resources, "OnAfterResourcesModified", new[] { typeof(int), typeof(int), RequiredType("ICities.NaturalResource"), typeof(int) });
+                    RequiredMethod(milestones, "OnRefreshMilestones", Type.EmptyTypes);
+                    RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() });
+                    RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes);
+                }
+                catch { continue; }
+                compatibleAssembly = assemblies[i];
+                return compatibleAssembly;
             }
             return null;
+        }
+
+        private static Type RequiredType(string fullName)
+        {
+            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            for (int i = 0; i < assemblies.Length; i++)
+            {
+                Type type = assemblies[i].GetType(fullName, false);
+                if (type != null) return type;
+            }
+            throw new TypeLoadException(fullName);
+        }
+
+        private static PropertyInfo RequiredProperty(PropertyInfo[] properties, string name)
+        {
+            for (int i = 0; i < properties.Length; i++) if (properties[i].Name == name) return properties[i];
+            throw new MissingMemberException(SettingsTypeName, name);
+        }
+
+        private static long RequiredValue(PropertyInfo[] properties, long[] values, string name)
+        {
+            for (int i = 0; i < properties.Length; i++) if (properties[i].Name == name) return values[i];
+            throw new MissingMemberException(SettingsTypeName, name);
+        }
+
+        private static MethodInfo RequiredMethod(Type type, string name, Type[] parameters)
+        {
+            if (type == null) throw new TypeLoadException(name);
+            MethodInfo method = type.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null, parameters, null);
+            if (method == null) throw new MissingMethodException(type.FullName, name);
+            return method;
         }
     }
 }

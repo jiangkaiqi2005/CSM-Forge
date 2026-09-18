@@ -105,6 +105,8 @@ namespace CsmForge.Runtime.Cities1
             }
             if (typeName == "CitiesHarmony.Mod") return "dependency-mod";
             if (typeName == "TrafficManager.Lifecycle.TrafficManagerMod") return "blocked-mod";
+            if (typeName == "GameAnarchy.Mod" && !GameAnarchyBridge.IsAvailable) return "blocked-mod";
+            if (typeName == "InfiniteGoodsMod.ModIdentity" && !InfiniteGoodsBridge.IsAvailable) return "blocked-mod";
             for (int i = 0; i < ClientOnlyModTypes.Length; i++)
                 if (typeName == ClientOnlyModTypes[i]) return "client-mod";
             return "mod";

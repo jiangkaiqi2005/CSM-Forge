@@ -29,7 +29,8 @@ namespace CsmForge.Runtime.Cities1
         private static readonly Type[] ManagedPanelTypes = new Type[]
         {
             typeof(ForgeMainMenuJoinPanel), typeof(ForgeHostGamePanel), typeof(ForgeSessionPanel),
-            typeof(ForgePlayersPanel), typeof(ForgeChatPanel), typeof(ForgeJoinProgressPanel)
+            typeof(ForgePlayersPanel), typeof(ForgeChatPanel), typeof(ForgeJoinProgressPanel),
+            typeof(ForgeLeaveConfirmPanel), typeof(ForgeFaultPanel)
         };
         private static readonly Stack<Type> PanelHistory = new Stack<Type>();
         private static Type activePanelType;
@@ -57,17 +58,9 @@ namespace CsmForge.Runtime.Cities1
             button.hoveredTextColor = new Color32(7, 123, 255, 255);
             button.pressedTextColor = new Color32(30, 30, 44, 255);
             button.useDropShadow = true; button.useGradient = true; button.useGUILayout = true;
-            button.eventClick += delegate { ShowPanel<ForgeMainMenuJoinPanel>(); };
+            button.eventClick += delegate { OpenMainMenuEntry(); };
             EnsurePump();
-            if (!string.IsNullOrEmpty(pendingSteamInvite))
-            {
-                ForgeMainMenuJoinPanel panel = ShowPanel<ForgeMainMenuJoinPanel>();
-                if (panel != null)
-                {
-                    string value = pendingSteamInvite; pendingSteamInvite = null;
-                    panel.ApplySteamInvite(value);
-                }
-            }
+            if (!string.IsNullOrEmpty(pendingSteamInvite)) OpenMainMenuEntry();
         }
 
         internal static void EnsurePauseMenuEntry()
@@ -87,12 +80,8 @@ namespace CsmForge.Runtime.Cities1
             {
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
                 ClosePauseMenu();
-                if (mode == MultiplayerSessionMode.Faulted)
-                {
-                    RuntimeServices.Multiplayer.StopImmediately();
-                    mode = MultiplayerSessionMode.Offline;
-                }
-                if (mode == MultiplayerSessionMode.Offline || mode == MultiplayerSessionMode.Faulted)
+                if (mode == MultiplayerSessionMode.Faulted) ShowPanel<ForgeFaultPanel>();
+                else if (mode == MultiplayerSessionMode.Offline)
                     ShowPanel<ForgeHostGamePanel>();
                 else ShowPanel<ForgeSessionPanel>();
             };
@@ -113,6 +102,8 @@ namespace CsmForge.Runtime.Cities1
             DestroyNamed(view, typeof(ForgePlayersPanel).Name);
             DestroyNamed(view, typeof(ForgeChatPanel).Name);
             DestroyNamed(view, typeof(ForgeJoinProgressPanel).Name);
+            DestroyNamed(view, typeof(ForgeLeaveConfirmPanel).Name);
+            DestroyNamed(view, typeof(ForgeFaultPanel).Name);
             ForgeMenuPump pump = view.gameObject.GetComponent<ForgeMenuPump>();
             if (pump != null) UnityEngine.Object.Destroy(pump);
             ForgePlayerPresenceUi presence = view.gameObject.GetComponent<ForgePlayerPresenceUi>();
@@ -235,8 +226,28 @@ namespace CsmForge.Runtime.Cities1
             IPEndPoint endpoint; string key;
             if (!TryParseInviteCode(invite, out endpoint, out key) || RuntimeServices.Lifecycle.Current.IsValid) return;
             pendingSteamInvite = invite;
+            if (RuntimeServices.Multiplayer.Status.Mode == MultiplayerSessionMode.Faulted)
+            {
+                ShowPanel<ForgeFaultPanel>();
+                return;
+            }
+            OpenMainJoinWithPendingInvite();
+        }
+
+        internal static void OpenMainMenuEntry()
+        {
+            if (RuntimeServices.Multiplayer.Status.Mode == MultiplayerSessionMode.Faulted)
+            { ShowPanel<ForgeFaultPanel>(); return; }
+            OpenMainJoinWithPendingInvite();
+        }
+
+        internal static void OpenMainJoinWithPendingInvite()
+        {
             ForgeMainMenuJoinPanel panel = ShowPanel<ForgeMainMenuJoinPanel>();
-            if (panel != null) { pendingSteamInvite = null; panel.ApplySteamInvite(invite); }
+            if (panel != null && !string.IsNullOrEmpty(pendingSteamInvite))
+            {
+                string value = pendingSteamInvite; pendingSteamInvite = null; panel.ApplySteamInvite(value);
+            }
         }
 
         internal static void HandleHotkeys()
@@ -341,6 +352,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private UITextField invite;
         private UITextField nameField;
+        private UIButton joinButton;
         private string deferredSteamInvite;
 
         public override void Start()
@@ -353,7 +365,7 @@ namespace CsmForge.Runtime.Cities1
             if (PlatformService.active && !string.IsNullOrEmpty(PlatformService.personaName)) display = PlatformService.personaName;
             nameField = Field(display, 158, false);
             Status = Label("尚未连接。加入后会自动下载并加载房主存档。", 205);
-            Button("加入房间", 242, Join);
+            joinButton = Button("加入房间", 242, Join);
             Button("取消 / 断开", 300, delegate
             {
                 RuntimeServices.Multiplayer.StopImmediately(); ForgeMultiplayerUi.Dismiss(this);
@@ -364,8 +376,12 @@ namespace CsmForge.Runtime.Cities1
 
         public override void Update()
         {
-            if (isVisible && RuntimeServices.Multiplayer.Status.Mode != MultiplayerSessionMode.Offline)
-                Status.text = StatusText();
+            if (isVisible)
+            {
+                MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
+                joinButton.isEnabled = mode == MultiplayerSessionMode.Offline;
+                if (mode != MultiplayerSessionMode.Offline) Status.text = StatusText();
+            }
             base.Update();
         }
 
@@ -383,6 +399,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.RequestJoinFromMainMenu(endpoint, key, display);
             if (ok)
             {
+                joinButton.isEnabled = false;
                 Status.text = "正在连接房主；收到快照后会自动进入城市……";
                 ForgeMultiplayerUi.ReplacePanel<ForgeJoinProgressPanel>();
             }
@@ -404,6 +421,7 @@ namespace CsmForge.Runtime.Cities1
         private UITextField keyField;
         private UITextField nameField;
         private UILabel players;
+        private UIButton createButton;
         private string feedback;
 
         public override void Start()
@@ -414,7 +432,7 @@ namespace CsmForge.Runtime.Cities1
             Label("临时房间口令", 190); keyField = Field(ForgeMultiplayerUi.RoomKey, 214, false);
             Status = Label("设置完成后点击创建房间。", 260);
             players = Label("直连地址：" + ForgeMultiplayerUi.LocalIpv4(), 300);
-            Button("创建房间（当前城市作为房主）", 350, CreateRoom);
+            createButton = Button("创建房间（当前城市作为房主）", 350, CreateRoom);
             Button("取消", 410, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
             base.Start();
         }
@@ -424,6 +442,7 @@ namespace CsmForge.Runtime.Cities1
             if (isVisible)
             {
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
+                createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline;
                 if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
                     Status.text = value.Mode == MultiplayerSessionMode.Offline ?
                         "设置完成后点击创建房间。" : StatusText();
@@ -433,6 +452,8 @@ namespace CsmForge.Runtime.Cities1
                 {
                     ForgeMultiplayerUi.ReplacePanel<ForgeSessionPanel>();
                 }
+                else if (value.Mode == MultiplayerSessionMode.Faulted)
+                    ForgeMultiplayerUi.ReplacePanel<ForgeFaultPanel>();
             }
             base.Update();
         }
@@ -450,6 +471,7 @@ namespace CsmForge.Runtime.Cities1
             ForgeMod.Settings.DisplayName.value = display; ForgeMod.Settings.Port.value = port;
             ForgeMultiplayerUi.RoomKey = key;
             bool ok = RuntimeServices.Multiplayer.RequestHost(port, key, display);
+            if (ok) createButton.isEnabled = false;
             SetFeedback(ok ? "正在创建房间……" :
                 "创建失败：当前城市会话不可用或已有 Forge 会话。请关闭此页后重试。");
         }
@@ -472,10 +494,8 @@ namespace CsmForge.Runtime.Cities1
             Button("玩家列表", 132, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgePlayersPanel>(); });
             Button("多人聊天（快捷键 T）", 184, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeChatPanel>(); });
             invite = Button("邀请 Steam 好友", 236, InviteFriends);
-            Button("停止房间 / 断开", 288, delegate
-            {
-                RuntimeServices.Multiplayer.RequestStop(); notice.text = "正在停止会话……";
-            });
+            Button("停止房间 / 断开", 288,
+                delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeLeaveConfirmPanel>(); });
             Button("关闭", 350, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
             notice = Label(string.Empty, 405);
             base.Start();
@@ -491,12 +511,16 @@ namespace CsmForge.Runtime.Cities1
                 invite.isVisible = value.Mode == MultiplayerSessionMode.Hosting;
                 invite.isEnabled = invite.isVisible;
                 if (value.Mode == MultiplayerSessionMode.Offline) ForgeMultiplayerUi.Dismiss(this);
+                else if (value.Mode == MultiplayerSessionMode.Faulted)
+                    ForgeMultiplayerUi.ReplacePanel<ForgeFaultPanel>();
             }
             base.Update();
         }
 
         private static int LiveCount(MultiplayerPlayerSnapshot[] values)
         { int count = 0; for (int i = 0; i < values.Length; i++) if (values[i].IsLive) count++; return count; }
+
+        internal void SetNotice(string value) { notice.text = value ?? string.Empty; }
 
         private void InviteFriends()
         {
@@ -635,7 +659,7 @@ namespace CsmForge.Runtime.Cities1
             MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
             if (value.Mode == MultiplayerSessionMode.Offline) { ForgeMultiplayerUi.Dismiss(this); return; }
             if (value.Mode == MultiplayerSessionMode.Faulted)
-            { status.text = "加入失败\n" + value.Detail; cancel.text = "关闭"; base.Update(); return; }
+            { ForgeMultiplayerUi.ReplacePanel<ForgeFaultPanel>(); return; }
             if (value.Mode == MultiplayerSessionMode.ClientLive) { ForgeMultiplayerUi.Dismiss(this); return; }
             if (value.SnapshotBytesTotal > 0)
             {
@@ -649,5 +673,120 @@ namespace CsmForge.Runtime.Cities1
 
         private static string FormatBytes(ulong bytes)
         { return bytes >= 1048576 ? (bytes / 1048576.0).ToString("0.0") + " MB" : (bytes / 1024.0).ToString("0.0") + " KB"; }
+    }
+
+    internal sealed class ForgeLeaveConfirmPanel : ForgePanelBase
+    {
+        private UILabel explanation;
+        private UIButton confirm;
+        private UILabel feedback;
+
+        public override void Start()
+        {
+            Configure("退出多人联机", 330);
+            explanation = Label(string.Empty, 68);
+            confirm = Button("确认断开", 145, Confirm);
+            Button("返回", 198, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
+            feedback = Label(string.Empty, 252);
+            base.Start();
+        }
+
+        public override void Update()
+        {
+            if (isVisible)
+            {
+                MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
+                bool host = mode == MultiplayerSessionMode.Hosting || mode == MultiplayerSessionMode.StartingHost;
+                confirm.text = host ? "确认停止房间" : "确认断开";
+                explanation.text = host
+                    ? "停止后所有加入者都会断开。城市仍保留在本机，之后可以重新创建房间。"
+                    : "断开后会退出当前多人会话；再次加入需要重新连接并核对房主城市。";
+                if (mode == MultiplayerSessionMode.Offline) ForgeMultiplayerUi.Dismiss(this);
+                else if (mode == MultiplayerSessionMode.Faulted)
+                    ForgeMultiplayerUi.ReplacePanel<ForgeFaultPanel>();
+            }
+            base.Update();
+        }
+
+        private void Confirm()
+        {
+            confirm.isEnabled = false;
+            if (!RuntimeServices.Multiplayer.RequestStop())
+            {
+                confirm.isEnabled = true;
+                feedback.text = "无法提交停止请求，请稍后重试或写入诊断日志。";
+                return;
+            }
+            UIView view = GetUIView();
+            ForgeSessionPanel session = view == null ? null : view.FindUIComponent<ForgeSessionPanel>(typeof(ForgeSessionPanel).Name);
+            if (session != null) session.SetNotice("正在安全停止多人会话……");
+            ForgeMultiplayerUi.ReplacePanel<ForgeSessionPanel>();
+        }
+    }
+
+    internal sealed class ForgeFaultPanel : ForgePanelBase
+    {
+        private UILabel summary;
+        private UILabel diagnostic;
+        private UIButton retry;
+        private UILabel feedback;
+
+        public override void Start()
+        {
+            Configure("CSM-Forge 联机已停止", 430);
+            summary = Label(string.Empty, 62); summary.height = 100; summary.autoHeight = false;
+            diagnostic = Label(string.Empty, 168); diagnostic.height = 72; diagnostic.autoHeight = false;
+            retry = Button("清理失败状态并返回", 252, ResetAndReturn);
+            Button("写入诊断日志", 304, WriteDiagnostics);
+            Button("关闭", 356, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
+            feedback = Label(string.Empty, 402);
+            base.Start();
+        }
+
+        public override void Update()
+        {
+            if (isVisible)
+            {
+                MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
+                bool fenced = RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.WorldFenced;
+                summary.text = fenced
+                    ? "为了保护城市状态，Forge 已隔离当前世界。必须返回主菜单并重新加载城市，不能在当前城市里直接重开房间。"
+                    : FaultHelp(value.Detail);
+                diagnostic.text = "诊断代码：" + (value.Detail ?? "unknown") +
+                    "\n如果问题重复出现，请写入诊断日志并运行安装目录中的 COLLECT-ALPHA-DIAGNOSTICS.ps1。";
+                retry.isVisible = !fenced;
+                retry.isEnabled = !fenced;
+            }
+            base.Update();
+        }
+
+        private void ResetAndReturn()
+        {
+            if (RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.WorldFenced) return;
+            bool hasWorld = RuntimeServices.Lifecycle.Current.IsValid;
+            RuntimeServices.Multiplayer.StopImmediately();
+            if (hasWorld) ForgeMultiplayerUi.ReplacePanel<ForgeHostGamePanel>();
+            else ForgeMultiplayerUi.OpenMainJoinWithPendingInvite();
+        }
+
+        private void WriteDiagnostics()
+        {
+            RuntimeDiagnostics.DumpToGameLog("multiplayer-fault-panel");
+            feedback.text = "诊断已写入游戏日志。请再运行安装目录中的诊断收集脚本。";
+        }
+
+        private static string FaultHelp(string detail)
+        {
+            detail = detail ?? string.Empty;
+            if (detail.StartsWith("compatibility-rejected:", StringComparison.Ordinal))
+                return "无法加入：你与房主的游戏、DLC、Mod 或共享配置不一致。请对照房主的安装清单后重试。";
+            if (detail.StartsWith("client-disconnected:", StringComparison.Ordinal))
+                return "与房主的连接已断开。请确认地址、端口、防火墙和房主房间仍在运行。";
+            if (detail.StartsWith("host-start:", StringComparison.Ordinal))
+                return "房间创建失败。端口可能被占用，或当前 Mod/运行时检查未通过。可以清理失败状态后修改设置重试。";
+            if (detail.StartsWith("snapshot-", StringComparison.Ordinal))
+                return "房主城市下载或加载失败。当前城市没有被当作成功加入；可以清理状态后重新连接。";
+            return "联机操作没有完成，Forge 没有把失败当作成功。可以清理失败状态后重试；若再次失败，请收集诊断。";
+        }
     }
 }

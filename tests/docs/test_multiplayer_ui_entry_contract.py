@@ -52,8 +52,38 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         session = source[source.index("internal sealed class ForgeSessionPanel"):source.index("internal sealed class ForgePlayersPanel")]
         self.assertIn("private UILabel notice", session)
-        self.assertIn('notice.text = "正在停止会话', session)
+        self.assertIn("internal void SetNotice", session)
         self.assertIn("notice.text = steamJoinReady", session)
+
+    def test_faulted_world_is_not_silently_unfenced_or_presented_as_retryable(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        pause = source[source.index("internal static void EnsurePauseMenuEntry()"):source.index("internal static void Shutdown()")]
+        self.assertNotIn("RuntimeServices.Multiplayer.StopImmediately();", pause)
+        self.assertIn("ShowPanel<ForgeFaultPanel>()", pause)
+        fault = source[source.index("internal sealed class ForgeFaultPanel"):]
+        self.assertIn("CitiesRuntimeRole.WorldFenced", fault)
+        self.assertIn("必须返回主菜单并重新加载城市", fault)
+        self.assertIn('RuntimeDiagnostics.DumpToGameLog("multiplayer-fault-panel")', fault)
+
+    def test_session_stop_requires_an_explicit_confirmation(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        session = source[source.index("internal sealed class ForgeSessionPanel"):source.index("internal sealed class ForgePlayersPanel")]
+        self.assertIn("OpenChildPanel<ForgeLeaveConfirmPanel>()", session)
+        confirm = source[source.index("internal sealed class ForgeLeaveConfirmPanel"):source.index("internal sealed class ForgeFaultPanel")]
+        self.assertIn("确认停止房间", confirm)
+        self.assertIn("确认断开", confirm)
+        self.assertIn("RuntimeServices.Multiplayer.RequestStop()", confirm)
+
+    def test_start_actions_are_single_submit_and_faults_have_recovery_routes(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn("private UIButton createButton", source)
+        self.assertIn("createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline", source)
+        self.assertIn("private UIButton joinButton", source)
+        self.assertIn("joinButton.isEnabled = false", source)
+        self.assertIn("joinButton.isEnabled = mode == MultiplayerSessionMode.Offline", source)
+        self.assertIn("internal static void OpenMainMenuEntry()", source)
+        self.assertIn("OpenMainJoinWithPendingInvite", source)
+        self.assertIn("ResetAndReturn", source)
 
     def test_steam_shutdown_unhooks_before_platform_native_state_disappears(self):
         source = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")

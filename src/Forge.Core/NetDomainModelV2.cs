@@ -15,7 +15,9 @@ namespace CsmForge.Core
         MultitoolRemoveNode = 17,
         MultitoolUnionNodes = 18,
         MultitoolSplitNode = 19,
-        MultitoolIntersectSegments = 20
+        MultitoolIntersectSegments = 20,
+        MultitoolCreateParallel = 21,
+        MultitoolCreateConnection = 22
     }
 
     public sealed class NetControlPointV2
@@ -47,6 +49,29 @@ namespace CsmForge.Core
         }
     }
 
+    public sealed class NetMultitoolPointV2
+    {
+        public float X { get; private set; }
+        public float Y { get; private set; }
+        public float Z { get; private set; }
+        public float ForwardX { get; private set; }
+        public float ForwardY { get; private set; }
+        public float ForwardZ { get; private set; }
+        public float BackwardX { get; private set; }
+        public float BackwardY { get; private set; }
+        public float BackwardZ { get; private set; }
+
+        public NetMultitoolPointV2(float x, float y, float z, float forwardX, float forwardY, float forwardZ,
+            float backwardX, float backwardY, float backwardZ)
+        {
+            NetControlPointV2.CheckFinite(x); NetControlPointV2.CheckFinite(y); NetControlPointV2.CheckFinite(z);
+            NetControlPointV2.CheckFinite(forwardX); NetControlPointV2.CheckFinite(forwardY); NetControlPointV2.CheckFinite(forwardZ);
+            NetControlPointV2.CheckFinite(backwardX); NetControlPointV2.CheckFinite(backwardY); NetControlPointV2.CheckFinite(backwardZ);
+            X = x; Y = y; Z = z; ForwardX = forwardX; ForwardY = forwardY; ForwardZ = forwardZ;
+            BackwardX = backwardX; BackwardY = backwardY; BackwardZ = backwardZ;
+        }
+    }
+
     public sealed class NetIntentV2
     {
         public NetIntentKindV2 Kind { get; private set; }
@@ -69,6 +94,10 @@ namespace CsmForge.Core
         public float X { get; private set; }
         public float Y { get; private set; }
         public float Z { get; private set; }
+        public NetMultitoolPointV2[] SemanticPoints { get; private set; }
+        public bool FirstStart { get; private set; }
+        public bool SecondStart { get; private set; }
+        public bool FollowTerrain { get; private set; }
 
         private NetIntentV2() { }
 
@@ -140,6 +169,34 @@ namespace CsmForge.Core
             ValidateIdentity(first, "first"); ValidateIdentity(second, "second");
             if (first.Equals(second)) throw new ArgumentException("Multitool intersect segments must be distinct.");
             return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolIntersectSegments, Target = first, SecondaryTarget = second };
+        }
+
+        public static NetIntentV2 MultitoolCreateParallel(string prefabKey, bool invert, NetMultitoolPointV2[] points)
+        {
+            ValidatePrefab(prefabKey);
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolCreateParallel, PrefabKey = prefabKey,
+                Invert = invert, SemanticPoints = CopyPoints(points) };
+        }
+
+        public static NetIntentV2 MultitoolCreateConnection(EntityIdentityV2 firstSegment, EntityIdentityV2 secondSegment,
+            bool firstStart, bool secondStart, string prefabKey, bool invert, bool followTerrain, NetMultitoolPointV2[] points)
+        {
+            ValidateIdentity(firstSegment, "firstSegment"); ValidateIdentity(secondSegment, "secondSegment");
+            if (firstSegment.Equals(secondSegment)) throw new ArgumentException("Multitool connection segments must be distinct.");
+            ValidatePrefab(prefabKey);
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolCreateConnection, Target = firstSegment,
+                SecondaryTarget = secondSegment, FirstStart = firstStart, SecondStart = secondStart,
+                PrefabKey = prefabKey, Invert = invert, FollowTerrain = followTerrain, SemanticPoints = CopyPoints(points) };
+        }
+
+        private static NetMultitoolPointV2[] CopyPoints(NetMultitoolPointV2[] points)
+        {
+            if (points == null || points.Length < 2 || points.Length > 512)
+                throw new ArgumentException("Invalid Multitool semantic point count.", "points");
+            NetMultitoolPointV2[] result = (NetMultitoolPointV2[])points.Clone();
+            for (int i = 0; i < result.Length; i++)
+                if (result[i] == null) throw new ArgumentException("Null Multitool semantic point.", "points");
+            return result;
         }
 
         private static void ValidateIdentity(EntityIdentityV2 value, string name)
@@ -411,6 +468,11 @@ namespace CsmForge.Core
                     writer.Write(value.MaxSegments); writer.Write(value.TestEnds); writer.Write(value.AutoFix);
                     writer.Write(value.Invert); writer.Write(value.SwitchDirection); writer.Write(value.ZoneGridFlags);
                 }
+                else if (value.Kind == NetIntentKindV2.MultitoolCreateParallel)
+                {
+                    NetStateIndexV2.WriteString(writer, value.PrefabKey); writer.Write(value.Invert);
+                    WriteSemanticPoints(writer, value.SemanticPoints);
+                }
                 else
                 {
                     NetStateIndexV2.WriteIdentity(writer, value.Target);
@@ -429,6 +491,14 @@ namespace CsmForge.Core
                         WritePosition(writer, value.X, value.Y, value.Z);
                         writer.Write((byte)value.RelatedTargets.Length);
                         for (int i = 0; i < value.RelatedTargets.Length; i++) NetStateIndexV2.WriteIdentity(writer, value.RelatedTargets[i]);
+                    }
+                    else if (value.Kind == NetIntentKindV2.MultitoolCreateConnection)
+                    {
+                        NetStateIndexV2.WriteIdentity(writer, value.SecondaryTarget);
+                        writer.Write(value.FirstStart); writer.Write(value.SecondStart);
+                        NetStateIndexV2.WriteString(writer, value.PrefabKey);
+                        writer.Write(value.Invert); writer.Write(value.FollowTerrain);
+                        WriteSemanticPoints(writer, value.SemanticPoints);
                     }
                     else if (value.Kind != NetIntentKindV2.DeleteNode && value.Kind != NetIntentKindV2.MultitoolRemoveNode)
                         throw new InvalidDataException("Unknown net intent kind.");
@@ -471,6 +541,16 @@ namespace CsmForge.Core
                 }
                 else if (kind == NetIntentKindV2.MultitoolIntersectSegments)
                     result = NetIntentV2.MultitoolIntersectSegments(ReadIdentity(reader), ReadIdentity(reader));
+                else if (kind == NetIntentKindV2.MultitoolCreateParallel)
+                    result = NetIntentV2.MultitoolCreateParallel(ReadString(reader), reader.ReadBoolean(), ReadSemanticPoints(reader));
+                else if (kind == NetIntentKindV2.MultitoolCreateConnection)
+                {
+                    EntityIdentityV2 first = ReadIdentity(reader), second = ReadIdentity(reader);
+                    bool firstStart = reader.ReadBoolean(), secondStart = reader.ReadBoolean();
+                    string prefab = ReadString(reader); bool invert = reader.ReadBoolean(), follow = reader.ReadBoolean();
+                    result = NetIntentV2.MultitoolCreateConnection(first, second, firstStart, secondStart,
+                        prefab, invert, follow, ReadSemanticPoints(reader));
+                }
                 else throw new InvalidDataException("Unknown net intent kind.");
                 EnsureEnd(reader); return result;
             }
@@ -508,6 +588,31 @@ namespace CsmForge.Core
                 EnsureEnd(reader);
                 return new NetMutationV2(upsertNodes, deleteNodes, upsertSegments, deleteSegments, cost, refund);
             }
+        }
+
+        private static void WriteSemanticPoints(BinaryWriter writer, NetMultitoolPointV2[] points)
+        {
+            if (points == null || points.Length < 2 || points.Length > 512) throw new InvalidDataException("Invalid Multitool point count.");
+            writer.Write((ushort)points.Length);
+            for (int i = 0; i < points.Length; i++)
+            {
+                NetMultitoolPointV2 p = points[i];
+                writer.Write(p.X); writer.Write(p.Y); writer.Write(p.Z);
+                writer.Write(p.ForwardX); writer.Write(p.ForwardY); writer.Write(p.ForwardZ);
+                writer.Write(p.BackwardX); writer.Write(p.BackwardY); writer.Write(p.BackwardZ);
+            }
+        }
+
+        private static NetMultitoolPointV2[] ReadSemanticPoints(BinaryReader reader)
+        {
+            int count = reader.ReadUInt16();
+            if (count < 2 || count > 512) throw new InvalidDataException("Invalid Multitool point count.");
+            NetMultitoolPointV2[] result = new NetMultitoolPointV2[count];
+            for (int i = 0; i < count; i++)
+                result[i] = new NetMultitoolPointV2(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
+                    reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
+                    reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+            return result;
         }
 
         private static void WritePosition(BinaryWriter writer, float x, float y, float z)

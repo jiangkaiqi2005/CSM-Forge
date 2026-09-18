@@ -13,8 +13,9 @@ class NetworkMultitoolBridgeContractTests(unittest.TestCase):
         core = (CORE / "NetDomainModelV2.cs").read_text(encoding="utf-8-sig")
         for marker in [
             "MultitoolAddNode", "MultitoolRemoveNode", "MultitoolUnionNodes",
-            "MultitoolSplitNode", "MultitoolIntersectSegments", "EntityIdentityV2",
-            "SecondaryTarget", "RelatedTargets",
+            "MultitoolSplitNode", "MultitoolIntersectSegments", "MultitoolCreateParallel",
+            "MultitoolCreateConnection", "NetMultitoolPointV2", "EntityIdentityV2",
+            "SecondaryTarget", "RelatedTargets", "SemanticPoints",
         ]:
             self.assertIn(marker, core)
 
@@ -26,7 +27,8 @@ class NetworkMultitoolBridgeContractTests(unittest.TestCase):
             "NetworkMultitool.UnionNodeMode", '"Union"',
             "NetworkMultitool.SplitNodeMode", '"Split"',
             "NetworkMultitool.IntersectSegmentMode", '"IntersectSegments"',
-            "TrySubmitNetIntent", "TryResolveClientNetNode", "TryResolveClientNetSegment",
+            "NetworkMultitool.CreateParallelMode", "NetworkMultitool.BaseCreateMode",
+            "SemanticVoidOperationPrefix", "HostConstructionCost", "TrySubmitNetIntent", "TryResolveClientNetNode", "TryResolveClientNetSegment",
             "TryResolveHostNetNode", "TryResolveHostNetSegment",
         ]:
             self.assertIn(marker, bridge)

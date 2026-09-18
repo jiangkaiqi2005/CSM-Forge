@@ -96,6 +96,28 @@ namespace CsmForge.Tests
                 NetIntentV2.MultitoolIntersectSegments(segmentA, segmentB)));
             Assert.Equal(NetIntentKindV2.MultitoolIntersectSegments, intersect.Kind);
             Assert.Equal(segmentB, intersect.SecondaryTarget);
+
+            NetMultitoolPointV2[] points = new[]
+            {
+                new NetMultitoolPointV2(0, 1, 2, 1, 0, 0, -1, 0, 0),
+                new NetMultitoolPointV2(10, 1, 2, 1, 0, 0, -1, 0, 0)
+            };
+            NetIntentV2 parallel = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolCreateParallel("road:parallel", true, points)));
+            Assert.Equal(NetIntentKindV2.MultitoolCreateParallel, parallel.Kind);
+            Assert.Equal(2, parallel.SemanticPoints.Length);
+            Assert.Equal("road:parallel", parallel.PrefabKey);
+            Assert.True(parallel.Invert);
+
+            NetIntentV2 connection = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolCreateConnection(segmentA, segmentB, true, false,
+                    "road:connection", false, true, points)));
+            Assert.Equal(NetIntentKindV2.MultitoolCreateConnection, connection.Kind);
+            Assert.Equal(segmentA, connection.Target);
+            Assert.Equal(segmentB, connection.SecondaryTarget);
+            Assert.True(connection.FirstStart);
+            Assert.False(connection.SecondStart);
+            Assert.True(connection.FollowTerrain);
         }
 
         [Case]

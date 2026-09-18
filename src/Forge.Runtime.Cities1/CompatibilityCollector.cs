@@ -107,9 +107,19 @@ namespace CsmForge.Runtime.Cities1
             if (typeName == "TrafficManager.Lifecycle.TrafficManagerMod") return "blocked-mod";
             if (typeName == "GameAnarchy.Mod" && !GameAnarchyBridge.IsAvailable) return "blocked-mod";
             if (typeName == "InfiniteGoodsMod.ModIdentity" && !InfiniteGoodsBridge.IsAvailable) return "blocked-mod";
+            if (IsAuditedCslModernMap(typeName, assembly)) return "client-mod";
             for (int i = 0; i < ClientOnlyModTypes.Length; i++)
                 if (typeName == ClientOnlyModTypes[i]) return "client-mod";
             return "mod";
+        }
+
+        private static bool IsAuditedCslModernMap(string typeName, Assembly assembly)
+        {
+            if (typeName != "CSLModernMap.CSLModernMap" || assembly == null) return false;
+            AssemblyName name = assembly.GetName();
+            if (!StringComparer.Ordinal.Equals(name.Name, "CSLModernMap") || name.Version != new Version(6, 6, 2, 0)) return false;
+            return StringComparer.OrdinalIgnoreCase.Equals(BinaryHash(assembly).ToString(),
+                "9fc331505b43484dc55d38762d5198e7b68aa04dca19af5ff8f59d37e76c300a");
         }
 
         private static Hash256 ModConfigurationHash(string typeName, Assembly assembly)

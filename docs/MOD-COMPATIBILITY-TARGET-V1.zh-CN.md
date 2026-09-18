@@ -10,7 +10,7 @@
 | ACME | algernon-A/ACME | ClientOnly | 已审计为相机/FPS表现层并加入 `client-mod` 白名单 |
 | New Place | Map | CONTENT | 地图/资产 fingerprint；无独立 shared-simulation adapter |
 | Precision Engineering (Harmony) | `PrecisionEngineering.Mod` | ClientOnly | 已从公开源码确认 IUserMod type；只提供建造测量/吸附辅助，加入 `client-mod` 白名单 |
-| CSLModernMap: Map&Metro Export | Workshop | ClientOnly/ReadOnly candidate | 仅在确认实际 IUserMod type 后进入白名单；未知 type 不猜、不放宽 |
+| CSLModernMap 6.6.2 | 3781187198（已下架） | Exact-binary ClientOnly exporter | 对实际 Workshop DLL 做 IL 审计：程序集 `CSLModernMap` 6.6.2.0，IUserMod type `CSLModernMap.CSLModernMap`，SHA-256 `9fc331…c300a`。世界访问是读取/export；只写本地文件、UI、renderer 安装目录并可启动外部 renderer。仅这个 type + assembly + version + hash 进入 `client-mod`，任何漂移回到默认 exact-match，见 `CSLMODERNMAP-AUDIT-V1.zh-CN.md` |
 | Game Anarchy 1.3.1 | 2781804786 | Host-owned settings + unsupported persistent-write blocks | 锁定官方 `v1.3.1@b4bed4cf` 的程序集/type/method surface；共享配置 Host-owned，Client shared setter 与手工/周期 money mutation 被阻断。尚无 authority adapter 的 milestone/resource/city-service/fire 配置在会话启动时显式拒绝，fire hook 多人态恢复原版路径。真实双机 gameplay 未验证，见 `GAME-ANARCHY-INFINITE-GOODS-AUDIT-V1.zh-CN.md` |
 | TM:PE 11.9.4.1 | 1637663252 | Dedicated synchronized adapter | 当前继续 `blocked-mod`；在 Stable Net rule adapter + Vehicle/Path authority 完成前不允许静默加入 |
 | Harmony 2.2.2-0 | dependency | Dependency | Forge 使用 CitiesHarmony；作为运行依赖进入 manifest |

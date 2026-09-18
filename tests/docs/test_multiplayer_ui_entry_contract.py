@@ -39,6 +39,32 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("OpenChildPanel<ForgePlayersPanel>()", session)
         self.assertIn("OpenChildPanel<ForgeChatPanel>()", session)
 
+    def test_forge_pages_block_clicks_from_reaching_the_underlying_game_menu(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn('ModalBackdropName = "CSMForgeModalBackdrop"', source)
+        self.assertIn("backdrop.isInteractive = true", source)
+        self.assertIn("parameter.Use();", source)
+        self.assertLess(source.index("backdrop.BringToFront();"), source.index("panel.BringToFront();"))
+        self.assertIn("HideModalBackdrop();", source)
+
+    def test_main_menu_explains_both_join_and_host_paths(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        main = source[source.index("internal sealed class ForgeMainMenuJoinPanel"):source.index("internal sealed class ForgeHostGamePanel")]
+        self.assertIn("加入好友", main)
+        self.assertIn("想当房主", main)
+        self.assertIn("先载入或新建一个城市", main)
+        self.assertIn("FORGE 多人联机", main)
+
+    def test_compatibility_rejection_names_actionable_content_mismatches(self):
+        formatter = (RUNTIME / "ForgeCompatibilityFailureText.cs").read_text(encoding="utf-8")
+        ui = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        for marker in [
+            "game-build-mismatch", "schema-mismatch", "missing:", "fingerprint-mismatch:",
+            "unsupported-extra:", "client-forbidden:", "host-unsupported:", "Workshop",
+        ]:
+            self.assertIn(marker, formatter)
+        self.assertIn("ForgeCompatibilityFailureText.Describe", ui)
+
     def test_primary_ui_translates_runtime_modes_into_player_facing_stages(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         for marker in [

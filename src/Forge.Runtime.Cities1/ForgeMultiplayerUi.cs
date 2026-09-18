@@ -26,6 +26,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private const string MainButtonName = "CSMForgeMainMultiplayer";
         private const string PauseButtonName = "CSMForgePauseMultiplayer";
+        private const string ModalBackdropName = "CSMForgeModalBackdrop";
         private static readonly Type[] ManagedPanelTypes = new Type[]
         {
             typeof(ForgeMainMenuJoinPanel), typeof(ForgeHostGamePanel), typeof(ForgeSessionPanel),
@@ -96,6 +97,7 @@ namespace CsmForge.Runtime.Cities1
             UIView view = UIView.GetAView();
             if (view == null) return;
             DestroyNamed(view, MainButtonName); DestroyNamed(view, PauseButtonName);
+            DestroyNamed(view, ModalBackdropName);
             DestroyNamed(view, typeof(ForgeMainMenuJoinPanel).Name);
             DestroyNamed(view, typeof(ForgeHostGamePanel).Name);
             DestroyNamed(view, typeof(ForgeSessionPanel).Name);
@@ -190,24 +192,49 @@ namespace CsmForge.Runtime.Cities1
         {
             if (panel != null) panel.isVisible = false;
             if (PanelHistory.Count > 0) DisplayExclusive(PanelHistory.Pop());
-            else activePanelType = null;
+            else { activePanelType = null; HideModalBackdrop(); }
         }
 
         internal static void Dismiss(UIComponent panel)
         {
             if (panel != null) panel.isVisible = false;
             if (panel != null && activePanelType == panel.GetType()) activePanelType = null;
-            PanelHistory.Clear();
+            PanelHistory.Clear(); HideModalBackdrop();
         }
 
         private static UIComponent DisplayExclusive(Type panelType)
         {
             UIView view = UIView.GetAView(); if (view == null) return null;
             HideManagedPanels(view, panelType);
+            UIPanel backdrop = EnsureModalBackdrop(view);
+            backdrop.isVisible = true; backdrop.BringToFront();
             UIComponent panel = view.FindUIComponent(panelType.Name);
             if (panel == null) { panel = view.AddUIComponent(panelType); panel.name = panelType.Name; }
             activePanelType = panelType;
             panel.isVisible = true; panel.BringToFront(); panel.Focus(); return panel;
+        }
+
+        private static UIPanel EnsureModalBackdrop(UIView view)
+        {
+            UIPanel backdrop = view.FindUIComponent(ModalBackdropName) as UIPanel;
+            if (backdrop == null)
+            {
+                backdrop = (UIPanel)view.AddUIComponent(typeof(UIPanel));
+                backdrop.name = ModalBackdropName; backdrop.backgroundSprite = "GenericPanel";
+                backdrop.color = new Color32(0, 0, 0, 150); backdrop.isInteractive = true; backdrop.canFocus = true;
+                backdrop.eventClick += delegate(UIComponent component, UIMouseEventParameter parameter)
+                { parameter.Use(); };
+            }
+            backdrop.relativePosition = Vector3.zero;
+            backdrop.size = view.GetScreenResolution();
+            return backdrop;
+        }
+
+        private static void HideModalBackdrop()
+        {
+            UIView view = UIView.GetAView();
+            UIComponent backdrop = view == null ? null : view.FindUIComponent(ModalBackdropName);
+            if (backdrop != null) backdrop.isVisible = false;
         }
 
         private static void HideManagedPanels(UIView view, Type except)
@@ -357,16 +384,18 @@ namespace CsmForge.Runtime.Cities1
 
         public override void Start()
         {
-            Configure("加入 CSM-Forge 房间", 390);
-            Label("粘贴房主发来的开发版 LAN 邀请信息", 62);
+            Configure("CSM-Forge 多人联机", 465);
+            Label("加入好友：粘贴房主发来的 LAN 邀请信息", 62);
             invite = Field(string.Empty, 88, false);
-            Label("显示名", 132);
+            Label("你的显示名", 132);
             string display = ForgeMod.Settings.DisplayName.value;
             if (PlatformService.active && !string.IsNullOrEmpty(PlatformService.personaName)) display = PlatformService.personaName;
             nameField = Field(display, 158, false);
             Status = Label("尚未连接。加入后会自动下载并加载房主存档。", 205);
             joinButton = Button("加入房间", 242, Join);
-            Button("取消 / 断开", 300, delegate
+            UILabel hostHelp = Label("想当房主：返回主菜单，先载入或新建一个城市；进入地图后按 Esc，点击“FORGE 多人联机”创建房间。", 300);
+            hostHelp.height = 62; hostHelp.autoHeight = false;
+            Button("返回主菜单", 370, delegate
             {
                 RuntimeServices.Multiplayer.StopImmediately(); ForgeMultiplayerUi.Dismiss(this);
             });
@@ -796,7 +825,7 @@ namespace CsmForge.Runtime.Cities1
         {
             detail = detail ?? string.Empty;
             if (detail.StartsWith("compatibility-rejected:", StringComparison.Ordinal))
-                return "无法加入：你与房主的游戏、DLC、Mod 或共享配置不一致。请对照房主的安装清单后重试。";
+                return ForgeCompatibilityFailureText.Describe(detail.Substring("compatibility-rejected:".Length));
             if (detail.StartsWith("client-disconnected:", StringComparison.Ordinal))
                 return "与房主的连接已断开。请确认地址、端口、防火墙和房主房间仍在运行。";
             if (detail.StartsWith("host-start:", StringComparison.Ordinal))

@@ -17,7 +17,32 @@ namespace CsmForge.Runtime.Cities1
     internal static class NetworkMultitoolBridge
     {
         private const string ModTypeName = "NetworkMultitool.Mod";
+        // Official v1.3.9 tag: 2abaf77e665f8b1c2cae65de188f9109f28f0c0b.
+        private static readonly Version SupportedVersion = new Version(1, 3, 9, 0);
         private static bool patched;
+        private static Surface surface;
+
+        private sealed class Surface
+        {
+            internal Type PointType;
+            internal Type PointArrayType;
+            internal Type SelectionType;
+            internal ConstructorInfo PointConstructor;
+            internal ConstructorInfo SegmentSelectionConstructor;
+            internal FieldInfo PointPosition;
+            internal FieldInfo PointForward;
+            internal FieldInfo PointBackward;
+            internal PropertyInfo NeedMoney;
+            internal PropertyInfo NeedMoneyValue;
+            internal MethodInfo GetCost;
+            internal MethodInfo AddNode;
+            internal MethodInfo RemoveNode;
+            internal MethodInfo UnionNodes;
+            internal MethodInfo SplitNode;
+            internal MethodInfo IntersectSegments;
+            internal MethodInfo CreateParallel;
+            internal MethodInfo CreateConnection;
+        }
 
         internal static bool IsAvailable { get { return ResolveType(ModTypeName) != null; } }
 
@@ -38,18 +63,14 @@ namespace CsmForge.Runtime.Cities1
 
             // Resolve every required 1.3.9 surface before installing any patch. An installed but
             // incompatible Multitool build must fail closed rather than leave a partially shimmed tool.
+            Surface resolved = ResolveSurface();
             MethodInfo[] boolMethods = new MethodInfo[]
             {
-                ResolveRequired("NetworkMultitool.AddNodeMode", "InsertNode", 2, typeof(bool)),
-                ResolveRequired("NetworkMultitool.RemoveNodeMode", "RemoveNode", 1, typeof(bool)),
-                ResolveRequired("NetworkMultitool.UnionNodeMode", "Union", 2, typeof(bool)),
-                ResolveRequired("NetworkMultitool.SplitNodeMode", "Split", 3, typeof(bool)),
-                ResolveRequired("NetworkMultitool.IntersectSegmentMode", "IntersectSegments", 2, typeof(bool))
+                resolved.AddNode, resolved.RemoveNode, resolved.UnionNodes, resolved.SplitNode, resolved.IntersectSegments
             };
             MethodInfo[] voidMethods = new MethodInfo[]
             {
-                ResolveRequired("NetworkMultitool.CreateParallelMode", "Create", 4, typeof(void)),
-                ResolveRequired("NetworkMultitool.BaseCreateMode", "Create", 9, typeof(void))
+                resolved.CreateParallel, resolved.CreateConnection
             };
             MethodInfo boolPrefix = typeof(NetworkMultitoolBridge).GetMethod("SemanticOperationPrefix",
                 BindingFlags.Static | BindingFlags.NonPublic);
@@ -60,10 +81,11 @@ namespace CsmForge.Runtime.Cities1
             HarmonyMethod voidHarmony = new HarmonyMethod(voidPrefix);
             for (int i = 0; i < boolMethods.Length; i++) harmony.Patch(boolMethods[i], boolHarmony);
             for (int i = 0; i < voidMethods.Length; i++) harmony.Patch(voidMethods[i], voidHarmony);
+            surface = resolved;
             patched = true;
         }
 
-        internal static void ResetPatchState() { patched = false; }
+        internal static void ResetPatchState() { patched = false; surface = null; }
 
         private static bool SemanticOperationPrefix(MethodBase __originalMethod, object[] __args, ref bool __result)
         {
@@ -183,17 +205,15 @@ namespace CsmForge.Runtime.Cities1
         {
             points = null;
             if (values == null || values.Length < 2 || values.Length > 512) return false;
-            Type type = values.GetType().GetElementType();
-            if (type == null) return false;
-            FieldInfo position = type.GetField("Position", BindingFlags.Instance | BindingFlags.Public);
-            FieldInfo forward = type.GetField("ForwardDirection", BindingFlags.Instance | BindingFlags.Public);
-            FieldInfo backward = type.GetField("BackwardDirection", BindingFlags.Instance | BindingFlags.Public);
-            if (position == null || forward == null || backward == null) return false;
+            Surface active = surface ?? ResolveSurface();
+            if (values.GetType() != active.PointArrayType) return false;
             NetMultitoolPointV2[] result = new NetMultitoolPointV2[values.Length];
             for (int i = 0; i < values.Length; i++)
             {
                 object item = values.GetValue(i); if (item == null) return false;
-                Vector3 p = (Vector3)position.GetValue(item), f = (Vector3)forward.GetValue(item), b = (Vector3)backward.GetValue(item);
+                Vector3 p = (Vector3)active.PointPosition.GetValue(item);
+                Vector3 f = (Vector3)active.PointForward.GetValue(item);
+                Vector3 b = (Vector3)active.PointBackward.GetValue(item);
                 result[i] = new NetMultitoolPointV2(p.x, p.y, p.z, f.x, f.y, f.z, b.x, b.y, b.z);
             }
             points = result; return true;
@@ -234,33 +254,34 @@ namespace CsmForge.Runtime.Cities1
         {
             if (intent == null || nodeIds == null || segmentIds == null || !IsSemanticIntent(intent.Kind) || !IsAvailable)
                 return false;
+            Surface active = surface ?? ResolveSurface();
             MethodInfo method;
             object[] args;
             uint first, second;
             if (intent.Kind == NetIntentKindV2.MultitoolAddNode)
             {
                 if (!segmentIds.TryGetNative(intent.Target, out first) || !UShort(first)) return false;
-                method = ResolveRequired("NetworkMultitool.AddNodeMode", "InsertNode", 2, typeof(bool));
+                method = active.AddNode;
                 args = new object[] { (ushort)first, new Vector3(intent.X, intent.Y, intent.Z) };
             }
             else if (intent.Kind == NetIntentKindV2.MultitoolRemoveNode)
             {
                 if (!nodeIds.TryGetNative(intent.Target, out first) || !UShort(first)) return false;
-                method = ResolveRequired("NetworkMultitool.RemoveNodeMode", "RemoveNode", 1, typeof(bool));
+                method = active.RemoveNode;
                 args = new object[] { (ushort)first };
             }
             else if (intent.Kind == NetIntentKindV2.MultitoolUnionNodes)
             {
                 if (!nodeIds.TryGetNative(intent.Target, out first) || !nodeIds.TryGetNative(intent.SecondaryTarget, out second) ||
                     !UShort(first) || !UShort(second)) return false;
-                method = ResolveRequired("NetworkMultitool.UnionNodeMode", "Union", 2, typeof(bool));
+                method = active.UnionNodes;
                 args = new object[] { (ushort)first, (ushort)second };
             }
             else if (intent.Kind == NetIntentKindV2.MultitoolSplitNode)
             {
                 if (!nodeIds.TryGetNative(intent.Target, out first) || !UShort(first)) return false;
-                method = ResolveRequired("NetworkMultitool.SplitNodeMode", "Split", 3, typeof(bool));
-                object selections = BuildSegmentSelectionArray(method.DeclaringType.Assembly, intent.RelatedTargets, segmentIds);
+                method = active.SplitNode;
+                object selections = BuildSegmentSelectionArray(active, intent.RelatedTargets, segmentIds);
                 if (selections == null) return false;
                 args = new object[] { (ushort)first, new Vector3(intent.X, intent.Y, intent.Z), selections };
             }
@@ -268,45 +289,41 @@ namespace CsmForge.Runtime.Cities1
             {
                 if (!segmentIds.TryGetNative(intent.Target, out first) || !segmentIds.TryGetNative(intent.SecondaryTarget, out second) ||
                     !UShort(first) || !UShort(second)) return false;
-                method = ResolveRequired("NetworkMultitool.IntersectSegmentMode", "IntersectSegments", 2, typeof(bool));
+                method = active.IntersectSegments;
                 args = new object[] { (ushort)first, (ushort)second };
             }
             else if (intent.Kind == NetIntentKindV2.MultitoolCreateParallel)
             {
-                method = ResolveRequired("NetworkMultitool.CreateParallelMode", "Create", 4, typeof(void));
+                method = active.CreateParallel;
                 NetInfo info = NetGameAccess.ResolvePrefab(intent.PrefabKey);
-                object points = BuildPointArray(method.DeclaringType.Assembly, intent.SemanticPoints);
+                object points = BuildPointArray(active, intent.SemanticPoints);
                 if (points == null) return false;
-                args = new object[] { points, intent.Invert, info, HostConstructionCost(method.DeclaringType.Assembly, points, info) };
+                args = new object[] { points, intent.Invert, info, HostConstructionCost(active, points, info) };
             }
             else
             {
                 if (!segmentIds.TryGetNative(intent.Target, out first) || !segmentIds.TryGetNative(intent.SecondaryTarget, out second) ||
                     !UShort(first) || !UShort(second)) return false;
-                method = ResolveRequired("NetworkMultitool.BaseCreateMode", "Create", 9, typeof(void));
+                method = active.CreateConnection;
                 NetInfo info = NetGameAccess.ResolvePrefab(intent.PrefabKey);
-                object points = BuildPointArray(method.DeclaringType.Assembly, intent.SemanticPoints);
+                object points = BuildPointArray(active, intent.SemanticPoints);
                 if (points == null) return false;
                 args = new object[] { points, intent.Invert, (ushort)first, (ushort)second, intent.FirstStart,
-                    intent.SecondStart, info, intent.FollowTerrain, HostConstructionCost(method.DeclaringType.Assembly, points, info) };
+                    intent.SecondStart, info, intent.FollowTerrain, HostConstructionCost(active, points, info) };
             }
 
             object result = method.Invoke(null, args);
             return method.ReturnType == typeof(void) || result is bool && (bool)result;
         }
 
-        private static object BuildPointArray(Assembly assembly, NetMultitoolPointV2[] values)
+        private static object BuildPointArray(Surface active, NetMultitoolPointV2[] values)
         {
-            if (assembly == null || values == null || values.Length < 2 || values.Length > 512) return null;
-            Type pointType = assembly.GetType("NetworkMultitool.BaseNetworkMultitoolMode+Point", false);
-            if (pointType == null) return null;
-            ConstructorInfo constructor = pointType.GetConstructor(new Type[] { typeof(Vector3), typeof(Vector3), typeof(Vector3) });
-            if (constructor == null) return null;
-            Array result = Array.CreateInstance(pointType, values.Length);
+            if (active == null || values == null || values.Length < 2 || values.Length > 512) return null;
+            Array result = Array.CreateInstance(active.PointType, values.Length);
             for (int i = 0; i < values.Length; i++)
             {
                 NetMultitoolPointV2 p = values[i];
-                result.SetValue(constructor.Invoke(new object[] {
+                result.SetValue(active.PointConstructor.Invoke(new object[] {
                     new Vector3(p.X, p.Y, p.Z),
                     new Vector3(p.ForwardX, p.ForwardY, p.ForwardZ),
                     new Vector3(p.BackwardX, p.BackwardY, p.BackwardZ)
@@ -315,65 +332,121 @@ namespace CsmForge.Runtime.Cities1
             return result;
         }
 
-        private static int HostConstructionCost(Assembly assembly, object points, NetInfo info)
+        private static int HostConstructionCost(Surface active, object points, NetInfo info)
         {
-            if (assembly == null || points == null || info == null) throw new ArgumentNullException("Multitool cost input.");
-            Type settings = assembly.GetType("NetworkMultitool.Settings", false);
-            PropertyInfo needMoney = settings == null ? null : settings.GetProperty("NeedMoney", BindingFlags.Static | BindingFlags.Public);
-            object saved = needMoney == null ? null : needMoney.GetValue(null, null);
-            PropertyInfo value = saved == null ? null : saved.GetType().GetProperty("value", BindingFlags.Instance | BindingFlags.Public);
-            if (value == null || value.PropertyType != typeof(bool))
-                throw new MissingMemberException("NetworkMultitool.Settings.NeedMoney.value");
-            if (!(bool)value.GetValue(saved, null)) return 0;
-
-            Type baseType = assembly.GetType("NetworkMultitool.BaseNetworkMultitoolMode", false);
-            MethodInfo[] methods = baseType == null ? new MethodInfo[0] : baseType.GetMethods(BindingFlags.Static | BindingFlags.NonPublic);
-            for (int i = 0; i < methods.Length; i++)
-            {
-                MethodInfo method = methods[i]; ParameterInfo[] parameters = method.GetParameters();
-                if (method.Name == "GetCost" && method.ReturnType == typeof(int) && parameters.Length == 2 &&
-                    parameters[0].ParameterType.IsInstanceOfType(points) && parameters[1].ParameterType == typeof(NetInfo))
-                    return (int)method.Invoke(null, new object[] { points, info });
-            }
-            throw new MissingMethodException("NetworkMultitool.BaseNetworkMultitoolMode", "GetCost(Point[], NetInfo)");
+            if (active == null || points == null || info == null) throw new ArgumentNullException("Multitool cost input.");
+            object saved = active.NeedMoney.GetValue(null, null);
+            if (saved == null) throw new MissingMemberException("NetworkMultitool.Settings.NeedMoney");
+            if (!(bool)active.NeedMoneyValue.GetValue(saved, null)) return 0;
+            return (int)active.GetCost.Invoke(null, new object[] { points, info });
         }
 
-        private static object BuildSegmentSelectionArray(Assembly assembly, EntityIdentityV2[] values, EntityIdMapV2 segmentIds)
+        private static object BuildSegmentSelectionArray(Surface active, EntityIdentityV2[] values, EntityIdMapV2 segmentIds)
         {
-            if (assembly == null || values == null || values.Length == 0) return null;
-            Type baseType = assembly.GetType("ModsCommon.Utilities.Selection", false);
-            Type segmentType = assembly.GetType("ModsCommon.Utilities.SegmentSelection", false);
-            if (baseType == null || segmentType == null || !baseType.IsAssignableFrom(segmentType)) return null;
-            ConstructorInfo constructor = segmentType.GetConstructor(new Type[] { typeof(ushort) });
-            if (constructor == null) return null;
-            Array array = Array.CreateInstance(baseType, values.Length);
+            if (active == null || values == null || values.Length == 0) return null;
+            Array array = Array.CreateInstance(active.SelectionType, values.Length);
             for (int i = 0; i < values.Length; i++)
             {
                 uint native;
                 if (!segmentIds.TryGetNative(values[i], out native) || !UShort(native)) return null;
-                array.SetValue(constructor.Invoke(new object[] { (ushort)native }), i);
+                array.SetValue(active.SegmentSelectionConstructor.Invoke(new object[] { (ushort)native }), i);
             }
             return array;
         }
 
         private static bool UShort(uint value) { return value != 0 && value <= ushort.MaxValue; }
 
-        private static MethodInfo ResolveRequired(string typeName, string methodName, int parameterCount, Type returnType)
+        private static Surface ResolveSurface()
         {
-            Type type = ResolveType(typeName);
+            Type modType = ResolveType(ModTypeName);
+            if (modType == null) throw new MissingMemberException(ModTypeName);
+            Assembly assembly = modType.Assembly;
+            AssemblyName name = assembly.GetName();
+            if (!StringComparer.Ordinal.Equals(name.Name, "NetworkMultitool") || name.Version == null || !name.Version.Equals(SupportedVersion))
+                throw new NotSupportedException("Network Multitool assembly must be exact Stable 1.3.9.0.");
+
+            Surface result = new Surface();
+            result.PointType = ResolveRequiredType(assembly, "NetworkMultitool.BaseNetworkMultitoolMode+Point");
+            result.PointArrayType = result.PointType.MakeArrayType();
+            result.SelectionType = ResolveRequiredType(assembly, "ModsCommon.Utilities.Selection");
+            Type segmentSelection = ResolveRequiredType(assembly, "ModsCommon.Utilities.SegmentSelection");
+            if (!result.SelectionType.IsAssignableFrom(segmentSelection))
+                throw new MissingMemberException("ModsCommon.Utilities.SegmentSelection : Selection");
+            result.PointConstructor = ResolveConstructor(result.PointType, typeof(Vector3), typeof(Vector3), typeof(Vector3));
+            result.SegmentSelectionConstructor = ResolveConstructor(segmentSelection, typeof(ushort));
+            result.PointPosition = ResolveField(result.PointType, "Position", typeof(Vector3));
+            result.PointForward = ResolveField(result.PointType, "ForwardDirection", typeof(Vector3));
+            result.PointBackward = ResolveField(result.PointType, "BackwardDirection", typeof(Vector3));
+
+            Type settings = ResolveRequiredType(assembly, "NetworkMultitool.Settings");
+            result.NeedMoney = settings.GetProperty("NeedMoney", BindingFlags.Static | BindingFlags.Public);
+            if (result.NeedMoney == null) throw new MissingMemberException("NetworkMultitool.Settings.NeedMoney");
+            result.NeedMoneyValue = result.NeedMoney.PropertyType.GetProperty("value", BindingFlags.Instance | BindingFlags.Public);
+            if (result.NeedMoneyValue == null || result.NeedMoneyValue.PropertyType != typeof(bool))
+                throw new MissingMemberException("NetworkMultitool.Settings.NeedMoney.value");
+
+            Type baseMode = ResolveRequiredType(assembly, "NetworkMultitool.BaseNetworkMultitoolMode");
+            result.GetCost = ResolveRequired(baseMode, "GetCost", typeof(int), result.PointArrayType, typeof(NetInfo));
+            result.AddNode = ResolveRequired(assembly, "NetworkMultitool.AddNodeMode", "InsertNode", typeof(bool), typeof(ushort), typeof(Vector3));
+            result.RemoveNode = ResolveRequired(assembly, "NetworkMultitool.RemoveNodeMode", "RemoveNode", typeof(bool), typeof(ushort));
+            result.UnionNodes = ResolveRequired(assembly, "NetworkMultitool.UnionNodeMode", "Union", typeof(bool), typeof(ushort), typeof(ushort));
+            Type selections = typeof(IEnumerable<>).MakeGenericType(result.SelectionType);
+            result.SplitNode = ResolveRequired(assembly, "NetworkMultitool.SplitNodeMode", "Split", typeof(bool), typeof(ushort), typeof(Vector3), selections);
+            result.IntersectSegments = ResolveRequired(assembly, "NetworkMultitool.IntersectSegmentMode", "IntersectSegments", typeof(bool), typeof(ushort), typeof(ushort));
+            result.CreateParallel = ResolveRequired(assembly, "NetworkMultitool.CreateParallelMode", "Create", typeof(void),
+                result.PointArrayType, typeof(bool), typeof(NetInfo), typeof(int));
+            result.CreateConnection = ResolveRequired(assembly, "NetworkMultitool.BaseCreateMode", "Create", typeof(void),
+                result.PointArrayType, typeof(bool), typeof(ushort), typeof(ushort), typeof(bool), typeof(bool), typeof(NetInfo), typeof(bool), typeof(int));
+            return result;
+        }
+
+        private static Type ResolveRequiredType(Assembly assembly, string typeName)
+        {
+            Type type = assembly == null ? null : assembly.GetType(typeName, false);
             if (type == null) throw new MissingMemberException(typeName);
+            return type;
+        }
+
+        private static ConstructorInfo ResolveConstructor(Type type, params Type[] parameterTypes)
+        {
+            ConstructorInfo constructor = type.GetConstructor(parameterTypes);
+            if (constructor == null) throw new MissingMethodException(type.FullName, ".ctor");
+            return constructor;
+        }
+
+        private static FieldInfo ResolveField(Type type, string fieldName, Type fieldType)
+        {
+            FieldInfo field = type.GetField(fieldName, BindingFlags.Instance | BindingFlags.Public);
+            if (field == null || field.FieldType != fieldType) throw new MissingFieldException(type.FullName, fieldName);
+            return field;
+        }
+
+        private static MethodInfo ResolveRequired(Assembly assembly, string typeName, string methodName, Type returnType, params Type[] parameterTypes)
+        {
+            return ResolveRequired(ResolveRequiredType(assembly, typeName), methodName, returnType, parameterTypes);
+        }
+
+        private static MethodInfo ResolveRequired(Type type, string methodName, Type returnType, params Type[] parameterTypes)
+        {
             MethodInfo found = null;
             MethodInfo[] methods = type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
             for (int i = 0; i < methods.Length; i++)
             {
                 MethodInfo candidate = methods[i];
-                if (candidate.Name != methodName || candidate.ReturnType != returnType ||
-                    candidate.GetParameters().Length != parameterCount) continue;
-                if (found != null) throw new AmbiguousMatchException(typeName + "." + methodName);
+                if (candidate.Name != methodName || candidate.ReturnType != returnType || !ParametersMatch(candidate, parameterTypes)) continue;
+                if (found != null) throw new AmbiguousMatchException(type.FullName + "." + methodName);
                 found = candidate;
             }
-            if (found == null) throw new MissingMethodException(typeName, methodName);
+            if (found == null) throw new MissingMethodException(type.FullName, methodName);
             return found;
+        }
+
+        private static bool ParametersMatch(MethodInfo method, Type[] expected)
+        {
+            ParameterInfo[] actual = method.GetParameters();
+            if (actual.Length != expected.Length) return false;
+            for (int i = 0; i < actual.Length; i++) if (actual[i].ParameterType != expected[i]) return false;
+            return true;
         }
 
         private static Type ResolveType(string name)

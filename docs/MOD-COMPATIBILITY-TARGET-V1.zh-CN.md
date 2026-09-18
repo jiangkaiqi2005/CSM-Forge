@@ -5,7 +5,7 @@
 | 项目 | Workshop / 来源 | Forge 分类 | 当前代码状态 |
 |---|---|---|---|
 | Demand Controller | 2916710759 | Host-owned bridge + Demand Authority | `bridge.demandcontroller` 同步控制配置；Client 本地 `Refresh()` 被阻断，实际 RCI 值继续由 Demand domain absolute projection |
-| Network Multitool 1.3.9 | 2560782729 | Net Authority semantic shim | Add Node / Remove Node / Union / Split / Intersect，以及 Parallel 与 BaseCreate connection family（Create Connection / Curve / Loop 共用执行入口）已按真实高层入口转 Stable Node/Segment + bounded absolute geometry intent；Host 重建原 Mod Point[]、按 Host shared setting 计算费用并在既有 Net Authority 内调用原 Mod 逻辑，最终捕获 absolute graph mutation。代码门禁通过后仍需真实双机逐项验证。 |
+| Network Multitool 1.3.9 | 2560782729 | Net Authority semantic shim | 以官方 `v1.3.9@2abaf77e` 为[源码基线](NETWORK-MULTITOOL-AUDIT-V1.zh-CN.md)；Add Node / Remove Node / Union / Split / Intersect，以及 Parallel 与 BaseCreate connection family（Create Connection / Curve / Loop 共用执行入口）已按真实高层入口转 Stable Node/Segment + bounded absolute geometry intent。安装 patch 前严格核对 `NetworkMultitool` 程序集版本 `1.3.9.0`、精确方法参数、Point 布局、费用与设置表面；任何漂移整体 fail-closed。Host 重建原 Mod Point[]、按 Host shared setting 计算费用并在既有 Net Authority 内调用原 Mod 逻辑，最终捕获 absolute graph mutation。仍需真实双机逐项验证。 |
 | Infinite Goods | 725555912 | Host-only simulation bridge | `bridge.infinitegoods` 同步 Host 配置；Client 原始 `TransferMonitor.OnAfterSimulationTick` 被阻断，避免 process-local Building slot 写入。完整兼容仍需 Building material-buffer absolute projection |
 | ACME | algernon-A/ACME | ClientOnly | 已审计为相机/FPS表现层并加入 `client-mod` 白名单 |
 | New Place | Map | CONTENT | 地图/资产 fingerprint；无独立 shared-simulation adapter |

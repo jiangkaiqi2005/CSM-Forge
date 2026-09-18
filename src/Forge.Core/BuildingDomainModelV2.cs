@@ -6,7 +6,7 @@ using System.Text;
 namespace CsmForge.Core
 {
     public enum BuildingIntentKindV2 : byte { Create = 1, Delete = 2 }
-    public enum BuildingResultKindV2 : byte { Created = 1, Deleted = 2 }
+    public enum BuildingResultKindV2 : byte { Created = 1, Deleted = 2, Updated = 3 }
 
     public sealed class BuildingIntentV2
     {
@@ -81,6 +81,11 @@ namespace CsmForge.Core
             if (state == null) throw new ArgumentNullException("state");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Created, Entity = state.Entity, State = state };
         }
+        public static BuildingResultV2 Updated(BuildingStateV2 state)
+        {
+            if (state == null) throw new ArgumentNullException("state");
+            return new BuildingResultV2 { Kind = BuildingResultKindV2.Updated, Entity = state.Entity, State = state };
+        }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity) { return Deleted(entity, 0); }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity, int refundAmount)
         {
@@ -106,7 +111,9 @@ namespace CsmForge.Core
         {
             if (result == null) throw new ArgumentNullException("result"); if (result.Kind == BuildingResultKindV2.Created) { Seed(result.State); return; }
             BuildingStateV2 current; if (!states.TryGetValue(result.Entity.EntityId, out current) || !current.Entity.Equals(result.Entity))
-                throw new InvalidOperationException("Cannot delete an unknown or stale building entity."); states.Remove(result.Entity.EntityId);
+                throw new InvalidOperationException("Cannot update or delete an unknown or stale building entity.");
+            if (result.Kind == BuildingResultKindV2.Updated) { states[result.Entity.EntityId] = result.State; return; }
+            if (result.Kind != BuildingResultKindV2.Deleted) throw new InvalidOperationException("Unknown building result kind."); states.Remove(result.Entity.EntityId);
         }
         public bool TryGet(EntityIdentityV2 entity, out BuildingStateV2 state)
         {
@@ -156,7 +163,7 @@ namespace CsmForge.Core
             if (value == null) throw new ArgumentNullException("value"); using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind); writer.Write(value.Entity.EntityId); writer.Write(value.Entity.Generation);
-                if (value.Kind == BuildingResultKindV2.Created)
+                if (value.Kind == BuildingResultKindV2.Created || value.Kind == BuildingResultKindV2.Updated)
                 { WriteString(writer, value.State.PrefabKey); writer.Write(value.State.X); writer.Write(value.State.Y); writer.Write(value.State.Z); writer.Write(value.State.Angle); writer.Write(value.State.Length); writer.Write(value.State.BuildIndex); writer.Write(value.State.ConstructionCost); }
                 else writer.Write(value.RefundAmount);
                 writer.Flush(); return stream.ToArray();
@@ -168,8 +175,8 @@ namespace CsmForge.Core
             using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes, false)))
             {
                 BuildingResultKindV2 kind = (BuildingResultKindV2)reader.ReadByte(); EntityIdentityV2 entity = new EntityIdentityV2(reader.ReadUInt64(), reader.ReadUInt32()); BuildingResultV2 result;
-                if (kind == BuildingResultKindV2.Created)
-                { string prefab = ReadString(reader); result = BuildingResultV2.Created(new BuildingStateV2(entity, prefab, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadInt32())); }
+                if (kind == BuildingResultKindV2.Created || kind == BuildingResultKindV2.Updated)
+                { string prefab = ReadString(reader); BuildingStateV2 state = new BuildingStateV2(entity, prefab, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadInt32()); result = kind == BuildingResultKindV2.Created ? BuildingResultV2.Created(state) : BuildingResultV2.Updated(state); }
                 else if (kind == BuildingResultKindV2.Deleted) result = BuildingResultV2.Deleted(entity, reader.ReadInt32());
                 else throw new InvalidDataException("Unknown building result kind."); EnsureEnd(reader); return result;
             }

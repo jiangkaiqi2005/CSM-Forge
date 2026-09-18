@@ -64,6 +64,10 @@ namespace CsmForge.Runtime.Cities1
         {
             nativeId = 0;
             if (!identity.IsValid) return false;
+            if (kind == StableNameTargetKindV2.Building)
+                return hostSide
+                    ? hostBuildings != null && hostBuildings.TryResolveNative(identity, out nativeId)
+                    : clientBuildings != null && clientBuildings.TryResolveNative(identity, out nativeId);
             uint upper = StableNameNativeUpperBound(kind);
             for (uint candidate = 1; candidate < upper; candidate++)
             {

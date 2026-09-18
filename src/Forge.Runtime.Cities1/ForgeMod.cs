@@ -20,6 +20,7 @@ namespace CsmForge.Runtime.Cities1
             ForgeExtensionApi.Register(new EventStateAdapter());
             ForgeExtensionApi.Register(new DisasterStateAdapter());
             ForgeExtensionApi.Register(new ParkGridStateAdapter());
+            ForgeExtensionApi.Register(new BuildingSimulationStateAdapter());
             KnownModBridgeRegistry.RegisterAvailable();
             RuntimeServices.Enable();
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
@@ -130,6 +131,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostCash();
                 RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.PollObservedHostWeather();
+                RuntimeServices.Multiplayer.PollObservedHostBuildings();
                 RuntimeServices.Multiplayer.PollObservedHostExtensions();
                 EightyOne2UtilityAuthority.RestoreClientProjection();
                 RuntimeServices.Multiplayer.RestoreClientWeatherTargets();

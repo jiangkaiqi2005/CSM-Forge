@@ -41,5 +41,16 @@ namespace CsmForge.Runtime.Cities1
             if (batch == null || authority.IsFenced) throw new InvalidOperationException("Observed building deletion could not be committed.");
             BroadcastBatch(batch);
         }
+
+        internal void PollObservedHostBuildings()
+        {
+            if (!IsHostBuildingAuthorityActive || snapshotSave != null) return;
+            ObservedBuildingChange change = hostBuildings.PollNaturalChanges(128); if (change == null) return;
+            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, BuildingAuthorityDomain.Id,
+                change.BeforeRoot, change.AfterRoot, BuildingDomainCodecV2.EncodeResult(change.Result));
+            if (batch == null || authority.IsFenced)
+            { FenceSession("observed-building-change-could-not-commit"); return; }
+            BroadcastBatch(batch);
+        }
     }
 }

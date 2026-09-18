@@ -21,6 +21,13 @@ class AlphaTestabilityContractTests(unittest.TestCase):
         self.assertIn("README-CANDIDATE.txt", build)
         self.assertLess(build.index("README-CANDIDATE.txt"), build.rindex("SHA256SUMS.txt"))
 
+    def test_install_verifier_rejects_original_csm_coexistence(self):
+        verifier = (ROOT / "scripts/verify-alpha-install.ps1").read_text(encoding="utf-8")
+        self.assertIn("CSM.dll", verifier)
+        self.assertIn("original CSM", verifier)
+        self.assertIn("cannot coexist", verifier)
+        self.assertIn("Split-Path -Parent $rootPath", verifier)
+
     def test_runtime_package_runs_real_startup_probe(self):
         build = (ROOT / "scripts/build-runtime.ps1").read_text(encoding="utf-8")
         probe = (ROOT / "tools/Forge.RuntimeStartupProbe/Program.cs").read_text(encoding="utf-8")

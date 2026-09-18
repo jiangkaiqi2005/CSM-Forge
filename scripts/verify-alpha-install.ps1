@@ -8,6 +8,12 @@ if (-not (Test-Path -LiteralPath $rootPath -PathType Container)) {
     throw "CSM-Forge install directory does not exist: $rootPath"
 }
 
+$modsRoot = Split-Path -Parent $rootPath
+$originalCsmDll = Join-Path $modsRoot 'CSM\CSM.dll'
+if (Test-Path -LiteralPath $originalCsmDll -PathType Leaf) {
+    throw "The original CSM and CSM-Forge cannot coexist. Move or uninstall the original CSM directory first: $originalCsmDll"
+}
+
 $required = @(
     'CSM.Forge.Runtime.Cities1.dll',
     'CSM.Forge.Core.dll',

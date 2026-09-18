@@ -101,6 +101,7 @@ Windows install target:
 %LOCALAPPDATA%\Colossal Order\Cities_Skylines\Addons\Mods\CSM-Forge
 
 Copy the CONTENTS of this package's CSM-Forge folder so that CSM.Forge.Runtime.Cities1.dll is directly inside that directory. Enable CSM-Forge and CitiesHarmony in Content Manager, then restart the game.
+Do not keep the original Cities: Skylines Multiplayer mod in a sibling Mods\CSM directory. The original CSM and CSM-Forge own competing multiplayer, Steam callback, networking and Harmony lifecycles and cannot coexist. VERIFY-INSTALL.ps1 rejects this layout.
 
 Before testing on each machine:
 1. Run VERIFY-INSTALL.ps1 from the installed CSM-Forge directory.

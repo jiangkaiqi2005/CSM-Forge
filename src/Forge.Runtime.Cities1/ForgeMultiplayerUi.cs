@@ -421,20 +421,25 @@ namespace CsmForge.Runtime.Cities1
         private UITextField keyField;
         private UITextField nameField;
         private UILabel players;
+        private UILabel preflightLabel;
         private UIButton createButton;
+        private ForgeRoomPreflightReport preflight;
         private string feedback;
 
         public override void Start()
         {
-            Configure("创建 CSM-Forge 房间", 510);
+            Configure("创建 CSM-Forge 房间", 630);
             Label("显示名", 58); nameField = Field(ForgeMod.Settings.DisplayName.value, 82, false);
             Label("UDP 端口", 124); portField = Field(ForgeMod.Settings.Port.value.ToString(), 148, true);
             Label("临时房间口令", 190); keyField = Field(ForgeMultiplayerUi.RoomKey, 214, false);
             Status = Label("设置完成后点击创建房间。", 260);
-            players = Label("直连地址：" + ForgeMultiplayerUi.LocalIpv4(), 300);
-            createButton = Button("创建房间（当前城市作为房主）", 350, CreateRoom);
-            Button("取消", 410, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
+            preflightLabel = Label(string.Empty, 300); preflightLabel.height = 86; preflightLabel.autoHeight = false;
+            players = Label("直连地址：" + ForgeMultiplayerUi.LocalIpv4(), 395);
+            createButton = Button("创建房间（当前城市作为房主）", 440, CreateRoom);
+            Button("重新检查 DLC / Mod / 资产", 492, RefreshPreflight);
+            Button("取消", 544, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
             base.Start();
+            RefreshPreflight();
         }
 
         public override void Update()
@@ -442,7 +447,8 @@ namespace CsmForge.Runtime.Cities1
             if (isVisible)
             {
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
-                createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline;
+                createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline &&
+                    preflight != null && preflight.CanHost;
                 if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
                     Status.text = value.Mode == MultiplayerSessionMode.Offline ?
                         "设置完成后点击创建房间。" : StatusText();
@@ -460,6 +466,9 @@ namespace CsmForge.Runtime.Cities1
 
         private void CreateRoom()
         {
+            RefreshPreflight();
+            if (preflight == null || !preflight.CanHost)
+            { SetFeedback(preflight == null ? "无法完成开房检查。" : preflight.Message); return; }
             int port; string display = (nameField.text ?? string.Empty).Trim(); string key = keyField.text ?? string.Empty;
             if (!int.TryParse(portField.text, out port) || port < 1 || port > 65535)
             { SetFeedback("端口必须是 1–65535。"); return; }
@@ -474,6 +483,14 @@ namespace CsmForge.Runtime.Cities1
             if (ok) createButton.isEnabled = false;
             SetFeedback(ok ? "正在创建房间……" :
                 "创建失败：当前城市会话不可用或已有 Forge 会话。请关闭此页后重试。");
+        }
+
+        private void RefreshPreflight()
+        {
+            preflight = ForgeRoomPreflight.EvaluateHost();
+            preflightLabel.text = preflight.Message;
+            if (createButton != null) createButton.isEnabled = preflight.CanHost &&
+                RuntimeServices.Multiplayer.Status.Mode == MultiplayerSessionMode.Offline;
         }
 
         private void SetFeedback(string value) { feedback = value; Status.text = value; }

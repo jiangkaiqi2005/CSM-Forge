@@ -85,6 +85,17 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("OpenMainJoinWithPendingInvite", source)
         self.assertIn("ResetAndReturn", source)
 
+    def test_host_preflight_reuses_the_real_compatibility_manifest_and_explains_blockers(self):
+        source = (RUNTIME / "ForgeRoomPreflight.cs").read_text(encoding="utf-8")
+        ui = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn("CitiesCompatibilityCollector.Collect()", source)
+        self.assertIn("CompatibilityCapabilityReport.From", source)
+        self.assertIn("report.BlockedIds", source)
+        self.assertIn("当前城市已被安全隔离", source)
+        self.assertIn("创建后仍会逐个核对加入者清单", source)
+        self.assertIn("ForgeRoomPreflight.EvaluateHost()", ui)
+        self.assertIn("重新检查 DLC / Mod / 资产", ui)
+
     def test_steam_shutdown_unhooks_before_platform_native_state_disappears(self):
         source = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
         self.assertIn("PlatformService.eventPlatformServiceShutdown += OnPlatformServiceShutdown", source)

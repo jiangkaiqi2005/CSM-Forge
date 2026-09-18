@@ -29,11 +29,13 @@ class AlphaTestabilityContractTests(unittest.TestCase):
 
     def test_host_join_controls_use_task_oriented_labels(self):
         panel = (ROOT / "src/Forge.Runtime.Cities1/ForgeSettingsPanel.cs").read_text(encoding="utf-8")
-        self.assertIn("创建房间（本机作为房主）", panel)
-        self.assertIn("加入房间并加载房主快照", panel)
-        self.assertIn("Esc → 选项 → CSM-Forge", panel)
+        multiplayer = (ROOT / "src/Forge.Runtime.Cities1/ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn("创建房间（当前城市作为房主）", multiplayer)
+        self.assertIn("加入房间", multiplayer)
+        self.assertIn("主菜单", panel)
+        self.assertIn("暂停菜单", panel)
         mod = (ROOT / "src/Forge.Runtime.Cities1/ForgeMod.cs").read_text(encoding="utf-8")
-        self.assertIn("Esc → 选项 → CSM-Forge", mod)
+        self.assertIn("主菜单加入房间", mod)
 
     def test_ci_finalizes_manifest_after_build_info(self):
         for relative in (".github/workflows/ci.yml", ".github/workflows/package-runtime.yml"):

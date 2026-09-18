@@ -137,6 +137,27 @@ namespace CsmForge.Runtime.Cities1
             return false;
         }
 
+        public bool RequestJoinFromMainMenu(IPEndPoint endpoint, string roomKey, string displayName)
+        {
+            if (lifecycle.Current.IsValid || endpoint == null || string.IsNullOrEmpty(roomKey) ||
+                string.IsNullOrEmpty(displayName)) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Offline) return false;
+                mode = MultiplayerSessionMode.ConnectingClient;
+                detail = "main-menu-client-start";
+            }
+            StartClientBootstrap(default(LoadIdentity), endpoint, roomKey, displayName);
+            return Status.Mode != MultiplayerSessionMode.Faulted;
+        }
+
+        public void PollMainMenu()
+        {
+            if (lifecycle.Current.IsValid || client == null) return;
+            try { DrainClientEvents(); }
+            catch (Exception error) { AbortStart("main-menu-poll:" + error.GetType().Name); }
+        }
+
         public bool RequestStop()
         {
             LoadIdentity identity = lifecycle.Current;

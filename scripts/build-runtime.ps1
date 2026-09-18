@@ -125,15 +125,16 @@ Ultimate Framework code coverage in this candidate:
 First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
-3. Enter a city on both machines. Host presses Esc, opens Options -> CSM-Forge, then chooses 创建房间（本机作为房主）.
-4. Client opens the same in-game panel, enters Host IPv4 plus the same UDP port and temporary room key, then chooses 加入房间并加载房主快照.
-5. Wait until Client status is ClientLive before editing.
-6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
-7. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
-8. Test Host and Client Tree/Prop create, move and delete in small isolated steps; record any identity, slot-reuse or projection failure. These paths are not yet gameplay-validated by CI.
-9. On the Host only, test a small Terrain brush and undo, then verify Terrain absolute height shards and Net/Building collateral on every Client. Client Terrain tools remain blocked. These paths are not yet gameplay-validated by CI.
-10. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
-11. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
+3. Host enters the city to share, presses Esc, then chooses FORGE 多人联机 -> 创建房间（当前城市作为房主）.
+4. Host chooses 复制邀请信息并打开 Steam 好友 and sends the copied development-LAN invitation text to the Client. This opens the friends overlay but does not provide NAT traversal.
+5. Client stays at the main menu, chooses FORGE 联机, pastes the invitation text, then chooses 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
+6. Wait until Client status is ClientLive before editing.
+7. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
+8. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
+9. Test Host and Client Tree/Prop create, move and delete in small isolated steps; record any identity, slot-reuse or projection failure. These paths are not yet gameplay-validated by CI.
+10. On the Host only, test a small Terrain brush and undo, then verify Terrain absolute height shards and Net/Building collateral on every Client. Client Terrain tools remain blocked. These paths are not yet gameplay-validated by CI.
+11. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
+12. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
 
 A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until the E4/RC multiplayer gates pass.
 '@

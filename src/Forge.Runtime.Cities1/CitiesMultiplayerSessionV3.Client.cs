@@ -12,7 +12,12 @@ namespace CsmForge.Runtime.Cities1
     {
         private void StartClientOnSimulation(LoadIdentity identity, IPEndPoint endpoint, string roomKey, string displayName)
         {
-            if (!lifecycle.IsCurrent(identity)) { SetOffline("stale-client-start"); return; }
+            StartClientBootstrap(identity, endpoint, roomKey, displayName);
+        }
+
+        private void StartClientBootstrap(LoadIdentity identity, IPEndPoint endpoint, string roomKey, string displayName)
+        {
+            if (identity.IsValid && !lifecycle.IsCurrent(identity)) { SetOffline("stale-client-start"); return; }
             try
             {
                 load = identity;
@@ -21,7 +26,7 @@ namespace CsmForge.Runtime.Cities1
                 clientManifestPages = BootstrapMessagesV2.CreateManifestPages(localManifest);
                 client = new LiteNetClientTransport();
                 if (!client.Start(endpoint, roomKey)) throw new InvalidOperationException("Could not start LiteNet client.");
-                if (!lifecycle.TryTransition(load, CitiesRuntimeRole.ClientLoading))
+                if (identity.IsValid && !lifecycle.TryTransition(load, CitiesRuntimeRole.ClientLoading))
                     throw new InvalidOperationException("Could not enter ClientLoading runtime role.");
                 lock (gate) { mode = MultiplayerSessionMode.ConnectingClient; detail = "connecting-development-transport"; }
             }
@@ -129,7 +134,7 @@ namespace CsmForge.Runtime.Cities1
 
             byte[] world = clientSnapshot.ReadAllVerifiedBytes();
             lock (gate) { preserveAcrossLevelLoad = true; detail = "loading-host-snapshot"; }
-            lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
+            if (load.IsValid) lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
             RuntimeServices.WorldLoader.Start(world, CompleteSnapshotLoad, delegate(Exception error)
             {
                 lock (gate) preserveAcrossLevelLoad = false;

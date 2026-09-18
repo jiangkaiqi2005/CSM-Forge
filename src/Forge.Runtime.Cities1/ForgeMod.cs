@@ -10,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public static readonly ForgeSettings Settings = new ForgeSettings();
         public string Name { get { return "CSM-Forge V3"; } }
-        public string Description { get { return "载入城市后按 Esc → 选项 → CSM-Forge，即可创建或加入房间（开发版）。"; } }
+        public string Description { get { return "主菜单加入房间；进入城市后从暂停菜单创建和管理房间（开发版）。"; } }
         public void OnEnabled()
         {
             BuiltInDlcAdapters.RegisterAll();
@@ -27,9 +27,10 @@ namespace CsmForge.Runtime.Cities1
             ForgeExtensionApi.Register(new TerrainStateAdapter());
             KnownModBridgeRegistry.RegisterAvailable();
             RuntimeServices.Enable();
+            ForgeMultiplayerUi.Initialize();
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
         }
-        public void OnDisabled() { RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+        public void OnDisabled() { ForgeMultiplayerUi.Shutdown(); RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
         public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
 
@@ -51,6 +52,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Metadata.Attach(identity);
                 KnownModBridgeRegistry.RegisterAvailable();
                 RuntimeServices.Patches.RefreshOptionalBridges();
+                ForgeMultiplayerUi.EnsurePauseMenuEntry();
                 CompatibilityManifest manifest = CitiesCompatibilityCollector.Collect();
                 UnityEngine.Debug.Log("[CSM-Forge] level loaded; world=" + identity.WorldId +
                     "; epoch=" + identity.Epoch + "; generation=" + identity.Generation +

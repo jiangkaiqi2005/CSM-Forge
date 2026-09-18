@@ -23,6 +23,12 @@ namespace CsmForge.Runtime.Cities1
             return 0u;
         }
 
+        internal EntityMapEntryV2[] SnapshotBuildingMappings(bool hostSide)
+        {
+            BuildingDomainBase domain = hostSide ? (BuildingDomainBase)hostBuildings : clientBuildings;
+            return domain == null ? new EntityMapEntryV2[0] : domain.SnapshotMappings();
+        }
+
         internal bool TryResolveStableNameIdentity(StableNameTargetKindV2 kind, uint nativeId,
             bool hostSide, out EntityIdentityV2 identity)
         {

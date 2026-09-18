@@ -30,6 +30,12 @@ namespace CsmForge.Tests
         }
 
         [Case]
+        public static void EntryBoundCoversUltimateDlcAndDynamicAuthorityShards()
+        {
+            Assert.True(ExtensionStateCodecV2.MaximumEntries >= 3000);
+        }
+
+        [Case]
         public static void SnapshotRoundTripsCanonically()
         {
             ExtensionStateSnapshotV2 value = new ExtensionStateSnapshotV2(new[]

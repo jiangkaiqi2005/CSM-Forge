@@ -43,7 +43,7 @@ P6-A 只闭合持久规则数据面；它没有宣称 TM:PE 动态交通已经�
 - custom pathfinding decisions；
 - vehicle lane selection；
 - TM:PE traffic AI side effects；
-- Citizen / Vehicle / Path 动态 authority 尚未完成；
+- Citizen / Vehicle / Path 动态 authority 代码闭包已在 P7-B 完成，但真实联机行为尚未验证；
 - Client 交通工具 UX/写入入口尚未进入 Host authority intent 边界。
 
-必须完成 P6-B/P7 后才能重新评估 Supported。当前代码编译、单元/契约测试和 CI green 都不等于真实双机 gameplay validated；TM:PE 11.9.4.1 的双机、多机、hot join/rejoin、长时间运行仍明确**未验证**。
+P6-B/P7 已提供重新评估所需的 dynamic code closure，但 UI 写入口与真实联机证据仍不充分，因此当前不解除 block。代码编译、单元/契约测试和 CI green 都不等于真实双机 gameplay validated；TM:PE 11.9.4.1 的双机、多机、hot join/rejoin、长时间运行仍明确**未验证**。

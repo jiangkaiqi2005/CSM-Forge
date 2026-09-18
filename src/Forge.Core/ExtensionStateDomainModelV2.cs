@@ -106,7 +106,7 @@ namespace CsmForge.Core
 
     public static class ExtensionStateCodecV2
     {
-        public const int MaximumEntries = 2048;
+        public const int MaximumEntries = 4096;
         private const uint Magic = 0x32584546;
 
         public static byte[] Encode(ExtensionStateSnapshotV2 snapshot)

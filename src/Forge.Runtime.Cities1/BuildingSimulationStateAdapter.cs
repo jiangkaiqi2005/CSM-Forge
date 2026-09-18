@@ -38,18 +38,15 @@ namespace CsmForge.Runtime.Cities1
             if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");
             bool hostSide = context.IsAuthoritative;
             List<State> values = new List<State>();
-            int limit = manager.m_buildings.m_buffer.Length;
-            if (limit > ushort.MaxValue + 1) limit = ushort.MaxValue + 1;
-            for (int i = 1; i < limit; i++)
+            EntityMapEntryV2[] mappings = RuntimeServices.Multiplayer.SnapshotBuildingMappings(hostSide);
+            for (int i = 0; i < mappings.Length; i++)
             {
-                ushort native = (ushort)i; Building data = manager.m_buildings.m_buffer[native];
+                if ((int)((mappings[i].Identity.EntityId - 1UL) % Shards) != shardIndex || mappings[i].NativeId == 0 || mappings[i].NativeId > ushort.MaxValue) continue;
+                ushort native = (ushort)mappings[i].NativeId; Building data = manager.m_buildings.m_buffer[native];
                 if (data.m_flags == Building.Flags.None) continue;
-                EntityIdentityV2 identity;
-                if (!RuntimeServices.Multiplayer.TryResolveStableNameIdentity(StableNameTargetKindV2.Building, native, hostSide, out identity)) continue;
-                if ((int)((identity.EntityId - 1UL) % Shards) != shardIndex) continue;
                 object boxed = data; long[] scalars = new long[Paths.Length];
                 for (int p = 0; p < Paths.Length; p++) scalars[p] = ReadLeaf(boxed, Paths[p]);
-                values.Add(new State { Identity = identity, Scalars = scalars });
+                values.Add(new State { Identity = mappings[i].Identity, Scalars = scalars });
             }
             values.Sort(delegate(State a, State b) { return a.Identity.EntityId.CompareTo(b.Identity.EntityId); });
             return Encode(shardIndex, values);

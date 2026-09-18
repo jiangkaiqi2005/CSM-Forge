@@ -296,6 +296,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private void Update()
         {
+            ForgeSteamRichPresence.Pump();
             RuntimeServices.Multiplayer.PollMainMenu();
             ForgeMultiplayerUi.HandleHotkeys();
         }
@@ -539,7 +540,7 @@ namespace CsmForge.Runtime.Cities1
             players = Label("玩家：读取中……", 92);
             Button("玩家列表", 132, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgePlayersPanel>(); });
             Button("多人聊天（快捷键 T）", 184, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeChatPanel>(); });
-            invite = Button("复制邀请码并打开 Steam 好友", 236, InviteFriends);
+            invite = Button("邀请 Steam 好友", 236, InviteFriends);
             Button("停止房间 / 断开", 288,
                 delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeLeaveConfirmPanel>(); });
             Button("关闭", 350, delegate { ForgeMultiplayerUi.CloseOrBack(this); });
@@ -574,11 +575,15 @@ namespace CsmForge.Runtime.Cities1
             { notice.text = "只有房主可以邀请其他玩家。"; return; }
             lastInvite = ForgeMultiplayerUi.BuildInviteCode(ForgeMultiplayerUi.LocalIpv4(), ForgeMod.Settings.Port.value,
                 ForgeMultiplayerUi.RoomKey);
+            bool steamJoinReady = ForgeSteamRichPresence.PublishInvite(lastInvite,
+                Math.Max(1, RuntimeServices.Multiplayer.Status.Players.Length));
             GUIUtility.systemCopyBuffer = lastInvite;
             if (PlatformService.active && PlatformService.IsOverlayEnabled())
             {
                 PlatformService.ActivateGameOverlay(GameOverlayDialog.Friends);
-                notice.text = "已复制直连邀请码并打开 Steam 好友；请粘贴发送给好友。自动点击加入已为稳定性停用。该方式不提供 NAT 穿透。";
+                notice.text = steamJoinReady
+                    ? "已发布 Steam 点击加入状态并打开好友列表；也已复制直连邀请码。该方式不提供 NAT 穿透。"
+                    : "已打开 Steam 好友并复制直连邀请码；Steam 点击加入当前不可用。该方式不提供 NAT 穿透。";
             }
             else notice.text = "直连邀请码已复制到剪贴板；Steam Overlay 当前不可用，请手动粘贴发送给好友。";
         }

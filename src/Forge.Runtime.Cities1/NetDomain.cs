@@ -374,6 +374,13 @@ namespace CsmForge.Runtime.Cities1
                     if (NetManager.instance.m_nodes.m_buffer[node].CountSegments() != 0) return DomainExecutionV2.Rejected();
                     using (RuntimeScopeGuard.EnterApply(Load, Id)) NetManager.instance.ReleaseNode(node);
                 }
+                else if (NetworkMultitoolBridge.IsSemanticIntent(intent.Kind))
+                {
+                    bool executed;
+                    using (RuntimeScopeGuard.EnterApply(Load, Id))
+                        executed = NetworkMultitoolBridge.TryExecuteHost(intent, NodeIds, SegmentIds);
+                    if (!executed) return DomainExecutionV2.Rejected();
+                }
                 else return DomainExecutionV2.Rejected();
 
                 NetMutationV2 mutation = Reconcile(before, economy.ConstructionFetched, economy.RefundAdded);

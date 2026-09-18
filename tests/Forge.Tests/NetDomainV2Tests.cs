@@ -68,6 +68,54 @@ namespace CsmForge.Tests
         }
 
         [Case]
+        public static void NetworkMultitoolIntentCodecCarriesStableSemanticTargets()
+        {
+            EntityIdentityV2 node = new EntityIdentityV2(100, 2);
+            EntityIdentityV2 otherNode = new EntityIdentityV2(101, 3);
+            EntityIdentityV2 segmentA = new EntityIdentityV2(200, 4);
+            EntityIdentityV2 segmentB = new EntityIdentityV2(201, 5);
+
+            NetIntentV2 add = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolAddNode(segmentA, 12.5f, 3f, -9f)));
+            Assert.Equal(NetIntentKindV2.MultitoolAddNode, add.Kind);
+            Assert.Equal(segmentA, add.Target);
+            Assert.Equal(12.5f, add.X);
+
+            NetIntentV2 union = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolUnionNodes(node, otherNode)));
+            Assert.Equal(node, union.Target);
+            Assert.Equal(otherNode, union.SecondaryTarget);
+
+            NetIntentV2 split = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolSplitNode(node, 1f, 2f, 3f, new[] { segmentB, segmentA })));
+            Assert.Equal(2, split.RelatedTargets.Length);
+            Assert.Equal(segmentA, split.RelatedTargets[0]);
+            Assert.Equal(segmentB, split.RelatedTargets[1]);
+
+            NetIntentV2 intersect = NetDomainCodecV2.DecodeIntent(NetDomainCodecV2.EncodeIntent(
+                NetIntentV2.MultitoolIntersectSegments(segmentA, segmentB)));
+            Assert.Equal(NetIntentKindV2.MultitoolIntersectSegments, intersect.Kind);
+            Assert.Equal(segmentB, intersect.SecondaryTarget);
+        }
+
+        [Case]
+        public static void NetworkMultitoolSplitRejectsDuplicateOrOversizedStableSets()
+        {
+            EntityIdentityV2 node = new EntityIdentityV2(300, 1);
+            EntityIdentityV2 segment = new EntityIdentityV2(301, 1);
+            Assert.Throws<ArgumentException>(delegate
+            {
+                NetIntentV2.MultitoolSplitNode(node, 0, 0, 0, new[] { segment, segment });
+            });
+            EntityIdentityV2[] tooMany = new EntityIdentityV2[8];
+            for (int i = 0; i < tooMany.Length; i++) tooMany[i] = new EntityIdentityV2((ulong)(400 + i), 1);
+            Assert.Throws<ArgumentException>(delegate
+            {
+                NetIntentV2.MultitoolSplitNode(node, 0, 0, 0, tooMany);
+            });
+        }
+
+        [Case]
         public static void NetMutationCodecPreservesGraphAndEconomyMetadata()
         {
             NetNodeStateV2 a = Node(11, "road:a", 0);

@@ -48,6 +48,7 @@ namespace CsmForge.Runtime.Cities1
                 GameAnarchyBridge.InstallOptionalPatches(harmony);
                 InfiniteGoodsBridge.InstallOptionalPatches(harmony);
                 EightyOne2Bridge.InstallOptionalPatches(harmony);
+                NetworkMultitoolBridge.InstallOptionalPatches(harmony);
             }
         }
 
@@ -59,6 +60,7 @@ namespace CsmForge.Runtime.Cities1
                 GameAnarchyBridge.ResetPatchState();
                 InfiniteGoodsBridge.ResetPatchState();
                 EightyOne2Bridge.ResetPatchState();
+                NetworkMultitoolBridge.ResetPatchState();
             }
         }
 

@@ -5,7 +5,7 @@
 | 项目 | Workshop / 来源 | Forge 分类 | 当前代码状态 |
 |---|---|---|---|
 | Demand Controller | 2916710759 | Host-owned bridge + Demand Authority | `bridge.demandcontroller` 同步控制配置；Client 本地 `Refresh()` 被阻断，实际 RCI 值继续由 Demand domain absolute projection |
-| Network Multitool 1.3.9 | 2560782729 | Net Authority target | 已确认其工具最终调用 `NetManager.CreateNode/CreateSegment/Release*`；Host direct mutations可进入现有 Net observer，Client 复杂工具语义仍需专用 intent/shim |
+| Network Multitool 1.3.9 | 2560782729 | Net Authority semantic shim | Add Node / Remove Node / Union / Split / Intersect 已按真实高层 Mode 入口转 Stable Node/Segment intent；Host 在既有 Net Authority 内调用原 Mod 逻辑并捕获 absolute graph mutation。代码门禁通过后仍需真实双机逐项验证；Parallel/Connection 等后续模式仍待继续覆盖。 |
 | Infinite Goods | 725555912 | Host-only simulation bridge | `bridge.infinitegoods` 同步 Host 配置；Client 原始 `TransferMonitor.OnAfterSimulationTick` 被阻断，避免 process-local Building slot 写入。完整兼容仍需 Building material-buffer absolute projection |
 | ACME | algernon-A/ACME | ClientOnly | 已审计为相机/FPS表现层并加入 `client-mod` 白名单 |
 | New Place | Map | CONTENT | 地图/资产 fingerprint；无独立 shared-simulation adapter |

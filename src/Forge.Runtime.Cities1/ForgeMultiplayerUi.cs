@@ -584,7 +584,7 @@ namespace CsmForge.Runtime.Cities1
                     ? "已发布 Steam 加入状态并打开好友列表；也已复制直连邀请码。该方式不提供 NAT 穿透。"
                     : "已打开 Steam 好友并复制直连邀请码；Steam 点击加入当前不可用。该方式不提供 NAT 穿透。";
             }
-            else notice.text = "开发版 LAN 邀请已复制到剪贴板；Steam Overlay 当前不可用，请手动发给好友。";
+            else notice.text = "LAN 邀请已复制到剪贴板；Steam Overlay 当前不可用，请手动发给好友。";
         }
     }
 
@@ -799,7 +799,7 @@ namespace CsmForge.Runtime.Cities1
                     ? "为了保护城市状态，Forge 已隔离当前世界。必须返回主菜单并重新加载城市，不能在当前城市里直接重开房间。"
                     : FaultHelp(value.Detail);
                 diagnostic.text = "诊断代码：" + (value.Detail ?? "unknown") +
-                    "\n如果问题重复出现，请写入诊断日志并运行安装目录中的 COLLECT-ALPHA-DIAGNOSTICS.ps1。";
+                    "\n如果问题重复出现，请写入诊断日志并运行安装目录中的 COLLECT-DIAGNOSTICS.ps1。";
                 retry.isVisible = !fenced;
                 retry.isEnabled = !fenced;
             }

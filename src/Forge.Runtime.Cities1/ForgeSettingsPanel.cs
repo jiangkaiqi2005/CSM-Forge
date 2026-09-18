@@ -42,7 +42,7 @@ namespace CsmForge.Runtime.Cities1
             group.AddButton("写入诊断日志", delegate
             {
                 RuntimeDiagnostics.DumpToGameLog("settings-button");
-                status.text = "诊断快照已写入游戏日志；若测试失败，请随后运行包内 COLLECT-ALPHA-DIAGNOSTICS.ps1。 " + StatusText();
+                status.text = "诊断快照已写入游戏日志；若测试失败，请随后运行包内 COLLECT-DIAGNOSTICS.ps1。 " + StatusText();
             });
         }
 

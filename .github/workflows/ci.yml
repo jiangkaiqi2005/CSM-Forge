@@ -141,8 +141,8 @@ jobs:
             $manifest += ('{0}  {1}' -f $fileHash.Hash.ToLowerInvariant(), $_.Name)
           }
           $manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding ascii
-          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-ALPHA-INSTALL.ps1') -Root $stage
-          if ($LASTEXITCODE -ne 0) { throw "Staged Alpha verification failed: $LASTEXITCODE" }
+          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-INSTALL.ps1') -Root $stage
+          if ($LASTEXITCODE -ne 0) { throw "Staged candidate verification failed: $LASTEXITCODE" }
           if (Test-Path $zip) { Remove-Item -Force $zip }
           Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()

@@ -148,6 +148,7 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("直连邀请码", source)
         self.assertIn("不提供 NAT 穿透", source)
         self.assertIn("GameOverlayDialog.Friends", source)
+        self.assertNotIn("开发版 LAN 邀请", source)
 
     def test_session_ui_has_join_progress_roster_chat_and_role_management(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")

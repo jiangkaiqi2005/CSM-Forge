@@ -91,7 +91,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $notice = @'
-CSM-Forge V3 minimum-playable Alpha / Ultimate Framework development candidate
+CSM-Forge 1.0 code-complete candidate
 
 This package intentionally does NOT contain Cities: Skylines, Unity, Steam, or other game-owned assemblies.
 It also does not bundle Harmony's implementation DLL; install/enable CitiesHarmony separately.
@@ -103,11 +103,11 @@ Windows install target:
 Copy the CONTENTS of this package's CSM-Forge folder so that CSM.Forge.Runtime.Cities1.dll is directly inside that directory. Enable CSM-Forge and CitiesHarmony in Content Manager, then restart the game.
 
 Before testing on each machine:
-1. Run VERIFY-ALPHA-INSTALL.ps1 from the installed CSM-Forge directory.
+1. Run VERIFY-INSTALL.ps1 from the installed CSM-Forge directory.
 2. Confirm it reports PASS.
 3. Confirm source_commit and manifest_sha256 are identical on every Host/Client machine.
 
-Minimum-playable Alpha scope retained:
+Candidate scope:
 - supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand/weather authority, and Tree/Prop create/move/delete through Forge Stable IDs;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
 - diagnostic-only projection audit logs projection-drift/local drift without automatically kicking/resyncing a client;
@@ -124,7 +124,7 @@ Ultimate Framework code coverage in this candidate:
 
 First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
-2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
+2. Run VERIFY-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
 3. Host enters the city to share, presses Esc, then chooses FORGE 多人联机 -> 创建房间（当前城市作为房主）.
 4. Host opens CSM-Forge multiplayer from the pause menu and chooses 邀请 Steam 好友. Forge publishes a Steam Rich Presence join command and also copies the direct-connect invitation text. A friend may use Steam's Join Game action, or receive and paste the copied invitation manually. This is direct UDP discovery only and does not provide NAT traversal or relay.
 5. Client stays at the main menu. A Steam Join Game request fills the Forge join panel and starts joining automatically; alternatively choose FORGE 联机, paste the invitation text, then choose 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
@@ -135,35 +135,39 @@ First two-machine test:
 10. On the Host only, test a small Terrain brush and undo, then verify Terrain absolute height shards and Net/Building collateral on every Client. Client Terrain tools remain blocked. These paths are not yet gameplay-validated by CI.
 11. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
 12. Open 玩家列表 and 多人聊天, press T to open chat, and confirm remote player tool cursors/names are visible during edits.
-13. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
+13. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-DIAGNOSTICS.ps1 on every involved machine.
+14. Record every scenario in E3-E4-TEST-RECORD.md. Leave outcomes as NOT RUN until the named machine actually completes them.
 
 A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. Steam click-to-join, player roster/chat/tool cursors, and all two-machine behavior remain real-gameplay unverified until the E4/RC multiplayer gates are run. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until those gates pass.
 '@
-$notice | Set-Content -LiteralPath (Join-Path $stage 'README-DEV.txt') -Encoding UTF8
+$notice | Set-Content -LiteralPath (Join-Path $stage 'README-CANDIDATE.txt') -Encoding UTF8
 Copy-Item -LiteralPath (Join-Path $repo 'THIRD-PARTY-NOTICES.txt') -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
 
 $packagedTools = @(
-    @('scripts/verify-alpha-install.ps1', 'VERIFY-ALPHA-INSTALL.ps1'),
-    @('scripts/collect-alpha-diagnostics.ps1', 'COLLECT-ALPHA-DIAGNOSTICS.ps1')
+    @('scripts/verify-alpha-install.ps1', 'VERIFY-INSTALL.ps1'),
+    @('scripts/collect-alpha-diagnostics.ps1', 'COLLECT-DIAGNOSTICS.ps1')
 )
 foreach ($tool in $packagedTools) {
     $source = Join-Path $repo $tool[0]
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-        throw "Required Alpha support script is missing: $source"
+        throw "Required candidate support script is missing: $source"
     }
     Copy-Item -LiteralPath $source -Destination (Join-Path $stage $tool[1])
 }
 
-foreach ($scriptName in @('VERIFY-ALPHA-INSTALL.ps1','COLLECT-ALPHA-DIAGNOSTICS.ps1')) {
+foreach ($scriptName in @('VERIFY-INSTALL.ps1','COLLECT-DIAGNOSTICS.ps1')) {
     $scriptPath = Join-Path $stage $scriptName
     $tokens = $null
     $parseErrors = $null
     [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$parseErrors) | Out-Null
     if ($parseErrors.Count -gt 0) {
         $messages = ($parseErrors | ForEach-Object { $_.Message }) -join '; '
-        throw "Packaged Alpha support script does not parse: $scriptName :: $messages"
+        throw "Packaged candidate support script does not parse: $scriptName :: $messages"
     }
 }
+
+Copy-Item -LiteralPath (Join-Path $repo 'docs/E3-E4-TEST-RECORD-TEMPLATE.zh-CN.md') `
+    -Destination (Join-Path $stage 'E3-E4-TEST-RECORD.md')
 
 $manifest = @()
 Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {

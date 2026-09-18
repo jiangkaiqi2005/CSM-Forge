@@ -19,16 +19,17 @@ python scripts/check_docs.py
 python -m unittest discover -s tests/docs -p "test_*.py"
 ```
 
-检查内容包括文档/相对链接存在、需求到验收和工作包的映射、工作包依赖无环、目标状态仍正确标记、预算上下界关系，以及最小 Alpha 的打包/诊断辅助合同。它不证明协议的语义正确性或游戏功能已经实现。
+检查内容包括文档/相对链接存在、需求到验收和工作包的映射、工作包依赖无环、目标状态仍正确标记、预算上下界关系，以及 Candidate 的打包/诊断辅助合同。它不证明协议的语义正确性或游戏功能已经实现。
 
-## 最小 Alpha 双机证据
+## 1.0 Candidate 双机证据
 
-Runtime Artifact 内包含两个 Windows PowerShell 辅助脚本：
+Runtime Artifact 内包含两个 Windows PowerShell 辅助脚本和一份固定证据表：
 
-- `VERIFY-ALPHA-INSTALL.ps1`：校验必需 DLL、禁止携带的游戏 DLL、`SHA256SUMS.txt`，并输出 `source_commit` 与 `manifest_sha256`。Host/Client 在启动游戏前都应运行；两个值必须一致。
-- `COLLECT-ALPHA-DIAGNOSTICS.ps1`：收集包 provenance、关键 DLL hash、可发现的 CS1 日志与 `[CSM-Forge]` 日志行并生成 ZIP；它不采集 room key 或网络配置。
+- `VERIFY-INSTALL.ps1`：校验必需 DLL、禁止携带的游戏 DLL、`SHA256SUMS.txt`，并输出 `source_commit` 与 `manifest_sha256`。Host/Client 在启动游戏前都应运行；两个值必须一致。
+- `COLLECT-DIAGNOSTICS.ps1`：收集包 provenance、关键 DLL hash、可发现的 CS1 日志与 `[CSM-Forge]` 日志行并生成 ZIP；它不采集 room key 或网络配置。
+- `E3-E4-TEST-RECORD.md`：固定 Host/Join、恢复、核心玩法、固定 Mod 和长跑矩阵，所有结果默认 `NOT RUN`。
 
-真机失败时，在离开城市前先到 CSM-Forge 设置页点击“写入诊断日志”。该动作把当前 Session 状态和内存中的 RuntimeEvent 环形记录刷入游戏日志，但不会改变 Authority、触发重同步或恢复动作。随后 Host 与每个 Client 分别运行 `COLLECT-ALPHA-DIAGNOSTICS.ps1`，并记录故障前最后一个玩家动作。
+真机失败时，在离开城市前先到 CSM-Forge 设置页点击“写入诊断日志”。该动作把当前 Session 状态和内存中的 RuntimeEvent 环形记录刷入游戏日志，但不会改变 Authority、触发重同步或恢复动作。随后 Host 与每个 Client 分别运行 `COLLECT-DIAGNOSTICS.ps1`，并记录故障前最后一个玩家动作。
 
 第一轮 E3/E4 证据至少绑定：Artifact `source_commit`、两机 `manifest_sha256`、Host/Client 诊断 ZIP、测试城市、游戏 build、是否存在其他 Mod，以及发生问题前的操作步骤。没有这些证据的 root mismatch / Join / Projection 问题不应靠猜测修改协议。
 

@@ -9,8 +9,8 @@ namespace CsmForge.Runtime.Cities1
     public sealed class ForgeMod : IUserMod
     {
         public static readonly ForgeSettings Settings = new ForgeSettings();
-        public string Name { get { return "CSM-Forge V3"; } }
-        public string Description { get { return "主菜单加入房间；进入城市后从暂停菜单创建和管理房间（开发版）。"; } }
+        public string Name { get { return "CSM-Forge 1.0 Candidate"; } }
+        public string Description { get { return "主菜单加入房间；进入城市后从暂停菜单创建和管理房间。真实多机玩法仍待验证。"; } }
         public void OnEnabled()
         {
             BuiltInDlcAdapters.RegisterAll();

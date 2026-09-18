@@ -13,12 +13,13 @@ class AlphaTestabilityContractTests(unittest.TestCase):
         self.assertIn("写入诊断日志", panel)
         self.assertIn("RuntimeDiagnostics.DumpToGameLog", panel)
 
-    def test_alpha_package_contains_verifier_and_collector(self):
+    def test_candidate_package_contains_verifier_collector_and_evidence_record(self):
         build = (ROOT / "scripts/build-runtime.ps1").read_text(encoding="utf-8")
-        self.assertIn("VERIFY-ALPHA-INSTALL.ps1", build)
-        self.assertIn("COLLECT-ALPHA-DIAGNOSTICS.ps1", build)
-        self.assertIn("README-DEV.txt", build)
-        self.assertLess(build.index("README-DEV.txt"), build.rindex("SHA256SUMS.txt"))
+        self.assertIn("VERIFY-INSTALL.ps1", build)
+        self.assertIn("COLLECT-DIAGNOSTICS.ps1", build)
+        self.assertIn("E3-E4-TEST-RECORD.md", build)
+        self.assertIn("README-CANDIDATE.txt", build)
+        self.assertLess(build.index("README-CANDIDATE.txt"), build.rindex("SHA256SUMS.txt"))
 
     def test_runtime_package_runs_real_startup_probe(self):
         build = (ROOT / "scripts/build-runtime.ps1").read_text(encoding="utf-8")
@@ -35,7 +36,16 @@ class AlphaTestabilityContractTests(unittest.TestCase):
         self.assertIn("主菜单", panel)
         self.assertIn("暂停菜单", panel)
         mod = (ROOT / "src/Forge.Runtime.Cities1/ForgeMod.cs").read_text(encoding="utf-8")
+        self.assertIn("CSM-Forge 1.0 Candidate", mod)
         self.assertIn("主菜单加入房间", mod)
+
+    def test_e3_e4_record_starts_unverified_and_keeps_tmpe_blocked(self):
+        record = (ROOT / "docs/E3-E4-TEST-RECORD-TEMPLATE.zh-CN.md").read_text(encoding="utf-8")
+        self.assertIn("默认状态全部是 `NOT RUN`", record)
+        self.assertIn("CI green 不能替代", record)
+        self.assertIn("TM:PE 必须保持未启用和 `blocked-mod`", record)
+        self.assertIn("1 Host + 2 Clients", record)
+        self.assertIn("24 小时 RC soak", record)
 
     def test_ci_finalizes_manifest_after_build_info(self):
         for relative in (".github/workflows/ci.yml", ".github/workflows/package-runtime.yml"):

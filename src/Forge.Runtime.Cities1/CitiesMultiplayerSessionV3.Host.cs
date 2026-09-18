@@ -23,12 +23,16 @@ namespace CsmForge.Runtime.Cities1
                 joins = new JoinCoordinator(MonotonicMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);
+                hostDisplayName = displayName;
                 if (!authority.RegisterConnection(hostLocalBinding, hostLocalMember, true, 1) || !authority.SetLive(hostLocalBinding, true))
                     throw new InvalidOperationException("Could not register Host local member.");
                 server = new LiteNetServerTransport();
                 if (!server.Start(port, roomKey)) throw new InvalidOperationException("Could not start LiteNet server.");
                 if (!lifecycle.TryTransition(load, CitiesRuntimeRole.HostLive))
                     throw new InvalidOperationException("Could not enter HostLive runtime role.");
+                RefreshHostRoster();
+                ForgeSteamRichPresence.PublishInvite(ForgeMultiplayerUi.BuildInviteCode(
+                    ForgeMultiplayerUi.LocalIpv4(), port, roomKey), 1);
                 lock (gate) { mode = MultiplayerSessionMode.Hosting; detail = "hosting-development-transport:" + port; }
             }
             catch (Exception error) { AbortStart("host-start:" + error.GetType().Name); }
@@ -128,6 +132,8 @@ namespace CsmForge.Runtime.Cities1
                 BootstrapMessagesV2.EncodeWelcome(new SessionWelcomeV2(authority.Stamp, peer.TransportId,
                     peer.Member, 1, authority.Revision, authority.CurrentRoot)));
             peer.SessionReady = true;
+            RefreshHostRoster();
+            BroadcastRoster();
             QueueSnapshotFor(peer);
         }
 
@@ -220,6 +226,17 @@ namespace CsmForge.Runtime.Cities1
                 case MessageKindV2.GapRequest:
                     TrySendJournalOrResync(peer, ControlMessagesV2.DecodeGapRequest(frame.Payload).AfterRevision);
                     break;
+                case MessageKindV2.ChatSubmit:
+                    if (!peer.Live) throw new InvalidOperationException("Non-live peer submitted chat.");
+                    ChatSubmitV2 chat = SocialMessagesV2.DecodeChatSubmit(frame.Payload);
+                    PublishChat(new ChatEventV2(peer.Member, peer.Hello.DisplayName, chat.Text));
+                    break;
+                case MessageKindV2.PlayerPresentation:
+                    if (!peer.Live) throw new InvalidOperationException("Non-live peer submitted presentation.");
+                    PlayerPresentationV2 presence = SocialMessagesV2.DecodePresentation(frame.Payload);
+                    PublishPresentation(new PlayerPresentationV2(peer.Member, peer.Hello.DisplayName, presence.ToolName,
+                        presence.WorldX, presence.WorldY, presence.WorldZ, presence.Visible));
+                    break;
                 default: throw new InvalidOperationException("Client message is not valid in the current Host path.");
             }
         }
@@ -274,6 +291,8 @@ namespace CsmForge.Runtime.Cities1
                 !authority.SetLive(peer.TransportId, true))
                 throw new InvalidOperationException("Client activation failed.");
             peer.Live = true;
+            RefreshHostRoster();
+            BroadcastRoster();
         }
 
         private void HandleRemoteIntent(HostPeer peer, PlayerIntentV2 intent)
@@ -344,6 +363,35 @@ namespace CsmForge.Runtime.Cities1
             if (peer.SnapshotCursor != null) { peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null; }
             if (peer.Join.IsValid) joins.Cancel(peer.Join);
             authority.Disconnect(peer.TransportId);
+            lock (gate) if (peer.Member.IsValid) presentationSnapshots.Remove(peer.Member.MemberId);
+            RefreshHostRoster();
+            BroadcastRoster();
+        }
+
+        private void RefreshHostRoster()
+        {
+            List<MultiplayerPlayerSnapshot> values = new List<MultiplayerPlayerSnapshot>();
+            if (hostLocalMember.IsValid) values.Add(new MultiplayerPlayerSnapshot
+            { Member = hostLocalMember, DisplayName = hostDisplayName, IsHost = true, IsLive = true, IsLocal = true });
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.Member.IsValid && peer.Hello != null) values.Add(new MultiplayerPlayerSnapshot
+                { Member = peer.Member, DisplayName = peer.Hello.DisplayName, IsHost = false, IsLive = peer.Live, IsLocal = false });
+            lock (gate) playerSnapshots = values.ToArray();
+            ForgeSteamRichPresence.SetPlayerCount(values.Count);
+        }
+
+        private void BroadcastRoster()
+        {
+            List<SessionPlayerV2> values = new List<SessionPlayerV2>();
+            if (hostLocalMember.IsValid) values.Add(new SessionPlayerV2(hostLocalMember, hostDisplayName,
+                SessionPlayerRoleV2.Host, SessionPlayerPhaseV2.Live));
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.Member.IsValid && peer.Hello != null) values.Add(new SessionPlayerV2(peer.Member, peer.Hello.DisplayName,
+                    SessionPlayerRoleV2.Client, peer.Live ? SessionPlayerPhaseV2.Live : SessionPlayerPhaseV2.Joining));
+            if (values.Count == 0) return;
+            byte[] payload = SocialMessagesV2.EncodeRoster(new RosterSnapshotV2(values.ToArray()));
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.SessionReady) SendServerFrame(peer, MessageKindV2.RosterSnapshot, payload);
         }
 
         private void ExpireHostJoins()

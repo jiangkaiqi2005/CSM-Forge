@@ -126,19 +126,21 @@ First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
 3. Host enters the city to share, presses Esc, then chooses FORGE 多人联机 -> 创建房间（当前城市作为房主）.
-4. Host chooses 复制邀请信息并打开 Steam 好友 and sends the copied development-LAN invitation text to the Client. This opens the friends overlay but does not provide NAT traversal.
-5. Client stays at the main menu, chooses FORGE 联机, pastes the invitation text, then chooses 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
+4. Host opens CSM-Forge multiplayer from the pause menu and chooses 邀请 Steam 好友. Forge publishes a Steam Rich Presence join command and also copies the direct-connect invitation text. A friend may use Steam's Join Game action, or receive and paste the copied invitation manually. This is direct UDP discovery only and does not provide NAT traversal or relay.
+5. Client stays at the main menu. A Steam Join Game request fills the Forge join panel and starts joining automatically; alternatively choose FORGE 联机, paste the invitation text, then choose 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
 6. Wait until Client status is ClientLive before editing.
 7. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
 8. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
 9. Test Host and Client Tree/Prop create, move and delete in small isolated steps; record any identity, slot-reuse or projection failure. These paths are not yet gameplay-validated by CI.
 10. On the Host only, test a small Terrain brush and undo, then verify Terrain absolute height shards and Net/Building collateral on every Client. Client Terrain tools remain blocked. These paths are not yet gameplay-validated by CI.
 11. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
-12. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
+12. Open 玩家列表 and 多人聊天, press T to open chat, and confirm remote player tool cursors/names are visible during edits.
+13. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
 
-A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until the E4/RC multiplayer gates pass.
+A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. Steam click-to-join, player roster/chat/tool cursors, and all two-machine behavior remain real-gameplay unverified until the E4/RC multiplayer gates are run. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until those gates pass.
 '@
 $notice | Set-Content -LiteralPath (Join-Path $stage 'README-DEV.txt') -Encoding UTF8
+Copy-Item -LiteralPath (Join-Path $repo 'THIRD-PARTY-NOTICES.txt') -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')
 
 $packagedTools = @(
     @('scripts/verify-alpha-install.ps1', 'VERIFY-ALPHA-INSTALL.ps1'),

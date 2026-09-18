@@ -30,9 +30,36 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
 
     def test_visible_invitation_action_is_honest_about_lan_transport(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
-        self.assertIn("复制邀请信息并打开 Steam 好友", source)
-        self.assertIn("开发版 LAN 邀请", source)
+        self.assertIn("邀请 Steam 好友", source)
+        self.assertIn("直连邀请码", source)
+        self.assertIn("不提供 NAT 穿透", source)
         self.assertIn("GameOverlayDialog.Friends", source)
+
+    def test_session_ui_has_join_progress_roster_chat_and_role_management(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn("ForgeJoinProgressPanel", source)
+        self.assertIn("ForgePlayersPanel", source)
+        self.assertIn("ForgeChatPanel", source)
+        self.assertIn("RequestKick(values[index].Member)", source)
+        self.assertIn("多人聊天（快捷键 T）", source)
+
+    def test_player_activity_uses_presentation_lane_and_stable_member_identity(self):
+        protocol = (ROOT / "src/Forge.Protocol/FrameCodecV2.cs").read_text(encoding="utf-8")
+        messages = (ROOT / "src/Forge.Protocol/SocialMessagesV2.cs").read_text(encoding="utf-8")
+        runtime = (RUNTIME / "ForgePlayerPresenceUi.cs").read_text(encoding="utf-8")
+        self.assertIn("PlayerPresentation", protocol)
+        self.assertIn("SessionLane.Presentation", protocol)
+        self.assertIn("MemberIdentity Member", messages)
+        self.assertIn("ToolName", messages)
+        self.assertIn("TryPublishPresentation", runtime)
+
+    def test_steam_join_is_discovery_only_and_keeps_forge_identity(self):
+        steam = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
+        ui = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        self.assertIn('SetPresence("connect", connect)', steam)
+        self.assertIn("JoinRequestedCallback = 337", steam)
+        self.assertIn("Forge MemberIdentity remains the network identity", steam)
+        self.assertIn("AcceptSteamInvite", ui)
 
 
 if __name__ == "__main__":

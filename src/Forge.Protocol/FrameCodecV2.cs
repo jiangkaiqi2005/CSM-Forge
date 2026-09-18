@@ -33,7 +33,11 @@ namespace CsmForge.Protocol
         Heartbeat = 17,
         Progress = 18,
         PermissionChanged = 19,
-        SessionClosing = 20
+        SessionClosing = 20,
+        RosterSnapshot = 21,
+        ChatSubmit = 22,
+        ChatEvent = 23,
+        PlayerPresentation = 24
     }
 
     public sealed class SessionFrameV2
@@ -80,6 +84,8 @@ namespace CsmForge.Protocol
                     return SessionLane.State;
                 case MessageKindV2.SnapshotChunk:
                     return SessionLane.Bulk;
+                case MessageKindV2.PlayerPresentation:
+                    return SessionLane.Presentation;
                 default:
                     return SessionLane.Control;
             }

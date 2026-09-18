@@ -13,6 +13,15 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed partial class CitiesMultiplayerSessionV3
     {
+        private sealed class PendingPresentation
+        {
+            public string ToolName;
+            public float X;
+            public float Y;
+            public float Z;
+            public bool Visible;
+        }
+
         private sealed class HostPeer
         {
             public Guid TransportId;
@@ -38,6 +47,7 @@ namespace CsmForge.Runtime.Cities1
         private readonly RuntimeEventLog events;
         private readonly Queue<WaterBudgetIntent> pendingBudget = new Queue<WaterBudgetIntent>();
         private readonly Queue<BuildingIntentV2> pendingBuildings = new Queue<BuildingIntentV2>();
+        private readonly Queue<string> pendingChat = new Queue<string>();
         private readonly Dictionary<Guid, HostPeer> hostPeers = new Dictionary<Guid, HostPeer>();
         private readonly Dictionary<Guid, uint> memberGenerations = new Dictionary<Guid, uint>();
         private readonly List<string> snapshotFiles = new List<string>();
@@ -59,6 +69,14 @@ namespace CsmForge.Runtime.Cities1
         private Guid hostLocalBinding;
         private MemberIdentity hostLocalMember;
         private ulong hostLocalOperation;
+        private string hostDisplayName;
+        private MultiplayerPlayerSnapshot[] playerSnapshots = new MultiplayerPlayerSnapshot[0];
+        private readonly List<MultiplayerChatSnapshot> chatSnapshots = new List<MultiplayerChatSnapshot>();
+        private readonly Dictionary<Guid, MultiplayerPresentationSnapshot> presentationSnapshots =
+            new Dictionary<Guid, MultiplayerPresentationSnapshot>();
+        private PendingPresentation pendingPresentation;
+        private ulong snapshotBytesReceived;
+        private ulong snapshotBytesTotal;
 
         private CitiesSnapshotSaveOperation snapshotSave;
         private SnapshotFileDescriptor publishedSnapshot;
@@ -96,9 +114,14 @@ namespace CsmForge.Runtime.Cities1
                     {
                         Mode = mode,
                         Detail = detail,
-                        ConnectedPeers = hostPeers.Count,
+                        ConnectedPeers = Math.Max(0, playerSnapshots.Length - 1),
                         Revision = authority != null ? authority.Revision : replica != null ? replica.Revision : 0,
-                        DevelopmentTransport = mode != MultiplayerSessionMode.Offline
+                        DevelopmentTransport = mode != MultiplayerSessionMode.Offline,
+                        SnapshotBytesReceived = snapshotBytesReceived,
+                        SnapshotBytesTotal = snapshotBytesTotal,
+                        Players = ClonePlayers(playerSnapshots),
+                        Chat = CloneChat(chatSnapshots),
+                        Presentations = ClonePresentations(presentationSnapshots)
                     };
             }
         }
@@ -167,6 +190,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void StopImmediately()
         {
+            ForgeSteamRichPresence.Clear();
             RestoreSnapshotPause();
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }
@@ -190,6 +214,13 @@ namespace CsmForge.Runtime.Cities1
                 preserveAcrossLevelLoad = false;
                 pendingBudget.Clear();
                 pendingBuildings.Clear();
+                pendingChat.Clear();
+                playerSnapshots = new MultiplayerPlayerSnapshot[0];
+                chatSnapshots.Clear();
+                presentationSnapshots.Clear();
+                pendingPresentation = null;
+                snapshotBytesReceived = 0;
+                snapshotBytesTotal = 0;
                 mode = MultiplayerSessionMode.Offline;
                 detail = "offline";
             }
@@ -221,6 +252,46 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public bool TrySendChat(string text)
+        {
+            text = (text ?? string.Empty).Trim();
+            if (text.Length == 0 || text.Length > 256) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                if (pendingChat.Count >= 32) return false;
+                pendingChat.Enqueue(text);
+                return true;
+            }
+        }
+
+        public bool RequestKick(MemberIdentity member)
+        {
+            LoadIdentity identity = lifecycle.Current;
+            if (!identity.IsValid || !member.IsValid) return false;
+            lock (gate) if (mode != MultiplayerSessionMode.Hosting) return false;
+            return RuntimeServices.Scheduler.QueueSimulation(identity, delegate
+            {
+                HostPeer target = null;
+                foreach (HostPeer peer in hostPeers.Values)
+                    if (peer.Member.Equals(member)) { target = peer; break; }
+                if (target != null && server != null) server.Disconnect(target.TransportId);
+            });
+        }
+
+        public bool TryPublishPresentation(string toolName, float x, float y, float z, bool visible)
+        {
+            if (toolName == null || toolName.Length > 96 || float.IsNaN(x) || float.IsInfinity(x) ||
+                float.IsNaN(y) || float.IsInfinity(y) || float.IsNaN(z) || float.IsInfinity(z)) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                pendingPresentation = new PendingPresentation
+                { ToolName = toolName, X = x, Y = y, Z = z, Visible = visible };
+                return true;
+            }
+        }
+
         public void PollSimulation()
         {
             if (!load.IsValid || !lifecycle.IsCurrent(load)) return;
@@ -236,6 +307,8 @@ namespace CsmForge.Runtime.Cities1
                 if (client != null) DrainClientEvents();
                 DrainBudgetIntents();
                 DrainBuildingIntents();
+                DrainChatMessages();
+                DrainPresentation();
             }
             catch (Exception error) { FenceSession("session-poll:" + error.GetType().Name); }
         }
@@ -275,6 +348,104 @@ namespace CsmForge.Runtime.Cities1
                 if (mode == MultiplayerSessionMode.Hosting) SubmitHostBuilding(intent);
                 else if (mode == MultiplayerSessionMode.ClientLive) SubmitClientBuilding(intent);
             }
+        }
+
+        private void DrainChatMessages()
+        {
+            int count = 0;
+            while (count++ < 8)
+            {
+                string text;
+                lock (gate) { if (pendingChat.Count == 0) break; text = pendingChat.Dequeue(); }
+                if (mode == MultiplayerSessionMode.Hosting)
+                    PublishChat(new ChatEventV2(hostLocalMember, hostDisplayName, text));
+                else if (mode == MultiplayerSessionMode.ClientLive)
+                    SendClientFrame(MessageKindV2.ChatSubmit, SocialMessagesV2.EncodeChatSubmit(new ChatSubmitV2(text)));
+            }
+        }
+
+        private void DrainPresentation()
+        {
+            PendingPresentation pending;
+            lock (gate) { pending = pendingPresentation; pendingPresentation = null; }
+            if (pending == null) return;
+            if (mode == MultiplayerSessionMode.Hosting)
+                PublishPresentation(new PlayerPresentationV2(hostLocalMember, hostDisplayName, pending.ToolName,
+                    pending.X, pending.Y, pending.Z, pending.Visible));
+            else if (mode == MultiplayerSessionMode.ClientLive)
+                SendClientFrame(MessageKindV2.PlayerPresentation, SocialMessagesV2.EncodePresentation(
+                    new PlayerPresentationV2(clientMember, clientName, pending.ToolName,
+                        pending.X, pending.Y, pending.Z, pending.Visible)));
+        }
+
+        private void PublishPresentation(PlayerPresentationV2 value)
+        {
+            RememberPresentation(value);
+            byte[] payload = SocialMessagesV2.EncodePresentation(value);
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.Live) SendServerFrame(peer, MessageKindV2.PlayerPresentation, payload);
+        }
+
+        private void RememberPresentation(PlayerPresentationV2 value)
+        {
+            bool local = value.Member.Equals(hostLocalMember) || value.Member.Equals(clientMember);
+            lock (gate) presentationSnapshots[value.Member.MemberId] = new MultiplayerPresentationSnapshot
+            {
+                Member = value.Member, DisplayName = value.DisplayName, ToolName = value.ToolName,
+                WorldX = value.WorldX, WorldY = value.WorldY, WorldZ = value.WorldZ,
+                Visible = value.Visible, IsLocal = local
+            };
+        }
+
+        private void PublishChat(ChatEventV2 value)
+        {
+            RememberChat(value);
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.SessionReady) SendServerFrame(peer, MessageKindV2.ChatEvent, SocialMessagesV2.EncodeChatEvent(value));
+        }
+
+        private void RememberChat(ChatEventV2 value)
+        {
+            lock (gate)
+            {
+                chatSnapshots.Add(new MultiplayerChatSnapshot
+                { Member = value.Member, DisplayName = value.DisplayName, Text = value.Text });
+                if (chatSnapshots.Count > 64) chatSnapshots.RemoveAt(0);
+            }
+        }
+
+        private static MultiplayerPlayerSnapshot[] ClonePlayers(MultiplayerPlayerSnapshot[] values)
+        {
+            MultiplayerPlayerSnapshot[] result = new MultiplayerPlayerSnapshot[values.Length];
+            for (int i = 0; i < values.Length; i++) result[i] = new MultiplayerPlayerSnapshot
+            {
+                Member = values[i].Member, DisplayName = values[i].DisplayName, IsHost = values[i].IsHost,
+                IsLive = values[i].IsLive, IsLocal = values[i].IsLocal
+            };
+            return result;
+        }
+
+        private static MultiplayerChatSnapshot[] CloneChat(List<MultiplayerChatSnapshot> values)
+        {
+            MultiplayerChatSnapshot[] result = new MultiplayerChatSnapshot[values.Count];
+            for (int i = 0; i < values.Count; i++) result[i] = new MultiplayerChatSnapshot
+            { Member = values[i].Member, DisplayName = values[i].DisplayName, Text = values[i].Text };
+            return result;
+        }
+
+        private static MultiplayerPresentationSnapshot[] ClonePresentations(
+            Dictionary<Guid, MultiplayerPresentationSnapshot> values)
+        {
+            MultiplayerPresentationSnapshot[] result = new MultiplayerPresentationSnapshot[values.Count];
+            int index = 0;
+            foreach (MultiplayerPresentationSnapshot value in values.Values) result[index++] =
+                new MultiplayerPresentationSnapshot
+                {
+                    Member = value.Member, DisplayName = value.DisplayName, ToolName = value.ToolName,
+                    WorldX = value.WorldX, WorldY = value.WorldY, WorldZ = value.WorldZ,
+                    Visible = value.Visible, IsLocal = value.IsLocal
+                };
+            return result;
         }
 
         private void SubmitHostBudget(WaterBudgetIntent value)
@@ -381,6 +552,7 @@ namespace CsmForge.Runtime.Cities1
 
         private void AbortStart(string reason)
         {
+            ForgeSteamRichPresence.Clear();
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }
@@ -388,12 +560,18 @@ namespace CsmForge.Runtime.Cities1
             server = null; client = null; authority = null; replica = null; joins = null;
             ClearAllDomainReferences();
             hostPeers.Clear();
-            lock (gate) { preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); mode = MultiplayerSessionMode.Faulted; detail = reason; }
+            lock (gate)
+            {
+                preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); pendingChat.Clear();
+                playerSnapshots = new MultiplayerPlayerSnapshot[0]; presentationSnapshots.Clear(); pendingPresentation = null;
+                snapshotBytesReceived = 0; snapshotBytesTotal = 0; mode = MultiplayerSessionMode.Faulted; detail = reason;
+            }
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
         }
 
         private void FenceSession(string reason)
         {
+            ForgeSteamRichPresence.Clear();
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); pendingBuildings.Clear(); }
             lifecycle.Fence(reason);

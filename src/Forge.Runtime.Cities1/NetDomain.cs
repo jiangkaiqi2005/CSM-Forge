@@ -173,6 +173,8 @@ namespace CsmForge.Runtime.Cities1
 
         public bool TryResolveNode(uint nativeId, out EntityIdentityV2 entity) { return NodeIds.TryGetIdentity(nativeId, out entity); }
         public bool TryResolveSegment(uint nativeId, out EntityIdentityV2 entity) { return SegmentIds.TryGetIdentity(nativeId, out entity); }
+        public bool TryResolveNodeNative(EntityIdentityV2 entity, out uint nativeId) { return NodeIds.TryGetNative(entity, out nativeId); }
+        public bool TryResolveSegmentNative(EntityIdentityV2 entity, out uint nativeId) { return SegmentIds.TryGetNative(entity, out nativeId); }
 
         private void SeedOrValidate()
         {

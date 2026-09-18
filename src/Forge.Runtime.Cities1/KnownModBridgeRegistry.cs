@@ -35,6 +35,8 @@ namespace CsmForge.Runtime.Cities1
                     if (!Registered(EightyOne2WaterGridAdapter.Adapter))
                         ForgeExtensionApi.Register(new EightyOne2WaterGridAdapter());
                 }
+                if (TmpePersistentRulesBridge.IsAvailable && !Registered(TmpePersistentRulesAdapter.Adapter))
+                    ForgeExtensionApi.Register(new TmpePersistentRulesAdapter());
             }
         }
 

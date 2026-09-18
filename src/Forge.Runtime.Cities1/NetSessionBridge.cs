@@ -107,6 +107,30 @@ namespace CsmForge.Runtime.Cities1
             return IsHostNetAuthorityActive && hostNet.TryResolveSegment(nativeId, out entity);
         }
 
+        internal bool TryResolveClientNetNodeNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsClientNetReplicaActive && clientNet.TryResolveNodeNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveClientNetSegmentNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsClientNetReplicaActive && clientNet.TryResolveSegmentNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveHostNetNodeNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsHostNetAuthorityActive && hostNet.TryResolveNodeNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveHostNetSegmentNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsHostNetAuthorityActive && hostNet.TryResolveSegmentNative(entity, out nativeId);
+        }
+
         internal bool TrySubmitNetIntent(NetIntentV2 value)
         {
             if (value == null || snapshotSave != null) return false;

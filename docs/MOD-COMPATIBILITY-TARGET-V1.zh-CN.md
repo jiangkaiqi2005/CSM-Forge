@@ -14,7 +14,7 @@
 | Game Anarchy 1.3.1 | 2781804786 | Host-owned settings bridge | `bridge.gameanarchy` 规范同步共享模拟配置；Client 共享配置 setter 与手工/周期经济修改被阻断，UI-only 设置排除在网络状态外 |
 | TM:PE 11.9.4.1 | 1637663252 | Dedicated synchronized adapter | 当前继续 `blocked-mod`；在 Stable Net rule adapter + Vehicle/Path authority 完成前不允许静默加入 |
 | Harmony 2.2.2-0 | dependency | Dependency | Forge 使用 CitiesHarmony；作为运行依赖进入 manifest |
-| 81 Tiles 2 1.0.5 | 2862121823 | Area + utility config bridge | `bridge.eightyone2` 同步七个共享开关并阻断 Client 本地改写；Area 可复用 Forge Authority。expanded Water/Electricity 等运行态仍需进一步 authority closure |
+| 81 Tiles 2 1.0.5 | 2862121823 | Area + Host-owned utility result bridge | 精确锁定 `EightyOne2` 1.0.5.0；`bridge.eightyone2` 同步七个共享开关，两个 462-row adapter 投影 expanded Electricity 与 Water/Sewage/Heating absolute result，Client utility step 被阻断；Area 复用 Forge Authority。代码闭包已实现，真实双机 gameplay 仍未验证，见 `81-TILES-2-AUDIT-V1.zh-CN.md` |
 
 ## 原则
 

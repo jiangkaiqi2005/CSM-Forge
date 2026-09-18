@@ -48,6 +48,8 @@ namespace CsmForge.Runtime.Cities1
 
     internal static class EightyOne2Bridge
     {
+        private const string ExpectedAssemblyName = "EightyOne2";
+        private static readonly Version AssemblyVersion = new Version(1, 0, 5, 0);
         private const string SettingsTypeName = "EightyOne2.ModSettings";
         internal static readonly string[] PropertyNames =
         {
@@ -66,8 +68,9 @@ namespace CsmForge.Runtime.Cities1
         };
         [ThreadStatic] private static bool applying;
         private static bool patched;
+        private static Assembly compatibleAssembly;
 
-        internal static bool IsAvailable { get { return ResolveType(SettingsTypeName) != null; } }
+        internal static bool IsAvailable { get { return ResolveCompatibleAssembly() != null; } }
 
         internal static bool[] Capture()
         {
@@ -120,10 +123,17 @@ namespace CsmForge.Runtime.Cities1
                 if (setter == null) throw new MissingMemberException(GuardedProperties[i, 0], GuardedProperties[i, 1]);
                 harmony.Patch(setter, guard);
             }
+            EightyOne2UtilityAuthority.InstallPatches(harmony);
             patched = true;
         }
 
-        internal static void ResetPatchState() { patched = false; applying = false; }
+        internal static void ResetPatchState()
+        {
+            patched = false;
+            applying = false;
+            compatibleAssembly = null;
+            EightyOne2UtilityAuthority.ResetPatchState();
+        }
 
         private static bool SharedSettingWritePrefix()
         {
@@ -135,10 +145,39 @@ namespace CsmForge.Runtime.Cities1
 
         private static Type ResolveType(string name)
         {
+            Assembly assembly = ResolveCompatibleAssembly();
+            return assembly == null ? null : assembly.GetType(name, false);
+        }
+
+        internal static Assembly ResolveCompatibleAssembly()
+        {
+            if (compatibleAssembly != null) return compatibleAssembly;
             Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
             for (int i = 0; i < assemblies.Length; i++)
             {
-                Type type = assemblies[i].GetType(name, false); if (type != null) return type;
+                AssemblyName candidate = assemblies[i].GetName();
+                if (!string.Equals(candidate.Name, ExpectedAssemblyName, StringComparison.Ordinal) ||
+                    candidate.Version == null || !candidate.Version.Equals(AssemblyVersion)) continue;
+                Type settings = assemblies[i].GetType(SettingsTypeName, false);
+                if (settings == null) return null;
+                for (int propertyIndex = 0; propertyIndex < PropertyNames.Length; propertyIndex++)
+                {
+                    PropertyInfo property = settings.GetProperty(PropertyNames[propertyIndex],
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (property == null || property.PropertyType != typeof(bool) || !property.CanRead || !property.CanWrite)
+                        return null;
+                }
+                for (int guardIndex = 0; guardIndex < GuardedProperties.GetLength(0); guardIndex++)
+                {
+                    Type guardedType = assemblies[i].GetType(GuardedProperties[guardIndex, 0], false);
+                    PropertyInfo guarded = guardedType == null ? null : guardedType.GetProperty(
+                        GuardedProperties[guardIndex, 1], BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (guarded == null || guarded.PropertyType != typeof(bool) || guarded.GetSetMethod(true) == null)
+                        return null;
+                }
+                if (!EightyOne2UtilityAuthority.ValidateSurface(assemblies[i])) return null;
+                compatibleAssembly = assemblies[i];
+                return compatibleAssembly;
             }
             return null;
         }

@@ -26,8 +26,15 @@ namespace CsmForge.Runtime.Cities1
                     if (!Registered(InfiniteGoodsBuildingBufferAdapter.Adapter))
                         ForgeExtensionApi.Register(new InfiniteGoodsBuildingBufferAdapter());
                 }
-                if (EightyOne2Bridge.IsAvailable && !Registered(EightyOne2BridgeAdapter.Adapter))
-                    ForgeExtensionApi.Register(new EightyOne2BridgeAdapter());
+                if (EightyOne2Bridge.IsAvailable)
+                {
+                    if (!Registered(EightyOne2BridgeAdapter.Adapter))
+                        ForgeExtensionApi.Register(new EightyOne2BridgeAdapter());
+                    if (!Registered(EightyOne2ElectricityGridAdapter.Adapter))
+                        ForgeExtensionApi.Register(new EightyOne2ElectricityGridAdapter());
+                    if (!Registered(EightyOne2WaterGridAdapter.Adapter))
+                        ForgeExtensionApi.Register(new EightyOne2WaterGridAdapter());
+                }
             }
         }
 

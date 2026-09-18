@@ -131,6 +131,7 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.PollObservedHostWeather();
                 RuntimeServices.Multiplayer.PollObservedHostExtensions();
+                EightyOne2UtilityAuthority.RestoreClientProjection();
                 RuntimeServices.Multiplayer.RestoreClientWeatherTargets();
                 RuntimeServices.Multiplayer.AuditClientProjection();
                 RuntimeServices.Multiplayer.AfterSimulationTick();

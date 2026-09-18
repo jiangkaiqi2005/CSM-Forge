@@ -16,6 +16,10 @@ namespace CsmForge.Runtime.Cities1
     public static class CitiesCompatibilityCollector
     {
         private const int EntryLimit = 4096;
+        private static readonly object OwnedDlcGate = new object();
+        private static bool ownedDlcCached;
+        private static ulong ownedExpansionMask;
+        private static ulong ownedModderPackMask;
         private static readonly string[] ClientOnlyModTypes =
         {
             "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
@@ -60,8 +64,11 @@ namespace CsmForge.Runtime.Cities1
                 Add(entries, seen, id, ConfigHash(checksum), ConfigHash(asset.fullName + "|enabled=1"));
             }
 
-            AddOwnedDlcBits(entries, seen, "dlc:expansion:", Convert.ToUInt64(SteamHelper.GetOwnedExpansionMask(), CultureInfo.InvariantCulture));
-            AddOwnedDlcBits(entries, seen, "dlc:modderpack:", Convert.ToUInt64(SteamHelper.GetOwnedModderPackMask(), CultureInfo.InvariantCulture));
+            ulong expansionMask;
+            ulong modderPackMask;
+            GetOwnedDlcMasks(out expansionMask, out modderPackMask);
+            AddOwnedDlcBits(entries, seen, "dlc:expansion:", expansionMask);
+            AddOwnedDlcBits(entries, seen, "dlc:modderpack:", modderPackMask);
 
             ForgeStateAdapterRegistration[] adapters = ForgeExtensionApi.SnapshotRegistrations();
             for (int i = 0; i < adapters.Length; i++)
@@ -74,6 +81,21 @@ namespace CsmForge.Runtime.Cities1
             Hash256 build = GameBuildHash();
             Hash256 schema = ConfigHash("csm-forge-v3-schema:2|core=" + typeof(CompatibilityManifest).Assembly.GetName().Version);
             return new CompatibilityManifest(build, schema, entries);
+        }
+
+        private static void GetOwnedDlcMasks(out ulong expansionMask, out ulong modderPackMask)
+        {
+            lock (OwnedDlcGate)
+            {
+                if (!ownedDlcCached)
+                {
+                    ownedExpansionMask = Convert.ToUInt64(SteamHelper.GetOwnedExpansionMask(), CultureInfo.InvariantCulture);
+                    ownedModderPackMask = Convert.ToUInt64(SteamHelper.GetOwnedModderPackMask(), CultureInfo.InvariantCulture);
+                    ownedDlcCached = true;
+                }
+                expansionMask = ownedExpansionMask;
+                modderPackMask = ownedModderPackMask;
+            }
         }
 
         private static void AddOwnedDlcBits(List<ComponentFingerprint> entries, HashSet<string> seen, string prefix, ulong mask)

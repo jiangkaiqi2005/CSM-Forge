@@ -35,6 +35,13 @@ class ModCompatibilityFrameworkContractTests(unittest.TestCase):
         for value in ["adapter:", "SchemaVersion", "BinaryHash(adapter.Assembly)"]:
             self.assertIn(value, collector)
 
+    def test_process_stable_dlc_masks_do_not_reenter_steam_for_each_preflight(self) -> None:
+        collector = (RUNTIME / "CompatibilityCollector.cs").read_text(encoding="utf-8-sig")
+        self.assertIn("private static void GetOwnedDlcMasks", collector)
+        self.assertIn("if (!ownedDlcCached)", collector)
+        self.assertEqual(collector.count("SteamHelper.GetOwnedExpansionMask()"), 1)
+        self.assertEqual(collector.count("SteamHelper.GetOwnedModderPackMask()"), 1)
+
     def test_public_adapter_documentation_locks_authority_model(self) -> None:
         docs = (REPO / "docs" / "MOD-ADAPTER-API-V1.zh-CN.md").read_text(encoding="utf-8-sig")
         for value in [

@@ -27,6 +27,9 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("private string feedback", host)
         self.assertIn("string.IsNullOrEmpty(feedback)", host)
         self.assertIn("Forge patches 尚未就绪", host)
+        self.assertIn("create room clicked", host)
+        self.assertIn("create room preflight completed", host)
+        self.assertIn("create room host request returned", host)
 
     def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")

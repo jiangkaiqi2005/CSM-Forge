@@ -495,7 +495,10 @@ namespace CsmForge.Runtime.Cities1
 
         private void CreateRoom()
         {
+            UnityEngine.Debug.Log("[CSM-Forge] create room clicked.");
             RefreshPreflight();
+            UnityEngine.Debug.Log("[CSM-Forge] create room preflight completed; canHost=" +
+                (preflight != null && preflight.CanHost) + ".");
             if (preflight == null || !preflight.CanHost)
             { SetFeedback(preflight == null ? "无法完成开房检查。" : preflight.Message); return; }
             int port; string display = (nameField.text ?? string.Empty).Trim(); string key = keyField.text ?? string.Empty;
@@ -509,6 +512,7 @@ namespace CsmForge.Runtime.Cities1
             ForgeMod.Settings.DisplayName.value = display; ForgeMod.Settings.Port.value = port;
             ForgeMultiplayerUi.RoomKey = key;
             bool ok = RuntimeServices.Multiplayer.RequestHost(port, key, display);
+            UnityEngine.Debug.Log("[CSM-Forge] create room host request returned; queued=" + ok + ".");
             if (ok) createButton.isEnabled = false;
             SetFeedback(ok ? "正在创建房间……" :
                 "创建失败：当前城市会话不可用或已有 Forge 会话。请关闭此页后重试。");

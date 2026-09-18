@@ -30,6 +30,19 @@ class DecorationAuthorityContractTests(unittest.TestCase):
         ]:
             self.assertIn(marker, source)
 
+    def test_host_building_and_net_collateral_bypass_decoration_intents(self) -> None:
+        source = (RUNTIME / "DecorationAuthorityPatches.cs").read_text(encoding="utf-8-sig")
+        for marker in [
+            "IsHostToolCollateralSideEffect", "BuildingToolIntentScope.Active",
+            "ToolsModifierControl.toolController", "CurrentTool is NetTool",
+            "TreeStateAdapter.MarkDirty()", "PropStateAdapter.MarkDirty()",
+        ]:
+            self.assertIn(marker, source)
+
+        safety = (RUNTIME / "AlphaSafetyPatches.cs").read_text(encoding="utf-8-sig")
+        self.assertNotIn("TreeManager", safety)
+        self.assertNotIn("PropManager", safety)
+
     def test_builtin_registry_always_registers_tree_and_prop(self) -> None:
         source = (RUNTIME / "KnownModBridgeRegistry.cs").read_text(encoding="utf-8-sig")
         self.assertIn("new TreeStateAdapter()", source)

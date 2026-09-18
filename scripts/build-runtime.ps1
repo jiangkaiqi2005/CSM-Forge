@@ -100,11 +100,11 @@ Before testing on each machine:
 3. Confirm source_commit and manifest_sha256 are identical on every Host/Client machine.
 
 Minimum-playable Alpha scope retained:
-- supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand and weather authority;
+- supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand/weather authority, and Tree/Prop create/move/delete through Forge Stable IDs;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
 - diagnostic-only projection audit logs projection-drift/local drift without automatically kicking/resyncing a client;
-- temporarily blocked in multiplayer for safety: direct Tree/Prop create/move/delete and Terrain brush writes;
-- still outside this framework milestone: full Tree/Prop/Terrain authority, full Citizen/Vehicle/Path authority, production-authenticated Internet transport, and broad real-world Mod/DLC soak certification.
+- Tree/Prop authority is code-complete for this batch but still requires real multi-machine gameplay validation; Terrain brush writes remain fail-closed;
+- still outside this framework milestone: Terrain authority, full Citizen/Vehicle/Path authority, production-authenticated Internet transport, and broad real-world Mod/DLC soak certification.
 
 Ultimate Framework code coverage in this candidate:
 - official gameplay DLC are classified to core authority or dedicated absolute-state adapters; see docs/DLC-COVERAGE-V1.zh-CN.md in the repository;
@@ -122,9 +122,10 @@ First two-machine test:
 5. Wait until Client status is ClientLive before editing.
 6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
 7. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
-8. Do NOT use Tree/Prop/Terrain tools; they remain fail-closed intentionally.
-9. Test a second client join/rejoin while the first client and Host remain live.
-10. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
+8. Test Host and Client Tree/Prop create, move and delete in small isolated steps; record any identity, slot-reuse or projection failure. These paths are not yet gameplay-validated by CI.
+9. Do NOT use Terrain tools; Terrain remains fail-closed intentionally.
+10. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
+11. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
 
 A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until the E4/RC multiplayer gates pass.
 '@

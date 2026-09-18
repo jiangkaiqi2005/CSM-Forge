@@ -19,6 +19,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { TreeStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                TreeStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 LoadIdentity load = RuntimeServices.Lifecycle.Current;
@@ -44,6 +49,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { TreeStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                TreeStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 using (RuntimeScopeGuard.EnterApply(RuntimeServices.Lifecycle.Current, ExtensionStateAuthorityDomain.Id))
@@ -65,6 +75,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { TreeStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                TreeStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 using (RuntimeScopeGuard.EnterApply(RuntimeServices.Lifecycle.Current, ExtensionStateAuthorityDomain.Id))
@@ -87,6 +102,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { PropStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                PropStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 using (RuntimeScopeGuard.EnterApply(RuntimeServices.Lifecycle.Current, ExtensionStateAuthorityDomain.Id))
@@ -107,6 +127,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { PropStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                PropStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 using (RuntimeScopeGuard.EnterApply(RuntimeServices.Lifecycle.Current, ExtensionStateAuthorityDomain.Id))
@@ -128,6 +153,11 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeScopeGuard.IsApplying) { PropStateAdapter.MarkDirty(); return true; }
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (Offline(role)) return true;
+            if (role == CitiesRuntimeRole.HostLive && IsHostToolCollateralSideEffect())
+            {
+                PropStateAdapter.MarkDirty();
+                return true;
+            }
             if (role == CitiesRuntimeRole.HostLive)
             {
                 using (RuntimeScopeGuard.EnterApply(RuntimeServices.Lifecycle.Current, ExtensionStateAuthorityDomain.Id))
@@ -141,6 +171,13 @@ namespace CsmForge.Runtime.Cities1
                 if (!queued) Fail("prop-delete-intent"); return false;
             }
             AlphaUnsupportedWritePolicy.Report("prop-delete-not-live"); return false;
+        }
+
+        private static bool IsHostToolCollateralSideEffect()
+        {
+            if (BuildingToolIntentScope.Active) return true;
+            ToolController controller = ToolsModifierControl.toolController;
+            return controller != null && controller.CurrentTool is NetTool;
         }
 
         private static bool Offline(CitiesRuntimeRole role)

@@ -2,7 +2,7 @@
 
 面向 **Cities: Skylines 1** 的 Host-authoritative 多人共同经营系统。Forge 是新的生产主线：吸收 CSM-CQU 已验证的异常安全、热加入、兼容采集、世界传输和真实 CS1 接入经验，但不把旧的 Command Relay/Replay 当作最终同步模型。
 
-当前 `fix/forge-cqu-integration-docs` 已推进到 **V3 minimum-playable Alpha 候选**。它不是玩家正式发行版，但已经具备真实 CS1 Runtime、自动可安装 ZIP、Host/Join/热加入/恢复链，以及一组可共同建设城市的 Host-authoritative 领域。
+当前 `feat/ultimate-dlc-mod-framework` 正推进到 **CSM-Forge 1.0 code-complete candidate**。它还不是玩家正式发行版，但已经具备真实 CS1 Runtime、自动可安装 ZIP、Host/Join/热加入/恢复链，以及持续扩展中的 Host-authoritative 领域。
 
 ## 当前最小可玩 Alpha 范围
 
@@ -25,17 +25,14 @@
 - Stable Name：Building / Road Segment / District / TransportLine 自定义名称；
 - City Name；
 - Weather：Host 权威天气 target，Client 保留本地视觉插值；
+- Tree / Prop：Stable ID + sharded absolute state；Client create/move/delete 转 semantic intent，Host 执行后再做 absolute projection；Building/Net 引发的 collateral clear 明确放行并使装饰物 shard 失效重捕获；
 - Client projection audit：低频检查真实游戏投影与最后 Host committed root；当前严格 **diagnostic-only**，发现漂移只记录日志，不自动踢人或重同步。
 
-### Alpha 安全边界
+### 当前安全边界
 
-Tree / Prop / Terrain 还没有完成 V3 Authority 闭包。为了避免玩家误操作后出现静默不同步，Forge 在多人阶段对以下持久写操作 **fail-closed**：
+Tree / Prop 已进入 Forge Authority 闭包，不再由旧 Alpha safety patch 拦截。它们使用 Stable ID、分 shard absolute state 与 semantic intent；但在真实双机/多机完成 E3/E4 前，只能称为**代码覆盖完成、真机未验证**。
 
-- Tree Create / Move / Release；
-- Prop Create / Move / Release；
-- Terrain brush。
-
-单机状态不受这些限制；Forge `ApplyScope` 内由已支持权威操作触发的底层调用仍可通过。
+Terrain 仍没有完成 absolute tile/shard Authority，因此多人阶段的 Terrain brush 继续 **fail-closed**。单机状态不受限制；Forge `ApplyScope` 内的权威投影仍可通过。
 
 Event、Campus 和其他 DLC 专用系统尚未声明完整支持。Citizen / Vehicle / Pathfinding 仍主要作为本地动态表现层运行；它们不能直接绕过现有 Building / Net / Zone / Economy 配置写屏障。是否存在长期动态漂移，需要 E4 真机长跑和 projection audit 日志继续验证。
 
@@ -125,9 +122,10 @@ Windows Mod 目录：
 5. Client 填 Host IPv4、同一端口与 room key，点击 **Join Host 快照**；
 6. 等 Client 状态明确进入 `ClientLive` 后再操作；
 7. 依次测试：暂停/速度 → 一条道路 → 一个建筑 → zoning → district brush/policy → tax/budget → area unlock → 一条 transport line；
-8. 当前 Alpha 不使用 Tree / Prop / Terrain 工具；这些写操作会被故意阻断；
-9. 再让第二名 Client 加入或让第一名 Client 重连，确认 Host 与其他玩家不被阻塞；
-10. 如果日志出现 `[CSM-Forge] diagnostic-only projection drift`，保留游戏日志并记录出现前的最后一个玩家操作。
+8. 小范围测试 Host/Client Tree 与 Prop 的 create/move/delete，并记录 Stable ID、slot reuse、hot join 后投影是否一致；
+9. 当前不要使用 Terrain 工具；Terrain 写操作仍会被故意阻断；
+10. 再让第二名 Client 加入或让第一名 Client 重连，确认 Host 与其他玩家不被阻塞；
+11. 如果日志出现 `[CSM-Forge] diagnostic-only projection drift`，保留游戏日志并记录出现前的最后一个玩家操作。
 
 ## 达到“稳定替代”前仍需完成
 
@@ -135,7 +133,7 @@ Windows Mod 目录：
 - 重叠热加入、慢 Client、取消、掉线重连；
 - 大城市 Snapshot 与 Journal 压力；
 - 弱网与长时间 projection audit；
-- Tree / Prop / Terrain Authority；
+- Terrain Authority；
 - Event / Campus / DLC 专用状态；
 - 更完整的 Citizen / Vehicle / Path 自然模拟 closure；
 - Host-only Mod 能力的真实分类与实测；

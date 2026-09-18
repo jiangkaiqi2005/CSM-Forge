@@ -17,9 +17,6 @@ namespace CsmForge.Runtime.Cities1
         private const string IdentityNamespace = "builtin.districtpark";
         private const int Shards = 16;
         private const int MaxDepth = 3;
-        private static readonly ScalarPath[] Paths = BuildPaths();
-        private static readonly uint SchemaFingerprint = ComputeSchemaFingerprint(Paths);
-
         private static readonly string[] ForbiddenTokens =
         {
             "id", "index", "building", "vehicle", "citizen", "instance", "node", "segment", "path", "line",
@@ -27,6 +24,8 @@ namespace CsmForge.Runtime.Cities1
             "randomseed", "flags", "parktype", "parklevel", "varsityidentity", "coachhiretimes", "granttype",
             "academicstaffcount", "cheerleadingbudget", "coachcount", "ticketprice", "dynamicvarsityattractivenessmodifier"
         };
+        private static readonly ScalarPath[] Paths = BuildPaths();
+        private static readonly uint SchemaFingerprint = ComputeSchemaFingerprint(Paths);
 
         public string AdapterId { get { return "builtin.districtpark-deep"; } }
         public uint SchemaVersion { get { return 1; } }

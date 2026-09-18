@@ -12,12 +12,18 @@ namespace CsmForge.Runtime.Cities1
         public static void Build(UIHelperBase helper, ForgeSettings settings)
         {
             if (helper == null || settings == null) return;
-            UIHelperBase group = helper.AddGroup("CSM-Forge V3 最小可玩 Alpha");
-            UITextField notice = (UITextField)group.AddTextfield("说明",
-                "开发/LAN 1.0 候选。Join 会下载并加载 Host 快照，请先备份城市。已支持：道路、建筑、分区、行政区/政策、税率/预算/现金/贷款、区域解锁、暂停/速度、交通线路、命名、需求、天气、Stable-ID Tree/Prop，以及 Host Terrain brush/undo 的 absolute height shard 投影。上述路径仍待真实多机验证；Client 不能直接运行 Terrain 工具。",
+            UIHelperBase group = helper.AddGroup("CSM-Forge 联机控制（开发版）");
+            UITextField notice = (UITextField)group.AddTextfield("先看这里",
+                "必须先载入要联机的城市，再按 Esc → 选项 → CSM-Forge。房主点击“创建房间”；其他玩家填写房主 IPv4、相同端口和房间口令后点击“加入房间”。加入会下载并加载房主快照，请先备份城市。真实双机玩法仍未完成验证。",
                 delegate(string text) { }, delegate(string text) { });
             notice.readOnly = true;
             notice.width = 700;
+
+            UITextField scope = (UITextField)group.AddTextfield("当前范围",
+                "已支持：道路、建筑、分区、行政区/政策、税率/预算/现金/贷款、区域解锁、暂停/速度、交通线路、命名、需求、天气、Stable-ID Tree/Prop，以及 Host Terrain brush/undo 的 absolute height shard 投影。上述路径仍待真实多机验证；Client 不能直接运行 Terrain 工具。",
+                delegate(string text) { }, delegate(string text) { });
+            scope.readOnly = true;
+            scope.width = 700;
 
             UITextField name = (UITextField)group.AddTextfield("显示名", settings.DisplayName.value,
                 delegate(string text) { }, delegate(string text)
@@ -26,15 +32,7 @@ namespace CsmForge.Runtime.Cities1
                 });
             name.width = 360;
 
-            UITextField address = (UITextField)group.AddTextfield("主机 IPv4", settings.HostAddress.value,
-                delegate(string text) { }, delegate(string text)
-                {
-                    IPAddress parsed;
-                    if (IPAddress.TryParse(text, out parsed)) settings.HostAddress.value = text;
-                });
-            address.width = 360;
-
-            UITextField port = (UITextField)group.AddTextfield("UDP 端口", settings.Port.value.ToString(),
+            UITextField port = (UITextField)group.AddTextfield("双方相同的 UDP 端口", settings.Port.value.ToString(),
                 delegate(string text) { }, delegate(string text)
                 {
                     int value;
@@ -42,7 +40,7 @@ namespace CsmForge.Runtime.Cities1
                 });
             port.numericalOnly = true;
 
-            UITextField key = (UITextField)group.AddTextfield("临时房间口令（不持久化）", roomKey,
+            UITextField key = (UITextField)group.AddTextfield("双方相同的临时房间口令", roomKey,
                 delegate(string text) { roomKey = text; }, delegate(string text) { roomKey = text; });
             key.width = 360;
 
@@ -51,20 +49,30 @@ namespace CsmForge.Runtime.Cities1
             status.readOnly = true;
             status.width = 700;
 
-            group.AddButton("Host 当前存档", delegate
+            group.AddButton("创建房间（本机作为房主）", delegate
             {
                 bool ok = RuntimeReadyForStart() &&
                     RuntimeServices.Multiplayer.RequestHost(settings.Port.value, roomKey, settings.DisplayName.value);
-                status.text = (ok ? "已提交 Host 请求。" :
-                    "Host 请求失败：请确认已进入城市、CitiesHarmony/Forge patches 已就绪且当前没有 Forge 会话。") + " " + StatusText();
+                status.text = (ok ? "正在创建房间；请点“刷新状态”，看到 Hosting 后把本机 IPv4、端口和口令告诉其他玩家。" :
+                    "创建失败：请先载入城市，并确认 CitiesHarmony 已启用、Forge patches 已就绪且当前没有 Forge 会话。") + " " + StatusText();
             });
-            group.AddButton("Join Host 快照", delegate
+
+            UIHelperBase join = helper.AddGroup("加入别人的房间");
+            UITextField address = (UITextField)join.AddTextfield("房主 IPv4（不是你自己的地址）", settings.HostAddress.value,
+                delegate(string text) { }, delegate(string text)
+                {
+                    IPAddress parsed;
+                    if (IPAddress.TryParse(text, out parsed)) settings.HostAddress.value = text;
+                });
+            address.width = 360;
+
+            join.AddButton("加入房间并加载房主快照", delegate
             {
                 IPAddress ip;
                 bool ok = RuntimeReadyForStart() && IPAddress.TryParse(settings.HostAddress.value, out ip) &&
                     RuntimeServices.Multiplayer.RequestJoinCurrentWorld(new IPEndPoint(ip, settings.Port.value), roomKey, settings.DisplayName.value);
-                status.text = (ok ? "已提交 Join 请求；兼容检查通过后会自动下载并加载 Host 快照。" :
-                    "Join 请求失败：需已进入城市、patches 已就绪、IPv4 有效且当前没有 Forge 会话。") + " " + StatusText();
+                status.text = (ok ? "正在连接；兼容检查通过后会自动下载并加载房主快照。请点“刷新状态”，等待 ClientLive。" :
+                    "加入失败：请先载入城市，并检查房主 IPv4、双方端口/口令、CitiesHarmony 和当前会话状态。") + " " + StatusText();
             });
             group.AddButton("停止 Forge 会话", delegate
             {

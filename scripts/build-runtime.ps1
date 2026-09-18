@@ -26,6 +26,8 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 $project = Join-Path $repo 'src/Forge.Runtime.Cities1/Forge.Runtime.Cities1.csproj'
 & dotnet build $project -c $Configuration --nologo `
+    '-m:1' `
+    '-p:UseSharedCompilation=false' `
     "-p:CitiesManagedPath=$managed" `
     "-p:ContinuousIntegrationBuild=true"
 if ($LASTEXITCODE -ne 0) { throw "Runtime build failed with exit code $LASTEXITCODE" }
@@ -82,6 +84,12 @@ foreach ($name in $forbidden) {
     }
 }
 
+$startupProbe = Join-Path $repo 'tools/Forge.RuntimeStartupProbe/Forge.RuntimeStartupProbe.csproj'
+& dotnet run --project $startupProbe -c Release -- $runtimeDll $managed
+if ($LASTEXITCODE -ne 0) {
+    throw "Runtime startup probe failed with exit code $LASTEXITCODE"
+}
+
 $notice = @'
 CSM-Forge V3 minimum-playable Alpha / Ultimate Framework development candidate
 
@@ -117,8 +125,8 @@ Ultimate Framework code coverage in this candidate:
 First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-ALPHA-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
-3. Enter a city on both machines. Host opens CSM-Forge settings and chooses Host current save.
-4. Client enters Host IPv4, same UDP port and temporary room key, then chooses Join Host snapshot.
+3. Enter a city on both machines. Host presses Esc, opens Options -> CSM-Forge, then chooses 创建房间（本机作为房主）.
+4. Client opens the same in-game panel, enters Host IPv4 plus the same UDP port and temporary room key, then chooses 加入房间并加载房主快照.
 5. Wait until Client status is ClientLive before editing.
 6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
 7. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.

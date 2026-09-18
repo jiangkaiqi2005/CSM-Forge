@@ -10,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public static readonly ForgeSettings Settings = new ForgeSettings();
         public string Name { get { return "CSM-Forge V3"; } }
-        public string Description { get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; } }
+        public string Description { get { return "载入城市后按 Esc → 选项 → CSM-Forge，即可创建或加入房间（开发版）。"; } }
         public void OnEnabled()
         {
             BuiltInDlcAdapters.RegisterAll();

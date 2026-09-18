@@ -79,7 +79,7 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         session = source[source.index("internal sealed class ForgeSessionPanel"):source.index("internal sealed class ForgePlayersPanel")]
         self.assertIn("private UILabel notice", session)
         self.assertIn("internal void SetNotice", session)
-        self.assertIn("Steam 点击加入", session)
+        self.assertIn("自动点击加入已为稳定性停用", session)
 
     def test_faulted_world_is_not_silently_unfenced_or_presented_as_retryable(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
@@ -122,20 +122,14 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("ForgeRoomPreflight.EvaluateHost()", ui)
         self.assertIn("重新检查 DLC / Mod / 资产", ui)
 
-    def test_steam_bridge_uses_the_proven_csm_lifecycle_and_main_thread_pump(self):
+    def test_room_lifecycle_never_enters_the_unverified_manual_steam_abi(self):
         source = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
         host = (RUNTIME / "CitiesMultiplayerSessionV3.Host.cs").read_text(encoding="utf-8")
         ui = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
-        self.assertIn("SteamAPI_Init", source)
-        self.assertLess(source.index("SteamApiInit()"), source.index("RegisterCallback("))
-        self.assertIn("PlatformService.eventPlatformServiceShutdown", source)
-        self.assertIn("GCHandleType.Pinned", source)
-        self.assertIn("GameRichPresenceJoinRequested", source)
-        self.assertIn('SetRichPresence("connect", connect)', source)
-        self.assertIn("ForgeMultiplayerUi.AcceptSteamInvite", source)
-        self.assertIn("ForgeSteamRichPresence.Pump();", ui)
-        self.assertIn("ForgeSteamRichPresence.PublishInvite", host)
-        self.assertNotIn("SetRichPresence", host)
+        for marker in ["DllImport", "SteamAPI_", "RegisterCallback", "SetRichPresence", "Marshal."]:
+            self.assertNotIn(marker, source)
+        self.assertNotIn("ForgeSteamRichPresence", host)
+        self.assertNotIn("ForgeSteamRichPresence.Pump();", ui)
 
     def test_main_menu_join_does_not_require_a_loaded_world(self):
         source = (RUNTIME / "CitiesMultiplayerSessionV3.cs").read_text(encoding="utf-8")
@@ -181,9 +175,10 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         steam = (RUNTIME / "ForgeSteamRichPresence.cs").read_text(encoding="utf-8")
         ui = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         self.assertIn("Forge MemberIdentity remains the network identity", steam)
+        self.assertIn("AutomaticJoinAvailable", steam)
         self.assertIn("GUIUtility.systemCopyBuffer = lastInvite", ui)
         self.assertIn("PlatformService.ActivateGameOverlay(GameOverlayDialog.Friends)", ui)
-        self.assertIn("Steam 点击加入", ui)
+        self.assertIn("自动点击加入已为稳定性停用", ui)
         self.assertIn("不提供 NAT 穿透", ui)
 
 

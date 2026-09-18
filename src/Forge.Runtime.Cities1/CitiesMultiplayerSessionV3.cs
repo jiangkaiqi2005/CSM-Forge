@@ -190,7 +190,6 @@ namespace CsmForge.Runtime.Cities1
 
         public void StopImmediately()
         {
-            ForgeSteamRichPresence.Clear();
             RestoreSnapshotPause();
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }
@@ -552,7 +551,6 @@ namespace CsmForge.Runtime.Cities1
 
         private void AbortStart(string reason)
         {
-            ForgeSteamRichPresence.Clear();
             UnityEngine.Debug.LogError("[CSM-Forge] multiplayer start aborted: " + reason);
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             try { if (server != null) server.Dispose(); } catch { }
@@ -572,7 +570,6 @@ namespace CsmForge.Runtime.Cities1
 
         private void FenceSession(string reason)
         {
-            ForgeSteamRichPresence.Clear();
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); pendingBuildings.Clear(); }
             lifecycle.Fence(reason);

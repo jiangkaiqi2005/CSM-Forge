@@ -126,7 +126,7 @@ First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
 3. Host enters the city to share, presses Esc, then chooses FORGE 多人联机 -> 创建房间（当前城市作为房主）.
-4. Host opens CSM-Forge multiplayer from the pause menu and chooses 邀请 Steam 好友. Forge publishes a Steam connect Rich Presence value and opens the friends overlay, while copying the direct-connect invitation as a fallback. The replacement bridge is source-grounded in CSM's shipped Steam callback lifecycle but remains real-two-machine unverified. This is direct UDP discovery only and does not provide NAT traversal or relay.
+4. Host opens CSM-Forge multiplayer from the pause menu and chooses 邀请 Steam 好友. Forge copies the direct-connect invitation and opens the official Steam friends overlay; paste the invitation to the friend. Automatic Steam click-to-join is disabled because two real CS1 runs hit native access violations in the manually declared Steam ABI. This is direct UDP discovery only and does not provide NAT traversal or relay.
 5. Client stays at the main menu, chooses FORGE 联机, pastes the invitation text, then chooses 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
 6. Wait until Client status is ClientLive before editing.
 7. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
@@ -138,7 +138,7 @@ First two-machine test:
 13. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-DIAGNOSTICS.ps1 on every involved machine.
 14. Record every scenario in E3-E4-TEST-RECORD.md. Leave outcomes as NOT RUN until the named machine actually completes them.
 
-A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. Player roster/chat/tool cursors, Steam click-to-join and all two-machine behavior remain real-gameplay unverified until the E4/RC multiplayer gates are run. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until those gates pass.
+A successful build proves compilation/package integrity and source-level authority contracts, not multi-hour gameplay acceptance. Player roster/chat/tool cursors and all two-machine behavior remain real-gameplay unverified until the E4/RC multiplayer gates are run. Automatic Steam click-to-join is not part of this package. BUILD_INFO.json intentionally says gameplay_validation=NOT RUN BY CI. Keep using backed-up saves until those gates pass.
 '@
 $notice | Set-Content -LiteralPath (Join-Path $stage 'README-CANDIDATE.txt') -Encoding UTF8
 Copy-Item -LiteralPath (Join-Path $repo 'THIRD-PARTY-NOTICES.txt') -Destination (Join-Path $stage 'THIRD-PARTY-NOTICES.txt')

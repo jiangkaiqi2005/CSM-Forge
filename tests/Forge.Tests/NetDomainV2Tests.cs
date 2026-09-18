@@ -116,7 +116,7 @@ namespace CsmForge.Tests
             Assert.Equal(segmentA, connection.Target);
             Assert.Equal(segmentB, connection.SecondaryTarget);
             Assert.True(connection.FirstStart);
-            Assert.False(connection.SecondStart);
+            Assert.True(!connection.SecondStart);
             Assert.True(connection.FollowTerrain);
         }
 

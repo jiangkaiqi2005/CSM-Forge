@@ -77,7 +77,7 @@
 
 ## 5. 仍然独立于“DLC 覆盖”的基础游戏边界
 
-Tree / Prop 已进入 Stable-ID + sharded absolute-state Authority，旧 Alpha safety patch 不再拦截它们；真实双机/多机仍未验证。Terrain 仍按安全策略 fail-closed；Citizen / Vehicle / Path 的完整自然模拟 authority 与生产级公网认证传输也不是本 DLC 矩阵的完成条件。它们属于完整 1.0 的基础游戏/网络层工作，不应和“某个 DLC 未分类”混为一谈。
+Tree / Prop 已进入 Stable-ID + sharded absolute-state Authority；Terrain 已进入 Host-owned raw-height absolute shards；Citizen / Vehicle / Path 已完成 Host-owned simulation/result 代码闭包。上述基础游戏层路径的真实双机/多机仍未验证，生产级公网认证传输也不是本 DLC 矩阵的完成条件；不应把 CI 代码门禁写成 gameplay validated，也不应和“某个 DLC 未分类”混为一谈。
 
 ## 6. 验收
 

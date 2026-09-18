@@ -9,7 +9,7 @@ internal static class Program
     {
         if (args.Length < 2)
         {
-            Console.Error.WriteLine("usage: Forge.MetadataProbe <assembly> <type> [type...]");
+            Console.Error.WriteLine("usage: Forge.MetadataProbe <assembly> <type|type::method> [type|type::method...]");
             return 2;
         }
         string assemblyPath = Path.GetFullPath(args[0]);
@@ -25,10 +25,19 @@ internal static class Program
         {
             for (int i = 1; i < args.Length; i++)
             {
-                TypeDefinition type = FindType(assembly.MainModule, args[i]);
+                string requested = args[i];
+                int methodSeparator = requested.IndexOf("::", StringComparison.Ordinal);
+                string typeName = methodSeparator < 0 ? requested : requested.Substring(0, methodSeparator);
+                string methodName = methodSeparator < 0 ? null : requested.Substring(methodSeparator + 2);
+                TypeDefinition type = FindType(assembly.MainModule, typeName);
                 if (type == null)
                 {
-                    Console.WriteLine("TYPE-MISSING " + args[i]);
+                    Console.WriteLine("TYPE-MISSING " + typeName);
+                    continue;
+                }
+                if (methodName != null)
+                {
+                    PrintMethodBodies(type, methodName);
                     continue;
                 }
                 Console.WriteLine("TYPE " + type.FullName);
@@ -56,6 +65,26 @@ internal static class Program
             }
         }
         return 0;
+    }
+
+    private static void PrintMethodBodies(TypeDefinition type, string methodName)
+    {
+        bool found = false;
+        foreach (MethodDefinition method in type.Methods)
+        {
+            if (method.Name != methodName) continue;
+            found = true;
+            Console.WriteLine("BODY " + type.FullName + "::" + method.FullName);
+            if (!method.HasBody)
+            {
+                Console.WriteLine("NO-BODY");
+                continue;
+            }
+            foreach (Mono.Cecil.Cil.Instruction instruction in method.Body.Instructions)
+                Console.WriteLine(instruction.Offset.ToString("X4") + " " + instruction.OpCode +
+                    (instruction.Operand == null ? string.Empty : " " + instruction.Operand));
+        }
+        if (!found) Console.WriteLine("METHOD-MISSING " + type.FullName + "::" + methodName);
     }
 
     private static TypeDefinition FindType(ModuleDefinition module, string name)

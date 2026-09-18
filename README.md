@@ -32,9 +32,9 @@
 
 Tree / Prop 已进入 Forge Authority 闭包，不再由旧 Alpha safety patch 拦截。它们使用 Stable ID、分 shard absolute state 与 semantic intent；但在真实双机/多机完成 E3/E4 前，只能称为**代码覆盖完成、真机未验证**。
 
-Terrain 仍没有完成 absolute tile/shard Authority，因此多人阶段的 Terrain brush 继续 **fail-closed**。单机状态不受限制；Forge `ApplyScope` 内的权威投影仍可通过。
+Terrain 已进入 Host-owned absolute height shard Authority：Host 可执行 brush/undo，Client 只投影最终 raw height rows，并通过原版 terrain update 管线重建 Net/Building 等派生结果。Client 本地 Terrain 工具继续阻断；真实双机/多机尚未验证。
 
-Event、Campus 和其他 DLC 专用系统尚未声明完整支持。Citizen / Vehicle / Pathfinding 仍主要作为本地动态表现层运行；它们不能直接绕过现有 Building / Net / Zone / Economy 配置写屏障。是否存在长期动态漂移，需要 E4 真机长跑和 projection audit 日志继续验证。
+Citizen / Vehicle / Path 已进入 Host-owned simulation/result Authority：Client 不运行对应 manager simulation，Path route 使用 Stable Path 与 Stable Segment identity，Vehicle/CitizenInstance 只投影 lifecycle 与 coarse presentation。DLC 与固定 Mod 的代码覆盖状态见各审查文档；所有这些路径仍需 E3/E4 真机矩阵和 projection audit 长跑，CI green 不代表 gameplay validated。
 
 ## 重要限制
 
@@ -123,7 +123,7 @@ Windows Mod 目录：
 6. 等 Client 状态明确进入 `ClientLive` 后再操作；
 7. 依次测试：暂停/速度 → 一条道路 → 一个建筑 → zoning → district brush/policy → tax/budget → area unlock → 一条 transport line；
 8. 小范围测试 Host/Client Tree 与 Prop 的 create/move/delete，并记录 Stable ID、slot reuse、hot join 后投影是否一致；
-9. 当前不要使用 Terrain 工具；Terrain 写操作仍会被故意阻断；
+9. 仅在 Host 小范围测试 Terrain brush/undo，核对 Client height shard 与 Net/Building collateral；Client Terrain 工具会被阻断；
 10. 再让第二名 Client 加入或让第一名 Client 重连，确认 Host 与其他玩家不被阻塞；
 11. 如果日志出现 `[CSM-Forge] diagnostic-only projection drift`，保留游戏日志并记录出现前的最后一个玩家操作。
 
@@ -133,7 +133,7 @@ Windows Mod 目录：
 - 重叠热加入、慢 Client、取消、掉线重连；
 - 大城市 Snapshot 与 Journal 压力；
 - 弱网与长时间 projection audit；
-- Terrain Authority；
+- Terrain Authority 的真实双机/多机、hot-join 与 collateral 验证；
 - Event / Campus / DLC 专用状态；
 - 更完整的 Citizen / Vehicle / Path 自然模拟 closure；
 - Host-only Mod 能力的真实分类与实测；

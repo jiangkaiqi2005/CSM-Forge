@@ -24,6 +24,7 @@ namespace CsmForge.Runtime.Cities1
             ForgeExtensionApi.Register(new PathUnitStateAdapter());
             ForgeExtensionApi.Register(new VehiclePresentationStateAdapter());
             ForgeExtensionApi.Register(new CitizenInstancePresentationStateAdapter());
+            ForgeExtensionApi.Register(new TerrainStateAdapter());
             KnownModBridgeRegistry.RegisterAvailable();
             RuntimeServices.Enable();
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");

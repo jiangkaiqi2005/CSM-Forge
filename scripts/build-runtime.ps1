@@ -103,8 +103,8 @@ Minimum-playable Alpha scope retained:
 - supported: host/join snapshot flow, roads/networks, buildings, zoning, districts and policies, tax/budgets/cash/loans, area unlock, pause/speed, transport lines, stable names/city name, demand/weather authority, and Tree/Prop create/move/delete through Forge Stable IDs;
 - recovery: journal catch-up, fixed replay barrier, activation grant, snapshot rebaseline for one lagging client;
 - diagnostic-only projection audit logs projection-drift/local drift without automatically kicking/resyncing a client;
-- Tree/Prop authority is code-complete for this batch but still requires real multi-machine gameplay validation; Terrain brush writes remain fail-closed;
-- still outside this framework milestone: Terrain authority, full Citizen/Vehicle/Path authority, production-authenticated Internet transport, and broad real-world Mod/DLC soak certification.
+- Tree/Prop and Terrain absolute height shards are code-complete for their authority batches but still require real multi-machine gameplay validation; Terrain remains one of the Host-only tools during multiplayer;
+- still outside this framework milestone: real multi-machine Citizen/Vehicle/Path/Terrain validation, production-authenticated Internet transport, and broad real-world Mod/DLC soak certification.
 
 Ultimate Framework code coverage in this candidate:
 - official gameplay DLC are classified to core authority or dedicated absolute-state adapters; see docs/DLC-COVERAGE-V1.zh-CN.md in the repository;
@@ -123,7 +123,7 @@ First two-machine test:
 6. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.
 7. Then test installed DLC in small isolated steps: park/campus/industry/airport area edits, Event controls/results, and a Host-started disaster.
 8. Test Host and Client Tree/Prop create, move and delete in small isolated steps; record any identity, slot-reuse or projection failure. These paths are not yet gameplay-validated by CI.
-9. Do NOT use Terrain tools; Terrain remains fail-closed intentionally.
+9. On the Host only, test a small Terrain brush and undo, then verify Terrain absolute height shards and Net/Building collateral on every Client. Client Terrain tools remain blocked. These paths are not yet gameplay-validated by CI.
 10. Test a second client join/rejoin while the first client and Host remain live, then repeat a Tree/Prop edit after hot join.
 11. On any failure or projection warning, click 写入诊断日志 in CSM-Forge settings before leaving the city, then run COLLECT-ALPHA-DIAGNOSTICS.ps1 on every involved machine.
 

@@ -104,7 +104,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           $gameAssembly = Join-Path $env:CS1_MANAGED 'Assembly-CSharp.dll'
-          dotnet run --project tools/Forge.MetadataProbe/Forge.MetadataProbe.csproj -c Release -- $gameAssembly EventManager EventData EventAI DisasterManager DisasterData DisasterAI DistrictPark AcademicWorksData DistrictYearReportData DistrictYearReportLedger InvestmentManager InvestmentData HotelManager HotelData HotelAI HotelBuildingAI Building BuildingManager Vehicle VehicleManager Citizen CitizenInstance CitizenManager PathUnit PathManager TreeInstance TreeManager PropInstance PropManager TerrainManager WaterManager ElectricityManager NaturalResourceManager 2>&1 | Tee-Object -FilePath artifacts/cs1-dlc-metadata.txt
+          dotnet run --project tools/Forge.MetadataProbe/Forge.MetadataProbe.csproj -c Release -- $gameAssembly EventManager EventData EventAI DisasterManager DisasterData DisasterAI DistrictPark AcademicWorksData DistrictYearReportData DistrictYearReportLedger InvestmentManager InvestmentData HotelManager HotelData HotelAI HotelBuildingAI Building BuildingManager Vehicle VehicleManager Citizen CitizenInstance CitizenManager PathUnit PathManager TreeInstance TreeManager PropInstance PropManager TerrainManager TerrainArea TerrainTool "TerrainManager/SurfaceCell" WaterManager ElectricityManager NaturalResourceManager 2>&1 | Tee-Object -FilePath artifacts/cs1-dlc-metadata.txt
           if ($LASTEXITCODE -ne 0) { throw "CS1 metadata probe failed: $LASTEXITCODE" }
       - name: Build and stage installable Forge runtime
         shell: pwsh

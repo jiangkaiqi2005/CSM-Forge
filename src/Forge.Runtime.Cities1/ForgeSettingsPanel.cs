@@ -14,7 +14,7 @@ namespace CsmForge.Runtime.Cities1
             if (helper == null || settings == null) return;
             UIHelperBase group = helper.AddGroup("CSM-Forge V3 最小可玩 Alpha");
             UITextField notice = (UITextField)group.AddTextfield("说明",
-                "开发/LAN 1.0 候选。Join 会下载并加载 Host 快照，请先备份城市。已支持：道路、建筑、分区、行政区/政策、税率/预算/现金/贷款、区域解锁、暂停/速度、交通线路、命名、需求、天气，以及 Stable-ID Tree/Prop create/move/delete。Tree/Prop 代码已进入 Authority，但仍待真实多机验证；Terrain 写操作继续安全阻断。",
+                "开发/LAN 1.0 候选。Join 会下载并加载 Host 快照，请先备份城市。已支持：道路、建筑、分区、行政区/政策、税率/预算/现金/贷款、区域解锁、暂停/速度、交通线路、命名、需求、天气、Stable-ID Tree/Prop，以及 Host Terrain brush/undo 的 absolute height shard 投影。上述路径仍待真实多机验证；Client 不能直接运行 Terrain 工具。",
                 delegate(string text) { }, delegate(string text) { });
             notice.readOnly = true;
             notice.width = 700;

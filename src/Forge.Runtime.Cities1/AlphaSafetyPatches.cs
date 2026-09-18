@@ -4,24 +4,12 @@ using HarmonyLib;
 namespace CsmForge.Runtime.Cities1
 {
     /// <summary>
-    /// Fail-closed boundary for persistent world writes that still do not have a Forge authority
-    /// closure. Tree/Prop are owned by DecorationAuthorityPatches; Terrain remains blocked until
-    /// its absolute tile/shard authority is implemented.
+    /// Shared reporting for a write that is not legal in the current staged multiplayer role.
+    /// Tree/Prop and Terrain now have dedicated authority owners; this type no longer owns a
+    /// persistent-world fail-closed surface.
     /// </summary>
     internal static class AlphaUnsupportedWritePolicy
     {
-        public static bool Block
-        {
-            get
-            {
-                if (RuntimeScopeGuard.IsApplying) return false;
-                CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
-                return role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
-                    role == CitiesRuntimeRole.ClientLoading || role == CitiesRuntimeRole.ClientReplicaLive ||
-                    role == CitiesRuntimeRole.ClientRecovering || role == CitiesRuntimeRole.WorldFenced;
-            }
-        }
-
         public static void Report(string surface)
         {
             LoadIdentity load = RuntimeServices.Lifecycle.Current;
@@ -30,14 +18,29 @@ namespace CsmForge.Runtime.Cities1
         }
     }
 
-    [HarmonyPatch(typeof(TerrainTool), "ApplyBrush")]
-    internal static class AlphaTerrainBrushBarrierPatch
+    internal static class TerrainAuthorityPatchPolicy
     {
-        public static bool Prefix()
+        internal static bool AllowToolMutation(string surface)
         {
-            if (!AlphaUnsupportedWritePolicy.Block) return true;
-            AlphaUnsupportedWritePolicy.Report("terrain-brush");
+            if (RuntimeScopeGuard.IsApplying) return true;
+            CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
+            if (role == CitiesRuntimeRole.Disabled || role == CitiesRuntimeRole.SinglePlayer ||
+                role == CitiesRuntimeRole.HostPreparing || role == CitiesRuntimeRole.HostLive ||
+                role == CitiesRuntimeRole.Unloading) return true;
+            AlphaUnsupportedWritePolicy.Report(surface);
             return false;
         }
+    }
+
+    [HarmonyPatch(typeof(TerrainTool), "ApplyBrush")]
+    internal static class TerrainBrushAuthorityPatch
+    {
+        public static bool Prefix() { return TerrainAuthorityPatchPolicy.AllowToolMutation("terrain-client-brush"); }
+    }
+
+    [HarmonyPatch(typeof(TerrainTool), "ApplyUndo")]
+    internal static class TerrainUndoAuthorityPatch
+    {
+        public static bool Prefix() { return TerrainAuthorityPatchPolicy.AllowToolMutation("terrain-client-undo"); }
     }
 }

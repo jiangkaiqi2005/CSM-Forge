@@ -9,23 +9,24 @@ RUNTIME = REPO / "src" / "Forge.Runtime.Cities1"
 
 
 class MinimumPlayableAlphaContractTests(unittest.TestCase):
-    def test_only_remaining_alpha_persistent_write_barrier_is_terrain(self) -> None:
+    def test_terrain_has_dedicated_host_authority_and_client_barrier(self) -> None:
         source = (RUNTIME / "AlphaSafetyPatches.cs").read_text(encoding="utf-8-sig")
-        for value in ["TerrainTool", "ApplyBrush", "AlphaUnsupportedWritePolicy.Block", "RuntimeScopeGuard.IsApplying"]:
+        for value in ["TerrainTool", "ApplyBrush", "ApplyUndo", "TerrainAuthorityPatchPolicy", "HostLive", "RuntimeScopeGuard.IsApplying"]:
             self.assertIn(value, source)
+        self.assertNotIn("AlphaUnsupportedWritePolicy.Block", source)
         for removed_surface in ["TreeManager", "CreateTree", "MoveTree", "ReleaseTree", "PropManager", "CreateProp", "MoveProp", "ReleaseProp"]:
             self.assertNotIn(removed_surface, source)
 
-    def test_player_ui_declares_tree_prop_authority_and_terrain_boundary(self) -> None:
+    def test_player_ui_declares_terrain_authority_and_real_machine_boundary(self) -> None:
         source = (RUNTIME / "ForgeSettingsPanel.cs").read_text(encoding="utf-8-sig")
-        for value in ["道路", "建筑", "交通线路", "Stable-ID Tree/Prop", "真实多机验证", "Terrain", "安全阻断"]:
+        for value in ["道路", "建筑", "交通线路", "Stable-ID Tree/Prop", "真实多机验证", "Terrain", "absolute height shard", "Host"]:
             self.assertIn(value, source)
 
     def test_package_notice_declares_same_boundary(self) -> None:
         source = (REPO / "scripts" / "build-runtime.ps1").read_text(encoding="utf-8-sig")
         for value in [
             "roads/networks", "buildings", "transport lines", "Tree/Prop",
-            "Stable IDs", "Terrain", "fail-closed", "projection-drift",
+            "Stable IDs", "Terrain", "absolute height shards", "Host-only tools", "projection-drift",
         ]:
             self.assertIn(value, source)
 

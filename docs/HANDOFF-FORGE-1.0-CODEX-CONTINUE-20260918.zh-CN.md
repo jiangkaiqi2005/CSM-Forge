@@ -32,11 +32,14 @@
 2. `8e960081d890c484da59921391749639807a6c7f`  
    `feat(net): add semantic Network Multitool authority shim`
 
-**当前最后一个已确认完整代码全绿基线是：**
+3. `8379f949d0451eb008284a484f207cd751b70a89`  
+   `feat(net): cover Multitool parallel and connection creation`
+
+**当前最后一个已确认完整代码全绿基线仍然是：**
 
 `8e960081d890c484da59921391749639807a6c7f`
 
-本交接文件会作为 docs-only commit 继续压在该 SHA 之上；如果 Codex 接手时 HEAD 已前进，先确认它是 `8e96008...` 的 fast-forward 后代并重新核对 CI。
+注意：`8379f949...` 在写本交接时已经存在，但 **CI 是红的**。当前 handoff docs commit 位于它之后，因此 Codex 接手时不能把当前 HEAD 当作 green。必须先修 `8379f949...` 的失败并重新证明 exact HEAD 全绿，不能 reset 回 `8e96008...`，除非用户明确要求回退。
 
 ---
 
@@ -95,7 +98,39 @@ Runtime Artifact：
 - Digest：
   `sha256:2b73244d4ab0f474cf6eeb377c5c07d8a6147eb51ee93a9e7ac031e80348a9de`
 
-**这只证明编译、测试、真实 reference build 和包完整性。没有真实双机 gameplay 证据。**
+**这只证明 `8e96008...` 的编译、测试、真实 reference build 和包完整性。没有真实双机 gameplay 证据。**
+
+### 2.1 后续 `8379f949...` 当前失败状态
+
+`8379f949d0451eb008284a484f207cd751b70a89` 试图继续覆盖：
+
+- `CreateParallelMode.Create`
+- `BaseCreateMode.Create`
+- Parallel
+- Create Connection / Curve / Loop 共用 connection family
+- bounded absolute geometry `NetMultitoolPointV2[]`
+- Host 侧重建原 Mod Point[]
+- Host 侧按 shared `NeedMoney` 设置计算 construction cost
+
+但该提交的 CI：
+
+- docs-contract：success
+- kernel-ci：**failure**
+- runtime-package-windows：skipped
+
+已确认第一处失败是纯测试 API 编译错误：
+
+`tests/Forge.Tests/NetDomainV2Tests.cs:119`
+
+使用了：
+
+`Assert.False(connection.SecondStart);`
+
+而当前自定义 `Assert` 没有 `False` 方法，Windows/Linux、net35/net8 都因此编译失败。
+
+**Codex 第一件事：修这个测试 API（使用仓库现有 Assert 风格），然后重新跑 exact HEAD CI。**
+
+由于 runtime-package 被跳过，修掉这个编译错误后仍必须继续等真实 CS1 reference runtime build；不能预设 `8379f949...` 的 reflection/signature 一定正确。
 
 `BUILD_INFO.gameplay_validation` 必须继续保持：
 
@@ -269,18 +304,61 @@ wire 只携带：
 
 ### P2 当前状态
 
-**首批五种模式代码已实现且完整 CI green。**
+**首批五种模式（Add/Remove/Union/Split/Intersect）在 `8e96008...` 已实现且完整 CI green。**
 
-但必须明确：
+**Parallel / Connection family 已在 `8379f949...` 写入代码，但尚未通过 CI，不能算完成。**
+
+`8379f949...` 的意图包括：
+
+- `MultitoolCreateParallel`
+- `MultitoolCreateConnection`
+- bounded `NetMultitoolPointV2[]`
+- patch `CreateParallelMode.Create`
+- patch `BaseCreateMode.Create`
+- Host 侧重建 Point[]
+- Host 侧 construction cost 计算
+- connection family 共用 BaseCreate 执行入口
+
+接手后先修测试编译并让 runtime-package 真正执行，再判断这批代码是否需要签名修正。
+
+仍必须明确：
 
 - 未真实加载 Network Multitool 1.3.9 做双机测试；
 - 未验证其第三方依赖/实际 Workshop assembly 在用户环境中的 type 漂移；
-- 未覆盖 Parallel / Connection family；
-- 未做真实 Add/Remove/Union/Split/Intersect 的 Host/Client/hot-join E3/E4。
+- Parallel / Connection 当前是“代码已写、CI 未过”，不是完成；
+- 未做任何 Multitool 模式的 Host/Client/hot-join E3/E4。
 
 ---
 
-## 5. Codex 接手后的第一件事：继续完成 P2，不要跳 P3
+## 5. Codex 接手后的第一件事：先修当前红 CI，再继续 P2
+
+### 5.0 先修 `8379f949...`
+
+第一处已知错误：
+
+`tests/Forge.Tests/NetDomainV2Tests.cs:119`
+
+不要使用不存在的 `Assert.False`，改成仓库测试框架支持的等价断言。
+
+然后必须重新确认：
+
+- docs
+- Windows
+- Linux
+- net8
+- Mono/net35
+- real CS1 metadata probe
+- real CS1 reference runtime build
+- runtime-package-windows
+
+如果 Runtime CI 报 Multitool reflection/signature 不存在：
+
+- 回到真实 1.3.9 源码/assembly surface；
+- 修真实签名；
+- 不删功能绕过；
+- 不放开 Client NetManager barrier。
+
+### 5.1 P2 完成边界
 
 原交接要求 P2 至少覆盖：
 
@@ -290,9 +368,9 @@ wire 只携带：
 - Split/intersect segment
 - parallel / connection creation
 
-前五项已有代码。
+前五项已有 green 代码。Parallel / Connection family 已有 `8379f949...` 实现草案，先通过 CI 和真实 reference build 审查这批代码，不要再平行另写第二套。
 
-下一步直接继续源码审计：
+重点复核真实源码：
 
 - `NetworkMultitool/ToolModes/NodeLineModes/CreateParallel.cs`
 - `NetworkMultitool/ToolModes/ConnectionModes/BaseCreate.cs`
@@ -482,7 +560,9 @@ Infinite Goods：
 继续：
 
 ### Batch B2
-- Parallel + Connection family
+- 修 `8379f949...` 当前测试编译错误
+- 审查 Parallel + Connection family 已写实现
+- 必要时按真实 1.3.9 signature 修正
 - contract/tests
 - exact HEAD 全 CI green
 
@@ -536,4 +616,4 @@ Infinite Goods：
 
 ## 11. 最短 Codex 启动指令
 
-> 继续开发 `jiangkaiqi2005/CSM-Forge` 的 `feat/ultimate-dlc-mod-framework`。先完整阅读 `docs/HANDOFF-FORGE-1.0-CODEX-20260918.zh-CN.md` 和 `docs/HANDOFF-FORGE-1.0-CODEX-CONTINUE-20260918.zh-CN.md`。最新已确认完整代码全绿基线是 `8e960081d890c484da59921391749639807a6c7f`：Tree/Prop 已从旧 Alpha safety barrier 正式迁出并由 Stable-ID Decoration Authority 独占；Network Multitool 1.3.9 的 Add/Remove/Union/Split/Intersect 已有 Stable-ID semantic Net intent shim，Host 在现有 Net Authority 内调用原 Mod 高层方法并由 Reconcile 捕获 absolute graph result。不要 merge main/develop，不要 Command Replay，不要 native ID wire，不要把 CI 当真机。接下来先完成 Network Multitool 的 Parallel / Connection family 和版本/type 漂移保护，exact HEAD 全 CI green 后再进入 P3；其余 P3→P9 严格按原 handoff 顺序执行。
+> 继续开发 `jiangkaiqi2005/CSM-Forge` 的 `feat/ultimate-dlc-mod-framework`。先完整阅读 `docs/HANDOFF-FORGE-1.0-CODEX-20260918.zh-CN.md` 和 `docs/HANDOFF-FORGE-1.0-CODEX-CONTINUE-20260918.zh-CN.md`。最新已确认完整代码全绿基线是 `8e960081d890c484da59921391749639807a6c7f`：Tree/Prop 已从旧 Alpha safety barrier 正式迁出并由 Stable-ID Decoration Authority 独占；Network Multitool 1.3.9 的 Add/Remove/Union/Split/Intersect 已有 Stable-ID semantic Net intent shim并全绿。其后的 `8379f949d0451eb008284a484f207cd751b70a89` 已写 Parallel / Connection family，但当前 kernel CI 因 `NetDomainV2Tests.cs:119` 使用不存在的 `Assert.False` 而失败，runtime-package 被跳过。不要 reset；先修该测试 API并重新证明 exact HEAD docs/Windows/Linux/Mono/real CS1 runtime-package 全绿，再审查 Parallel/Connection 的真实 1.3.9 signature。不要 merge main/develop，不要 Command Replay，不要 native ID wire，不要把 CI 当真机。全绿后再进入 P3；其余 P3→P9 严格按原 handoff 顺序执行。

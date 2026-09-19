@@ -15,12 +15,7 @@ namespace ModScan
     /// </summary>
     public static class Program
     {
-        private static readonly string[] HardcodedClientOnlyModTypes =
-        {
-            "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
-            "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod", "AchieveIt.ModInfo",
-            "ACME.Mod", "PrecisionEngineering.Mod"
-        };
+        private static readonly string[] HardcodedClientOnlyModTypes = ModCompatibilityCatalog.ClientOnlyModTypes;
 
         public static int Main(string[] args)
         {

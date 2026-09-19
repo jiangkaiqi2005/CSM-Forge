@@ -46,7 +46,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static bool CellEquivalent(DistrictCellStateV2 a, DistrictCellStateV2 b)
         {
-            if (a == null || b == null || a.Index != b.Index) return false;
+            if (a.Index != b.Index) return false; // WP-1.3: value type, nothing to null-check
             for (int slot = 0; slot < 4; slot++)
                 if (a.AlphaAt(slot) != b.AlphaAt(slot) ||
                     (a.AlphaAt(slot) != 0 && !a.IdentityAt(slot).Equals(b.IdentityAt(slot)))) return false;
@@ -92,7 +92,7 @@ namespace CsmForge.Runtime.Cities1
         public static void ApplyCell(LoadIdentity load, DistrictCellStateV2 state, EntityIdMapV2 ids)
         {
             DistrictManager manager = DistrictManager.instance;
-            if (!RuntimeServices.Lifecycle.IsCurrent(load) || manager == null || state == null || state.Index >= manager.m_districtGrid.Length)
+            if (!RuntimeServices.Lifecycle.IsCurrent(load) || manager == null || state.Index >= manager.m_districtGrid.Length)
                 throw new InvalidOperationException("District cell apply is invalid.");
             DistrictManager.Cell cell = manager.m_districtGrid[state.Index];
             cell.m_district1 = state.Alpha1 == 0 || !state.District1.IsValid ? (byte)0 : Native(state.District1, ids); cell.m_alpha1 = state.Alpha1;

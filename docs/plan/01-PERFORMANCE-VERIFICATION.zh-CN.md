@@ -84,11 +84,15 @@
 - **验收**：net35 构建 0 警告 0 错误、190/190 测试（会话层无游戏无关测试框架，
   新增确定性回归需真机场景：客户端 kill -9 后房主继续运行，聊天/批次不炸房）。
 
-### WP-1.3 区划网格止血（独立小步）
+### WP-1.3 区划网格止血（独立小步）—— 已实现，待真机验收
 
-- `DistrictCellStateV2`（`DistrictDomainModelV2.cs:54`）由 class 改 struct，或池化复用；
-- `ReconcileAll` 支持传入"脏单元集合"（先全量接口兼容，脏集合由 WP-1.4 供给）。
-- **验收**：单次 ObserveHostWorld 分配量在 DiagnosticRing 中可计量且下降一个数量级。
+- `DistrictCellStateV2` 由 class 改为 **struct** 并实现 `IEquatable`（字段级相等 +
+  GetHash 重写），262k 格 reconcile 不再每格分配一个堆对象（估算省 ~15-25MB/次捕获垃圾）；
+  该类型构造后只读，值语义与字典/编解码行为一致（`DistrictCellValueTests` 4 项回归：
+  字段级相等、default 空格种子、字典语义、构造校验）。
+- 连带清理：`DistrictMutationV2` 的 cell 非空循环、`SeedCell` 的 NotNull、
+  `CellEquivalent`/`ApplyCell` 的 null 比较——值类型无 null 可言，校验保留在构造器内。
+- **验收**：单测 209/209；net35 构建 0 警告 0 错误；真机 PERF 对比待 E3/E4。
 
 ### WP-1.4 脏分片 + 增量根（治本）
 

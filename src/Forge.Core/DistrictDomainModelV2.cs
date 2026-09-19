@@ -51,7 +51,12 @@ namespace CsmForge.Core
         }
     }
 
-    public sealed class DistrictCellStateV2
+    /// <summary>
+    /// WP-1.3: value type by design — the host reconciles all 262k grid cells per capture, so a
+    /// class here allocated a full heap object per cell every tick. Immutable after construction;
+    /// field-wise equality keeps dictionary and codec semantics identical to the class version.
+    /// </summary>
+    public struct DistrictCellStateV2 : IEquatable<DistrictCellStateV2>
     {
         public uint Index { get; private set; }
         public EntityIdentityV2 District1 { get; private set; }
@@ -91,6 +96,27 @@ namespace CsmForge.Core
             if (slot == 2) return Alpha3; if (slot == 3) return Alpha4;
             throw new ArgumentOutOfRangeException("slot");
         }
+
+        public bool Equals(DistrictCellStateV2 other)
+        {
+            return Index == other.Index && Alpha1 == other.Alpha1 && Alpha2 == other.Alpha2 &&
+                Alpha3 == other.Alpha3 && Alpha4 == other.Alpha4 &&
+                District1.Equals(other.District1) && District2.Equals(other.District2) &&
+                District3.Equals(other.District3) && District4.Equals(other.District4);
+        }
+        public override bool Equals(object obj) { return obj is DistrictCellStateV2 && Equals((DistrictCellStateV2)obj); }
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = (int)Index;
+                hash = hash * 31 + Alpha1; hash = hash * 31 + District1.GetHashCode();
+                hash = hash * 31 + Alpha2; hash = hash * 31 + District2.GetHashCode();
+                hash = hash * 31 + Alpha3; hash = hash * 31 + District3.GetHashCode();
+                hash = hash * 31 + Alpha4; hash = hash * 31 + District4.GetHashCode();
+                return hash;
+            }
+        }
     }
 
     public sealed class DistrictMutationV2
@@ -111,7 +137,8 @@ namespace CsmForge.Core
             Cells = (DistrictCellStateV2[])cells.Clone();
             for (int i = 0; i < UpsertEntities.Length; i++) if (UpsertEntities[i] == null) throw new ArgumentException("Null district entity state.");
             for (int i = 0; i < DeleteEntities.Length; i++) if (!DeleteEntities[i].IsValid) throw new ArgumentException("Invalid district deletion identity.");
-            for (int i = 0; i < Cells.Length; i++) if (Cells[i] == null) throw new ArgumentException("Null district cell state.");
+            // DistrictCellStateV2 is a value type (WP-1.3): elements cannot be null and validate
+            // themselves in their constructor.
         }
     }
 
@@ -126,7 +153,8 @@ namespace CsmForge.Core
         public void SeedEntity(DistrictEntityStateV2 value) { UpsertEntity(value, false); }
         public void SeedCell(DistrictCellStateV2 value)
         {
-            Check.NotNull(value, "value");
+            // Value type (WP-1.3): nothing to null-check; validation lives in the cell constructor
+            // and ValidateReferences.
             ValidateReferences(value);
             if (value.IsEmpty) return;
             if (cells.ContainsKey(value.Index)) throw new InvalidOperationException("Duplicate district cell.");

@@ -319,9 +319,17 @@ namespace CsmForge.Runtime.Cities1
 
         protected UILabel Label(string text, float y)
         {
-            UILabel label = AddUIComponent<UILabel>(); label.text = text; label.textScale = 0.9f;
-            label.width = 340; label.wordWrap = true; label.relativePosition = new Vector3(10, y); return label;
+            UILabel label = AddUIComponent<UILabel>();
+            label.autoSize = false; label.autoHeight = false; label.width = 340; label.height = 32;
+            label.textScale = 0.9f; label.wordWrap = true; label.relativePosition = new Vector3(10, y);
+            label.text = text; return label;
         }
+
+        protected static void SetText(UILabel label, string value)
+        { if (label.text != value) label.text = value; }
+
+        protected static void SetText(UIButton button, string value)
+        { if (button.text != value) button.text = value; }
 
         protected UITextField Field(string text, float y, bool numeric)
         {
@@ -409,7 +417,7 @@ namespace CsmForge.Runtime.Cities1
             {
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
                 joinButton.isEnabled = mode == MultiplayerSessionMode.Offline;
-                if (mode != MultiplayerSessionMode.Offline) Status.text = StatusText();
+                if (mode != MultiplayerSessionMode.Offline) SetText(Status, StatusText());
             }
             base.Update();
         }
@@ -479,10 +487,10 @@ namespace CsmForge.Runtime.Cities1
                 createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline &&
                     preflight != null && preflight.CanHost;
                 if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
-                    Status.text = value.Mode == MultiplayerSessionMode.Offline ?
-                        "设置完成后点击创建房间。" : StatusText();
-                players.text = value.Mode == MultiplayerSessionMode.Hosting ?
-                    "房间已创建，正在打开会话管理……" : "直连地址：" + ForgeMultiplayerUi.LocalIpv4();
+                    SetText(Status, value.Mode == MultiplayerSessionMode.Offline ?
+                        "设置完成后点击创建房间。" : StatusText());
+                SetText(players, value.Mode == MultiplayerSessionMode.Hosting ?
+                    "房间已创建，正在打开会话管理……" : "直连地址：" + ForgeMultiplayerUi.LocalIpv4());
                 if (value.Mode == MultiplayerSessionMode.Hosting)
                 {
                     ForgeMultiplayerUi.ReplacePanel<ForgeSessionPanel>();
@@ -556,8 +564,8 @@ namespace CsmForge.Runtime.Cities1
             if (isVisible)
             {
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
-                Status.text = StatusText();
-                players.text = "玩家：" + value.Players.Length + " 人（" + LiveCount(value.Players) + " 人已就绪）";
+                SetText(Status, StatusText());
+                SetText(players, "玩家：" + value.Players.Length + " 人（" + LiveCount(value.Players) + " 人已就绪）");
                 invite.isVisible = value.Mode == MultiplayerSessionMode.Hosting;
                 invite.isEnabled = invite.isVisible;
                 if (value.Mode == MultiplayerSessionMode.Offline) ForgeMultiplayerUi.Dismiss(this);
@@ -618,8 +626,8 @@ namespace CsmForge.Runtime.Cities1
                     names[i].isVisible = present; kick[i].isVisible = present;
                     if (!present) continue;
                     MultiplayerPlayerSnapshot player = value.Players[i];
-                    names[i].text = (player.IsHost ? "[房主] " : "") + player.DisplayName +
-                        (player.IsLocal ? "（你）" : "") + (player.IsLive ? "" : " — 正在加入");
+                    SetText(names[i], (player.IsHost ? "[房主] " : "") + player.DisplayName +
+                        (player.IsLocal ? "（你）" : "") + (player.IsLive ? "" : " — 正在加入"));
                     kick[i].isVisible = value.Mode == MultiplayerSessionMode.Hosting && !player.IsHost && !player.IsLocal;
                     kick[i].isEnabled = kick[i].isVisible;
                 }
@@ -666,7 +674,7 @@ namespace CsmForge.Runtime.Cities1
                 int start = Math.Max(0, values.Length - 10);
                 for (int i = start; i < values.Length; i++) builder.Append('<').Append(values[i].DisplayName)
                     .Append("> ").Append(values[i].Text).Append('\n');
-                log.text = builder.Length == 0 ? "还没有聊天消息。" : builder.ToString();
+                SetText(log, builder.Length == 0 ? "还没有聊天消息。" : builder.ToString());
             }
             base.Update();
         }
@@ -710,10 +718,15 @@ namespace CsmForge.Runtime.Cities1
             if (value.SnapshotBytesTotal > 0)
             {
                 double percent = value.SnapshotBytesReceived * 100.0 / value.SnapshotBytesTotal;
-                status.text = "正在下载房主城市……\n" + percent.ToString("0.0") + "%  " +
+                string progress = "正在下载房主城市……\n" + percent.ToString("0.0") + "%  " +
                     FormatBytes(value.SnapshotBytesReceived) + " / " + FormatBytes(value.SnapshotBytesTotal);
+                if (status.text != progress) status.text = progress;
             }
-            else status.text = "正在连接并核对游戏内容……\n" + value.Detail;
+            else
+            {
+                string progress = "正在连接并核对游戏内容……\n" + value.Detail;
+                if (status.text != progress) status.text = progress;
+            }
             base.Update();
         }
 
@@ -743,10 +756,10 @@ namespace CsmForge.Runtime.Cities1
             {
                 MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
                 bool host = mode == MultiplayerSessionMode.Hosting || mode == MultiplayerSessionMode.StartingHost;
-                confirm.text = host ? "确认停止房间" : "确认断开";
-                explanation.text = host
+                SetText(confirm, host ? "确认停止房间" : "确认断开");
+                SetText(explanation, host
                     ? "停止后所有加入者都会断开。城市仍保留在本机，之后可以重新创建房间。"
-                    : "断开后会退出当前多人会话；再次加入需要重新连接并核对房主城市。";
+                    : "断开后会退出当前多人会话；再次加入需要重新连接并核对房主城市。");
                 if (mode == MultiplayerSessionMode.Offline) ForgeMultiplayerUi.Dismiss(this);
                 else if (mode == MultiplayerSessionMode.Faulted)
                     ForgeMultiplayerUi.ReplacePanel<ForgeFaultPanel>();
@@ -795,11 +808,11 @@ namespace CsmForge.Runtime.Cities1
             {
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
                 bool fenced = RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.WorldFenced;
-                summary.text = fenced
+                SetText(summary, fenced
                     ? "为了保护城市状态，Forge 已隔离当前世界。必须返回主菜单并重新加载城市，不能在当前城市里直接重开房间。"
-                    : FaultHelp(value.Detail);
-                diagnostic.text = "诊断代码：" + (value.Detail ?? "unknown") +
-                    "\n如果问题重复出现，请写入诊断日志并运行安装目录中的 COLLECT-DIAGNOSTICS.ps1。";
+                    : FaultHelp(value.Detail));
+                SetText(diagnostic, "诊断代码：" + (value.Detail ?? "unknown") +
+                    "\n如果问题重复出现，请写入诊断日志并运行安装目录中的 COLLECT-DIAGNOSTICS.ps1。");
                 retry.isVisible = !fenced;
                 retry.isEnabled = !fenced;
             }

@@ -31,6 +31,18 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("create room preflight completed", host)
         self.assertIn("create room host request returned", host)
 
+    def test_live_labels_have_stable_geometry_and_skip_identical_text_assignments(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        label_factory = source[source.index("protected UILabel Label"):source.index("protected UITextField Field")]
+        self.assertIn("label.autoSize = false", label_factory)
+        self.assertIn("label.autoHeight = false", label_factory)
+        self.assertIn("label.width = 340", label_factory)
+        self.assertIn("label.height = 32", label_factory)
+        self.assertIn("if (label.text != value)", label_factory)
+        host = source[source.index("internal sealed class ForgeHostGamePanel"):source.index("internal sealed class ForgeSessionPanel")]
+        self.assertIn("SetText(players", host)
+        self.assertNotIn("players.text = value.Mode", host)
+
     def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         self.assertIn("private static readonly Type[] ManagedPanelTypes", source)

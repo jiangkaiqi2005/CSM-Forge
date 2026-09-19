@@ -112,6 +112,17 @@ namespace CsmForge.Runtime.Cities1
             if (typeName == ModCompatibilityCatalog.Default.BlockedModType) return "blocked-mod";
             if (typeName == "GameAnarchy.Mod" && !GameAnarchyBridge.IsAvailable) return "blocked-mod";
             if (typeName == "InfiniteGoodsMod.ModIdentity" && !InfiniteGoodsBridge.IsAvailable) return "blocked-mod";
+            // WP-3.2b: manifest-declared entries. A synchronized entry whose settings surface
+            // failed to resolve at runtime is blocked (fail closed), never silently unsynced.
+            ModEntryData manifestEntry;
+            if (ModCompatibilityCatalog.Default.TryGetModEntry(typeName, out manifestEntry))
+            {
+                if (manifestEntry.Category == "blocked") return "blocked-mod";
+                if (manifestEntry.Category == "dependency") return "dependency-mod";
+                if (manifestEntry.Category == "client-only") return "client-mod";
+                if (manifestEntry.Category == "synchronized")
+                    return GenericSettingsStateAdapter.IsResolvedFor(typeName) ? "sync-mod" : "blocked-mod";
+            }
             if (IsAuditedCslModernMap(typeName, assembly)) return "client-mod";
             for (int i = 0; i < ModCompatibilityCatalog.Default.ClientOnlyModTypes.Length; i++)
                 if (typeName == ModCompatibilityCatalog.Default.ClientOnlyModTypes[i]) return "client-mod";

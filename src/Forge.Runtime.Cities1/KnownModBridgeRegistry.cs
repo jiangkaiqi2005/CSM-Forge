@@ -56,6 +56,15 @@ namespace CsmForge.Runtime.Cities1
                 if (!Registered(TreeStateAdapter.Adapter)) ForgeExtensionApi.Register(new TreeStateAdapter());
                 if (!Registered(PropStateAdapter.Adapter)) ForgeExtensionApi.Register(new PropStateAdapter());
                 for (int i = 0; i < Bridges.Length; i++) Bridges[i].RegisterIfActive(enabled);
+                // WP-3.2b: manifest-declared synchronized mods that have no hand-written bridge
+                // register a generic settings adapter (capture/apply via SettingsSurfaceCodec).
+                foreach (ModEntryData entry in ModCompatibilityCatalog.Default.Mods)
+                {
+                    if (entry == null || entry.Category != "synchronized" || IsHandwrittenBridge(entry.UserModType)) continue;
+                    GenericSettingsStateAdapter generic = new GenericSettingsStateAdapter(entry);
+                    if (!generic.TryResolve()) continue;
+                    if (!Registered(generic.AdapterId)) ForgeExtensionApi.Register(generic);
+                }
                 // TM:PE remains a blocked-mod.  Keep its audited bridge code dormant until the
                 // UI-write audit and real multi-machine validation promote it to Supported.
                 // A blocked mod must not be patched or registered merely because its assembly is
@@ -72,6 +81,17 @@ namespace CsmForge.Runtime.Cities1
                 for (int i = 0; i < Bridges.Length; i++) Bridges[i].InstallIfActive(enabled, harmony);
                 // TM:PE is intentionally not patched while its compatibility kind is blocked-mod.
             }
+        }
+
+        /// <summary>WP-3.2b: these synchronized mods are owned by hand-written bridges.</summary>
+        private static bool IsHandwrittenBridge(string userModType)
+        {
+            ModCompatibilityDocument document = ModCompatibilityCatalog.Default;
+            return userModType == document.DemandControllerUserModType ||
+                userModType == document.GameAnarchyUserModType ||
+                userModType == document.InfiniteGoodsUserModType ||
+                userModType == document.EightyOne2UserModType ||
+                userModType == document.NetworkMultitoolUserModType;
         }
 
         internal static void ResetOptionalPatchState()

@@ -296,6 +296,7 @@ namespace CsmForge.Core
         public string[] FixedValueLabels { get; private set; }
         public string[] FixedValuePropertyNames { get; private set; }
         public long[] FixedValueRequired { get; private set; }
+        public string HolderFieldName { get; private set; }
 
         private ModEntryData() { }
 
@@ -334,6 +335,8 @@ namespace CsmForge.Core
             if (node.TryGet("assemblyName", out field) && field.Kind == JsonKind.String) result.AssemblyName = field.Text;
             if (node.TryGet("supportedVersion", out field) && field.Kind == JsonKind.String) result.SupportedVersion = field.Text;
             if (node.TryGet("settingsTypeName", out field) && field.Kind == JsonKind.String) result.SettingsTypeName = field.Text;
+            if (node.TryGet("holderFieldName", out field) && field.Kind == JsonKind.String && field.Text.Length > 0 && field.Text.Length <= 256)
+                result.HolderFieldName = field.Text;
 
             string[] holders;
             if (ModCompatibilityDocumentParse.RequireTextArray(node, "holderTypeNames", 8, 256, out holders))

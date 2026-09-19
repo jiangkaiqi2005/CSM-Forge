@@ -24,7 +24,12 @@ namespace CsmForge.Runtime.Cities1
         public static ForgeRoomPreflightReport EvaluateHost()
         {
             if (!RuntimeServices.Patches.Installed)
-                return Blocked("CitiesHarmony/Forge 补丁尚未就绪。请启用 CitiesHarmony 并重启游戏。");
+            {
+                string failure = RuntimeServices.Patches.FailureDetail;
+                return Blocked(string.IsNullOrEmpty(failure)
+                    ? "CitiesHarmony 已加载；Forge 补丁仍在等待初始化。"
+                    : "Forge 补丁安装失败：" + failure + "。详细异常已写入游戏日志。");
+            }
             if (!RuntimeServices.Lifecycle.Current.IsValid)
                 return Blocked("当前没有已载入的城市。请先进入要作为房主的城市。");
             if (RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.WorldFenced)

@@ -43,6 +43,23 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("SetText(players", host)
         self.assertNotIn("players.text = value.Mode", host)
 
+    def test_host_preflight_rechecks_when_harmony_readiness_changes(self):
+        source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
+        host = source[source.index("internal sealed class ForgeHostGamePanel"):source.index("internal sealed class ForgeSessionPanel")]
+        self.assertIn("private uint observedPatchStatusRevision", host)
+        self.assertIn("uint patchStatusRevision = RuntimeServices.Patches.StatusRevision", host)
+        self.assertIn("if (patchStatusRevision != observedPatchStatusRevision) RefreshPreflight();", host)
+        refresh = host[host.index("private void RefreshPreflight()") :]
+        self.assertIn("observedPatchStatusRevision = RuntimeServices.Patches.StatusRevision", refresh)
+
+    def test_patch_failure_names_the_exact_patch_in_game_log_and_preflight(self):
+        coordinator = (RUNTIME / "PatchCoordinator.cs").read_text(encoding="utf-8")
+        preflight = (RUNTIME / "ForgeRoomPreflight.cs").read_text(encoding="utf-8")
+        self.assertIn("currentPatch = types[i].FullName", coordinator)
+        self.assertIn("Harmony patch installation failed at", coordinator)
+        self.assertIn("public string FailureDetail", coordinator)
+        self.assertIn("Forge 补丁安装失败：", preflight)
+
     def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         self.assertIn("private static readonly Type[] ManagedPanelTypes", source)

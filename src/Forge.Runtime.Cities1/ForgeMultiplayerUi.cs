@@ -462,6 +462,7 @@ namespace CsmForge.Runtime.Cities1
         private UIButton createButton;
         private ForgeRoomPreflightReport preflight;
         private string feedback;
+        private uint observedPatchStatusRevision;
 
         public override void Start()
         {
@@ -483,6 +484,8 @@ namespace CsmForge.Runtime.Cities1
         {
             if (isVisible)
             {
+                uint patchStatusRevision = RuntimeServices.Patches.StatusRevision;
+                if (patchStatusRevision != observedPatchStatusRevision) RefreshPreflight();
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
                 createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline &&
                     preflight != null && preflight.CanHost;
@@ -528,6 +531,7 @@ namespace CsmForge.Runtime.Cities1
 
         private void RefreshPreflight()
         {
+            observedPatchStatusRevision = RuntimeServices.Patches.StatusRevision;
             preflight = ForgeRoomPreflight.EvaluateHost();
             preflightLabel.text = preflight.Message;
             if (createButton != null) createButton.isEnabled = preflight.CanHost &&

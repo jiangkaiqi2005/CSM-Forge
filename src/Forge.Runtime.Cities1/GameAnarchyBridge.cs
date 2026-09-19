@@ -14,7 +14,6 @@ namespace CsmForge.Runtime.Cities1
     /// </summary>
     internal sealed class GameAnarchyBridgeAdapter : IForgeStateAdapterV1
     {
-        private const uint Magic = 0x31414746u; // FGA1
         internal const string Adapter = "bridge.gameanarchy";
         public string AdapterId { get { return Adapter; } }
         public uint SchemaVersion { get { return 1; } }
@@ -24,44 +23,19 @@ namespace CsmForge.Runtime.Cities1
             Type type; object instance;
             if (!GameAnarchyBridge.TryGetSettings(out type, out instance))
                 throw new InvalidOperationException("Game Anarchy settings are unavailable.");
-            PropertyInfo[] properties = GameAnarchyBridge.SharedProperties(type);
-            GameAnarchyBridge.ValidateSupportedConfiguration(properties, instance);
-            using (MemoryStream stream = new MemoryStream())
-            using (BinaryWriter writer = new BinaryWriter(stream))
-            {
-                writer.Write(Magic); writer.Write(GameAnarchyBridge.SchemaFingerprint(properties));
-                writer.Write((ushort)properties.Length);
-                for (int i = 0; i < properties.Length; i++) writer.Write(GameAnarchyBridge.ToBits(properties[i].PropertyType, properties[i].GetValue(instance, null)));
-                writer.Flush();
-                if (stream.Length > 4096) throw new InvalidOperationException("Game Anarchy bridge state exceeded its fixed budget.");
-                return stream.ToArray();
-            }
+            return GameAnarchyBridge.GetSettingsCodec(type).Capture(instance);
         }
 
         public void ApplyAbsolute(byte[] state)
         {
-            if (state == null || state.Length < 10 || state.Length > 4096) throw new InvalidDataException("Invalid Game Anarchy bridge state.");
             Type type; object instance;
-            if (!GameAnarchyBridge.TryGetSettings(out type, out instance)) throw new InvalidOperationException("Game Anarchy settings are unavailable.");
-            PropertyInfo[] properties = GameAnarchyBridge.SharedProperties(type);
-            using (MemoryStream stream = new MemoryStream(state, false))
-            using (BinaryReader reader = new BinaryReader(stream))
-            {
-                if (reader.ReadUInt32() != Magic || reader.ReadUInt32() != GameAnarchyBridge.SchemaFingerprint(properties))
-                    throw new InvalidDataException("Game Anarchy bridge schema mismatch.");
-                if (reader.ReadUInt16() != properties.Length) throw new InvalidDataException("Game Anarchy bridge property count mismatch.");
-                long[] values = new long[properties.Length];
-                for (int i = 0; i < properties.Length; i++) values[i] = reader.ReadInt64();
-                if (stream.Position != stream.Length) throw new InvalidDataException("Trailing Game Anarchy bridge bytes.");
-                GameAnarchyBridge.ValidateSupportedValues(properties, values);
-                GameAnarchyBridge.BeginApply();
-                try
-                {
-                    for (int i = 0; i < properties.Length; i++)
-                        properties[i].SetValue(instance, GameAnarchyBridge.FromBits(properties[i].PropertyType, values[i]), null);
-                }
-                finally { GameAnarchyBridge.EndApply(); }
-            }
+            if (!GameAnarchyBridge.TryGetSettings(out type, out instance))
+                throw new InvalidOperationException("Game Anarchy settings are unavailable.");
+            SettingsSurfaceCodec codec = GameAnarchyBridge.GetSettingsCodec(type);
+            long[] values = codec.ValidateState(state);
+            GameAnarchyBridge.BeginApply();
+            try { codec.WriteValues(instance, values); }
+            finally { GameAnarchyBridge.EndApply(); }
         }
     }
 
@@ -70,12 +44,11 @@ namespace CsmForge.Runtime.Cities1
         private static readonly string AssemblyName = ModCompatibilityCatalog.Default.GameAnarchy.AssemblyName;
         private static readonly Version SupportedVersion = new Version(ModCompatibilityCatalog.Default.GameAnarchy.SupportedVersion);
         private static readonly string SettingsTypeName = ModCompatibilityCatalog.Default.GameAnarchy.SettingsTypeName;
-        private static readonly string[] LocalOnly = ModCompatibilityCatalog.Default.GameAnarchy.LocalOnlySettings;
         private static readonly string[] MoneyMutationMethods = { "OnPreSimulationFrame", "ChargeInterest", "AutoAddMoney", "SetStartMoney", "AddMoneyManually", "SubstrateMoneyManually", "ModifyMoney", "AddLoanAmount" };
-        private static readonly string[] UnsupportedBooleanSettings = ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings;
         [ThreadStatic] private static bool applying;
         private static bool patched;
         private static Assembly compatibleAssembly;
+        private static SettingsSurfaceCodec settingsCodec;
 
         internal static bool IsAvailable { get { return FindCompatibleAssembly() != null; } }
         internal static void BeginApply() { applying = true; }
@@ -97,80 +70,36 @@ namespace CsmForge.Runtime.Cities1
             return false;
         }
 
+        internal static SettingsSurfaceCodec GetSettingsCodec(Type settingsType)
+        {
+            // WP-3.2: the surface selection, wire capture and aggregated validation now live in
+            // the shared codec; only the catalog data and the fixed-value labels are GA-specific.
+            if (settingsCodec == null)
+            {
+                string bothRates = "OilDepletionRate/OreDepletionRate (both rates must be 100)";
+                string fireSpread = "BuildingSpreadFireProbability/TreeSpreadFireProbability (fire-spread overrides)";
+                string unlock = "CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)";
+                settingsCodec = new SettingsSurfaceCodec(
+                    settingsType.GetProperties(BindingFlags.Instance | BindingFlags.Public),
+                    ModCompatibilityCatalog.Default.GameAnarchy.LocalOnlySettings,
+                    ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings,
+                    new[]
+                    {
+                        new FixedValueRule("OilDepletionRate", ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate, bothRates),
+                        new FixedValueRule("OreDepletionRate", ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate, bothRates),
+                        new FixedValueRule("BuildingSpreadFireProbability", ModCompatibilityCatalog.Default.GameAnarchy.FixedSpreadFireProbability, fireSpread),
+                        new FixedValueRule("TreeSpreadFireProbability", ModCompatibilityCatalog.Default.GameAnarchy.FixedSpreadFireProbability, fireSpread),
+                        new FixedValueRule("CurrentUnlockMode", 0L, unlock),
+                        new FixedValueRule("CurrentMilestoneLevel", 0L, unlock)
+                    },
+                    0x31414746u, 4096, "Game Anarchy");
+            }
+            return settingsCodec;
+        }
+
         internal static PropertyInfo[] SharedProperties(Type type)
         {
-            List<PropertyInfo> result = new List<PropertyInfo>();
-            PropertyInfo[] values = type.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-            for (int i = 0; i < values.Length; i++)
-            {
-                PropertyInfo property = values[i];
-                if (!property.CanRead || !property.CanWrite || !Supported(property.PropertyType) || IsLocalOnly(property.Name)) continue;
-                result.Add(property);
-            }
-            result.Sort(delegate(PropertyInfo a, PropertyInfo b) { return StringComparer.Ordinal.Compare(a.Name, b.Name); });
-            if (result.Count == 0 || result.Count > 128) throw new InvalidOperationException("Game Anarchy shared settings surface is invalid.");
-            return result.ToArray();
-        }
-
-        internal static void ValidateSupportedConfiguration(PropertyInfo[] properties, object instance)
-        {
-            long[] values = new long[properties.Length];
-            for (int i = 0; i < properties.Length; i++) values[i] = ToBits(properties[i].PropertyType, properties[i].GetValue(instance, null));
-            ValidateSupportedValues(properties, values);
-        }
-
-        internal static void ValidateSupportedValues(PropertyInfo[] properties, long[] values)
-        {
-            if (properties == null || values == null || properties.Length != values.Length)
-                throw new InvalidDataException("Invalid Game Anarchy shared setting values.");
-            // S2: aggregate every violation so one hosting attempt reports the complete list
-            // (matches the 1.0 candidate build) instead of one option per attempt.
-            List<string> violations = new List<string>();
-            for (int i = 0; i < UnsupportedBooleanSettings.Length; i++)
-                if (RequiredValue(properties, values, UnsupportedBooleanSettings[i]) != 0L)
-                    violations.Add(UnsupportedBooleanSettings[i]);
-            if (RequiredValue(properties, values, "CurrentUnlockMode") != 0L || RequiredValue(properties, values, "CurrentMilestoneLevel") != 0L)
-                violations.Add("CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)");
-            if (RequiredValue(properties, values, "OilDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate || RequiredValue(properties, values, "OreDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOreDepletionRate)
-                violations.Add("OilDepletionRate/OreDepletionRate (both rates must be 100)");
-            if (RequiredValue(properties, values, "BuildingSpreadFireProbability") != 0L ||
-                RequiredValue(properties, values, "TreeSpreadFireProbability") != 0L)
-                violations.Add("BuildingSpreadFireProbability/TreeSpreadFireProbability (fire-spread overrides)");
-            if (violations.Count != 0)
-                throw new InvalidOperationException("Game Anarchy options are not supported in Forge multiplayer: " +
-                    string.Join(", ", violations.ToArray()));
-        }
-
-        internal static uint SchemaFingerprint(PropertyInfo[] properties)
-        {
-            uint value = 2166136261u;
-            for (int i = 0; i < properties.Length; i++)
-            {
-                string text = properties[i].Name + ":" + properties[i].PropertyType.FullName + ";";
-                for (int p = 0; p < text.Length; p++) { value ^= text[p]; value *= 16777619u; }
-            }
-            return value;
-        }
-
-        internal static long ToBits(Type type, object value)
-        {
-            if (type.IsEnum) return Convert.ToInt64(value);
-            if (type == typeof(bool)) return (bool)value ? 1L : 0L;
-            if (type == typeof(float)) return BitConverter.ToInt32(BitConverter.GetBytes((float)value), 0);
-            if (type == typeof(uint)) return (long)(uint)value;
-            if (type == typeof(long)) return (long)value;
-            return Convert.ToInt64(value);
-        }
-
-        internal static object FromBits(Type type, long bits)
-        {
-            if (type.IsEnum) return Enum.ToObject(type, bits);
-            if (type == typeof(bool)) return bits != 0;
-            if (type == typeof(float)) return BitConverter.ToSingle(BitConverter.GetBytes(unchecked((int)bits)), 0);
-            if (type == typeof(uint)) return checked((uint)bits);
-            if (type == typeof(long)) return bits;
-            if (type == typeof(int)) return checked((int)bits);
-            throw new InvalidOperationException("Unsupported Game Anarchy setting type: " + type.FullName);
+            return GetSettingsCodec(type).SharedProperties;
         }
 
         internal static void InstallOptionalPatches(Harmony harmony)
@@ -237,7 +166,8 @@ namespace CsmForge.Runtime.Cities1
         }
         private static bool IsLocalOnly(string name)
         {
-            for (int i = 0; i < LocalOnly.Length; i++) if (name == LocalOnly[i]) return true;
+            string[] localOnly = ModCompatibilityCatalog.Default.GameAnarchy.LocalOnlySettings;
+            for (int i = 0; i < localOnly.Length; i++) if (name == localOnly[i]) return true;
             return false;
         }
         private static bool Supported(Type type)
@@ -271,7 +201,8 @@ namespace CsmForge.Runtime.Cities1
                 try
                 {
                     PropertyInfo[] properties = SharedProperties(settings);
-                    for (int p = 0; p < UnsupportedBooleanSettings.Length; p++) RequiredProperty(properties, UnsupportedBooleanSettings[p]);
+                    string[] blocked = ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings;
+                    for (int p = 0; p < blocked.Length; p++) RequiredProperty(properties, blocked[p]);
                     RequiredProperty(properties, "CurrentUnlockMode"); RequiredProperty(properties, "CurrentMilestoneLevel");
                     RequiredProperty(properties, "OilDepletionRate"); RequiredProperty(properties, "OreDepletionRate");
                     RequiredProperty(properties, "BuildingSpreadFireProbability"); RequiredProperty(properties, "TreeSpreadFireProbability");

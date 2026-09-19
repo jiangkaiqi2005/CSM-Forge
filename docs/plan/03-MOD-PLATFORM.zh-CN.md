@@ -29,16 +29,27 @@
 
 ## 2. 工作包
 
-### WP-3.1 client-only 启发式自动分类（收益最大，独立可做）
+### WP-3.1 client-only 启发式自动分类（收益最大，独立可做）—— 已实现，附真机差异报告
 
 - **现状**：`ClientOnlyModTypes`（`CompatibilityCollector.cs:20-25`）+ `ModCategory`
   字符串特判，名单外的一律按需同步/拒绝。
-- **设计**：对每个启用插件做静态判定——
-  1. 程序集引用集分析：只引用 UI/表现层（`ICities` 的 UI 面、UnityEngine.UI）而
-     不引用模拟 Manager（`BuildingManager`/`NetManager`/…）→ 倾向 client-only；
-  2. Harmony patch 目标扫描：patch 目标全在表现层类型 → 加分；
-  3. 结果并入兼容清单，仍受"未知默认拒绝"约束的只有模拟层嫌疑者。
-- **显式覆盖**：启发式允许 manifest 声明覆盖（强制 client-only / 强制拒绝）。
+- **已实现**：
+  - `Forge.Core/SimulationSurfaceMatcher`：保守的"表现层判定"——类型面出现
+    Manager/Tool/Simulation/AI 后缀即视为触碰模拟面（方向刻意单边：误报只会回落到
+    精确匹配，安全；漏报才是危险，故不做"看起来像 UI"的放行名单）；
+  - `CompatibilityCollector.TouchesSimulationSurface`：收集 mod 程序集的可见类型面
+    （自有类型、基类链、接口、成员签名），不可加载的类型/程序集 fail-closed；
+  - `ModCategory` 接入顺序：显式声明 > 依赖/阻断名单 > 已审计条目 > 硬编码 client-only
+    名单 > **启发式** > 默认精确匹配；
+  - 已知 v1 局限（已记录）：泛型类型参数与 Harmony attribute 目标不扫描——
+    签名含 List&lt;BuildingManager&gt; 的 UI mod 保持精确匹配（保守方向）。
+- **真机差异报告**（`docs/plan/evidence/modscan-report.txt`，工具 `scripts/modscan`，
+  MetadataLoadContext 元数据反射，不加载执行 mod 代码）：
+  本机 Workshop 32 个 DLL——17 个判 client（免桥接）、7 个不可扫（fail-closed）、
+  `UnifiedUILib`/`TMPE.API` 因引用 NetManager/Manager 族正确判 sim、
+  `InfiniteGoodsMod` 正确判 sim（BuildingManager/PowerPlantAI）。
+- **验收**：单测 `SimulationSurfaceMatcherTests` 4 项（纯 UI 不触发 / Manager·Tool·AI·Simulation
+  触发 / Controller 不触发 / 空集 fail-closed）；分类器对本机 mod 集输出与预期一致。
 - **验收**：对本机已装 mod 集跑分类器，与手工判定对比输出差异报告；
   分类结果进入兼容清单并可被 S2 的报错文本引用。
 

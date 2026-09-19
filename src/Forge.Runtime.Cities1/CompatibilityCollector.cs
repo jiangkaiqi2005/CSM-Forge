@@ -122,7 +122,53 @@ namespace CsmForge.Runtime.Cities1
             if (IsAuditedCslModernMap(typeName, assembly)) return "client-mod";
             for (int i = 0; i < ClientOnlyModTypes.Length; i++)
                 if (typeName == ClientOnlyModTypes[i]) return "client-mod";
+            // WP-3.1: heuristic auto-classification. A mod whose visible type surface never
+            // names a simulation manager/tool is treated as client-only; explicit declarations
+            // and the audited lists above always win, and ambiguous assemblies fail closed to
+            // exact-match ("mod").
+            if (assembly != null && !TouchesSimulationSurface(assembly)) return "client-mod";
             return "mod";
+        }
+
+        /// <summary>
+        /// WP-3.1: collect every visible simple type name of the mod assembly (own types, base
+        /// chains, interfaces, member signatures) and feed the conservative matcher. Unloadable
+        /// types or assemblies fail closed to simulation-touching (exact-match classification).
+        /// Known v1 limitation: generic type arguments and Harmony attribute targets are not
+        /// scanned, so a UI mod using List&lt;BuildingManager&gt; in a signature is kept exact-match.
+        /// </summary>
+        private static bool TouchesSimulationSurface(Assembly assembly)
+        {
+            Type[] types;
+            try { types = assembly.GetTypes(); }
+            catch (ReflectionTypeLoadException error)
+            {
+                types = error.Types;
+                if (types == null) return true;
+            }
+            catch { return true; }
+            List<string> names = new List<string>(types.Length * 2);
+            for (int t = 0; t < types.Length; t++)
+            {
+                Type type = types[t];
+                if (type == null) return true; // unloadable type: cannot prove presentation-only
+                if (type.BaseType != null) names.Add(type.BaseType.Name);
+                try
+                {
+                    foreach (Type interfaceType in type.GetInterfaces()) names.Add(interfaceType.Name);
+                    const BindingFlags all = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+                    foreach (FieldInfo field in type.GetFields(all | BindingFlags.DeclaredOnly)) names.Add(field.FieldType.Name);
+                    foreach (PropertyInfo property in type.GetProperties(all | BindingFlags.DeclaredOnly)) names.Add(property.PropertyType.Name);
+                    foreach (MethodInfo method in type.GetMethods(all | BindingFlags.DeclaredOnly))
+                    {
+                        names.Add(method.ReturnType.Name);
+                        ParameterInfo[] parameters = method.GetParameters();
+                        for (int p = 0; p < parameters.Length; p++) names.Add(parameters[p].ParameterType.Name);
+                    }
+                }
+                catch { return true; } // reflection failure: fail closed
+            }
+            return SimulationSurfaceMatcher.TouchesSimulationSurface(names);
         }
 
         private static bool IsAuditedCslModernMap(string typeName, Assembly assembly)

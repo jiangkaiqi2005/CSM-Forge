@@ -66,14 +66,21 @@
 
 ## 3. 施工顺序与依赖
 
+**集成记录（2026-09-20）**：①-④ 与 ⑤ 第一轮、⑥ 的全部工作已通过 `--no-ff` 合并
+`feat/wp-1.4b-district-dirty-hooks` 回 `feat/ultimate-dlc-mod-framework`（合并提交 `fc17958`，
+已推送）；`build-runtime.ps1` 已从该提交打包 `dist/runtime/CSM-Forge-runtime.zip`，
+BUILD_INFO 溯源恢复（source_commit 可达）。E3/E4 真机记录待执行：安装包后按
+docs/TESTING 场景跑 1 Host + 1/2 Client、画区/修路/聊天、客户端 kill -9、
+节拍窗口前后 PERF 对比，并把结果写回 E3-E4-TEST-RECORD。
+
 ```
-① WP-1.1 低频安全点验证      （独立可做，体感质变，一个 PR 量级）
-② WP-1.2 P1 分级响应          （稳定性，与①无依赖）
-③ S2/S3 报错与字符边界        （中文用户可感知修复）
-④ WP-1.6 预检后台化 + S1 LocalIpv4
-⑤ WP-2.x 门禁治理             （依赖①落定后的热路径形态）
-⑥ WP-3.1 client-only 自动分类 （独立）
-⑦ WP-1.3→1.4→1.5 脏分片/增量根/线程化 （治本，工作量最大）
+① WP-1.1 低频安全点验证      （独立可做，体感质变，一个 PR 量级）✅
+② WP-1.2 P1 分级响应          （稳定性，与①无依赖）✅
+③ S2/S3 报错与字符边界        （中文用户可感知修复）✅
+④ WP-1.6 预检后台化 + S1 LocalIpv4 ✅
+⑤ WP-2.x 门禁治理             （第一轮完成；剩余 AE/AOORE 转换、桥反射去重、D4 全接线）部分完成
+⑥ WP-3.1 client-only 自动分类 （独立）✅
+⑦ WP-1.3→1.4→1.5 脏分片/增量根/线程化 （1.3/1.4a/1.4b 完成；NetDomain 分片化与 1.5 待做）部分完成
 ⑧ WP-3.2/3.3 目录数据化 + 通用适配器
 ```
 

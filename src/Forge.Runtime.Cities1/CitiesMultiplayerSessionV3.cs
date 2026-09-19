@@ -227,6 +227,7 @@ namespace CsmForge.Runtime.Cities1
                 mode = MultiplayerSessionMode.Offline;
                 detail = "offline";
             }
+            ForgeRoomPreflight.Invalidate();
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
             load = default(LoadIdentity);
         }

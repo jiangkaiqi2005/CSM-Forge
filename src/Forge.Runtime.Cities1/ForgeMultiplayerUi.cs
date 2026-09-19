@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Text;
 using System.Collections.Generic;
@@ -132,8 +133,31 @@ namespace CsmForge.Runtime.Cities1
             endpoint = new IPEndPoint(address, port); return true;
         }
 
+        /// <summary>
+        /// S1: pick the address of a real uplink instead of the first non-loopback IPv4 — DNS
+        /// ordering previously handed back a gateway-less VPN/TUN adapter (2.0.0.1 on this dev
+        /// machine), producing invite codes friends could not reach. Prefer up interfaces that
+        /// own an IPv4 default gateway and are not tunnels; fall back to the old DNS probe.
+        /// Verified on the dev machine (multi-homed + Hyper-V/WSL virtual switches): returns the
+        /// gatewayed Ethernet address, skipping the TUN adapter and virtual switches.
+        /// </summary>
         internal static string LocalIpv4()
         {
+            try
+            {
+                NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                for (int i = 0; i < interfaces.Length; i++)
+                {
+                    NetworkInterface candidate = interfaces[i];
+                    if (candidate.OperationalStatus != OperationalStatus.Up) continue;
+                    if (candidate.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                        candidate.NetworkInterfaceType == NetworkInterfaceType.Tunnel) continue;
+                    if (!HasIpv4Gateway(candidate.GetIPProperties())) continue;
+                    string address = FirstIpv4Of(candidate);
+                    if (address != null) return address;
+                }
+            }
+            catch { }
             try
             {
                 IPAddress[] addresses = Dns.GetHostAddresses(Dns.GetHostName());
@@ -143,6 +167,34 @@ namespace CsmForge.Runtime.Cities1
             }
             catch { }
             return "127.0.0.1";
+        }
+
+        private static bool HasIpv4Gateway(IPInterfaceProperties properties)
+        {
+            if (properties == null || properties.GatewayAddresses == null) return false;
+            foreach (GatewayIPAddressInformation gateway in properties.GatewayAddresses)
+                if (gateway != null && gateway.Address != null &&
+                    gateway.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) return true;
+            return false;
+        }
+
+        private static bool IsLinkLocalIpv4(IPAddress address)
+        {
+            byte[] bytes = address.GetAddressBytes();
+            return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
+        }
+
+        private static string FirstIpv4Of(NetworkInterface candidate)
+        {
+            IPInterfaceProperties properties = candidate.GetIPProperties();
+            if (properties == null || properties.UnicastAddresses == null) return null;
+            foreach (UnicastIPAddressInformation unicast in properties.UnicastAddresses)
+            {
+                IPAddress address = unicast.Address;
+                if (address != null && address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(address) && !IsLinkLocalIpv4(address)) return address.ToString();
+            }
+            return null;
         }
 
         private static void EnsurePump()
@@ -491,6 +543,13 @@ namespace CsmForge.Runtime.Cities1
             {
                 uint patchStatusRevision = RuntimeServices.Patches.StatusRevision;
                 if (patchStatusRevision != observedPatchStatusRevision) RefreshPreflight();
+                // WP-1.6: the panel never runs the manifest collection inline; it displays the
+                // cached report and queues a fresh simulation-thread evaluation when inputs move.
+                ForgeRoomPreflight.RequestEvaluation(false, patchStatusRevision);
+                preflight = ForgeRoomPreflight.PeekCached();
+                bool reportCurrent = preflight != null && ForgeRoomPreflight.CachedPatchRevision() == patchStatusRevision;
+                if (preflight != null && reportCurrent) SetText(preflightLabel, preflight.Message);
+                else if (ForgeRoomPreflight.EvaluationInFlight()) SetText(preflightLabel, "正在检查 DLC / Mod / 资产……");
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
                 // WP-1.2: teardown is queued now, so the Offline transition can land after this
                 // panel opened; re-run the preflight when it does.
@@ -500,7 +559,7 @@ namespace CsmForge.Runtime.Cities1
                     if (value.Mode == MultiplayerSessionMode.Offline) RefreshPreflight();
                 }
                 createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline &&
-                    preflight != null && preflight.CanHost;
+                    reportCurrent && preflight != null && preflight.CanHost;
                 if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
                     SetText(Status, value.Mode == MultiplayerSessionMode.Offline ?
                         "设置完成后点击创建房间。" : StatusText());
@@ -519,11 +578,12 @@ namespace CsmForge.Runtime.Cities1
         private void CreateRoom()
         {
             UnityEngine.Debug.Log("[CSM-Forge] create room clicked.");
-            RefreshPreflight();
-            UnityEngine.Debug.Log("[CSM-Forge] create room preflight completed; canHost=" +
-                (preflight != null && preflight.CanHost) + ".");
-            if (preflight == null || !preflight.CanHost)
-            { SetFeedback(preflight == null ? "无法完成开房检查。" : preflight.Message); return; }
+            ForgeRoomPreflightReport report = ForgeRoomPreflight.PeekCached();
+            if (report == null || ForgeRoomPreflight.CachedPatchRevision() != RuntimeServices.Patches.StatusRevision)
+            { RefreshPreflight(); SetFeedback("正在重新检查 DLC / Mod / 资产清单，请稍候。"); return; }
+            UnityEngine.Debug.Log("[CSM-Forge] create room preflight completed; canHost=" + report.CanHost + ".");
+            if (!report.CanHost)
+            { SetFeedback(report.Message); return; }
             int port; string display = (nameField.text ?? string.Empty).Trim(); string key = keyField.text ?? string.Empty;
             if (!int.TryParse(portField.text, out port) || port < 1 || port > 65535)
             { SetFeedback("端口必须是 1–65535。"); return; }
@@ -544,10 +604,7 @@ namespace CsmForge.Runtime.Cities1
         private void RefreshPreflight()
         {
             observedPatchStatusRevision = RuntimeServices.Patches.StatusRevision;
-            preflight = ForgeRoomPreflight.EvaluateHost();
-            preflightLabel.text = preflight.Message;
-            if (createButton != null) createButton.isEnabled = preflight.CanHost &&
-                RuntimeServices.Multiplayer.Status.Mode == MultiplayerSessionMode.Offline;
+            ForgeRoomPreflight.RequestEvaluation(true, observedPatchStatusRevision);
         }
 
         private void SetFeedback(string value) { feedback = value; Status.text = value; }

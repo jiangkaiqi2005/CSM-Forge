@@ -107,27 +107,32 @@
 - tick 边界主线程只拷贝脏分片字节（双缓冲/代际指针），SHA-256 与编码在工作线程；
 - 结果回投 `BoundedInbox`（`Diagnostics.cs` 已有该原语），下个安全点消费。
 
-### WP-1.6 预检后台化 + 缓存
+### WP-1.6 预检后台化 + 缓存（独立小步）—— 已实现，待真机验收
 
-- `ForgeRoomPreflight.EvaluateHost` 的 `CitiesCompatibilityCollector.Collect()`
-  （mod 程序集 SHA-256 + 全资产枚举）挪到后台线程，结果按
-  （patch StatusRevision, 启用插件集合哈希）缓存；面板打开即显缓存结果 + "重新检查"按钮强刷。
-- 创建房间时的权威收集（模拟线程 `StartHostOnSimulation`）保留不变——那是设计好的权威检查。
+- **诊断修正（实现时复核）**：`PackageManager`/`PluginManager`/`SteamHelper` 是主线程亲和的
+  游戏单例，不能挪到任意工作线程；"后台化"的正确形态是**排队到模拟线程评估 + UI 只读缓存**。
+- **实现**：`ForgeRoomPreflight` 增加缓存层——`RequestEvaluation(force, patchRevision)`
+  排队到模拟线程（`Scheduler.QueueSimulation`，线程亲和纪律不变），UI 每帧只读
+  `PeekCached()`；缓存按 patch revision 键控，显式"重新检查"按钮与 revision 变化强制重评。
+  `ForgeHostGamePanel` 不再在 Start/Update/CreateRoom 内联执行收集（此前每次面板打开、
+  每次 patch revision 变化、每次点击创建都会在 UI 线程全量收集）；`StopImmediately` 清缓存。
+- **验收**：单测 195/195；net35 构建 0 警告 0 错误；真机确认"打开开房面板不再卡顿、
+  检查期间显示'正在检查'、按钮在报告落地后解锁"。
 
-### WP-1.7 LiteNetLib 池回收
+### WP-1.7 LiteNetLib 池回收（待做）
 
 - `LiteNetServerTransport`/`LiteNetClientTransport` 的 NetManager 设 `AutoRecycle = true`
   （或每条退出路径 `reader.Recycle()`）。一行止血每包 GC 压力。
 
-### WP-1.8 LocalIpv4 修复（S1）
+### WP-1.8 LocalIpv4 修复（S1）—— 已实现，已真机验证
 
-- 现状：`ForgeMultiplayerUi.cs:135-146` `Dns.GetHostAddresses(主机名)` 取首个非回环 IPv4，
-  本机实测抓到无网关的虚拟网卡 2.0.0.1，真实内网地址 10.244.185.121 被跳过；
-  邀请码（`BuildInviteCode`）随之不可达。
-- **改动**：用 `NetworkInterface.GetAllNetworkInterfaces()` 过滤：`OperationalStatus.Up`、
-  有 IPv4 默认网关、隧道/虚拟交换机类型排除；取默认路由接口的 IPv4；
-  UI 上允许手动改写（地址可见可编辑即已兜底）。
-- **验收**：在本机（多网卡 + VPN）返回 10.244.185.121；单网卡机器行为不变。
+- `ForgeMultiplayerUi.LocalIpv4` 改用 `NetworkInterface.GetAllNetworkInterfaces()`：
+  Up 且拥有 IPv4 默认网关、非 Loopback/Tunnel 的接口优先，排除 169.254 链路本地地址；
+  无匹配时回退原 DNS 探测。注意 `GatewayIPv4Addresses` 在 net35/net8 不可用，
+  使用 `GatewayAddresses` 按族过滤（真机验证时抓出该编译错误）。
+- **真机证据**：同一算法的独立控制台程序在本机（多网卡 + Hyper-V/WSL 虚拟交换机）
+  返回 `10.244.185.121`（以太网 2，网关 10.244.0.1），正确跳过无网关的
+  `2.0.0.1`（以太网 4）与两个 vEthernet 虚拟交换机。
 
 ## 3. 非目标与红线
 

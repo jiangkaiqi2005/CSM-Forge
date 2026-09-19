@@ -46,7 +46,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static bool CellEquivalent(DistrictCellStateV2 a, DistrictCellStateV2 b)
         {
-            if (a == null || b == null || a.Index != b.Index) return false;
+            if (a.Index != b.Index) return false; // WP-1.3: value type, nothing to null-check
             for (int slot = 0; slot < 4; slot++)
                 if (a.AlphaAt(slot) != b.AlphaAt(slot) ||
                     (a.AlphaAt(slot) != 0 && !a.IdentityAt(slot).Equals(b.IdentityAt(slot)))) return false;
@@ -92,7 +92,7 @@ namespace CsmForge.Runtime.Cities1
         public static void ApplyCell(LoadIdentity load, DistrictCellStateV2 state, EntityIdMapV2 ids)
         {
             DistrictManager manager = DistrictManager.instance;
-            if (!RuntimeServices.Lifecycle.IsCurrent(load) || manager == null || state == null || state.Index >= manager.m_districtGrid.Length)
+            if (!RuntimeServices.Lifecycle.IsCurrent(load) || manager == null || state.Index >= manager.m_districtGrid.Length)
                 throw new InvalidOperationException("District cell apply is invalid.");
             DistrictManager.Cell cell = manager.m_districtGrid[state.Index];
             cell.m_district1 = state.Alpha1 == 0 || !state.District1.IsValid ? (byte)0 : Native(state.District1, ids); cell.m_alpha1 = state.Alpha1;
@@ -152,6 +152,11 @@ namespace CsmForge.Runtime.Cities1
 
         public Hash256 CurrentRoot { get { return Committed.Root; } }
         public bool TryResolve(uint nativeId, out EntityIdentityV2 identity) { return Ids.TryGetIdentity(nativeId, out identity); }
+
+        /// <summary>WP-1.4b: Harmony hooks flag the touched grid shard for the cheap reconcile.</summary>
+        internal void MarkCellSourceDirty(uint cellIndex) { Committed.MarkCellSourceDirty(cellIndex); }
+        internal void MarkAllCellsSourceDirty() { Committed.MarkAllCellsSourceDirty(); }
+        internal bool HasSourceDirtyShards() { return Committed.HasSourceDirtyShards(); }
 
         private void SeedMappings()
         {
@@ -266,6 +271,57 @@ namespace CsmForge.Runtime.Cities1
         }
 
         internal DistrictMutationV2 ObserveHostWorld() { return ReconcileAll(); }
+
+        // inherited from DistrictDomainBase: internal bool HasSourceDirtyShards() { return Committed.HasSourceDirtyShards(); }
+
+        /// <summary>
+        /// WP-1.4b cheap path: reconciles only the shards the ModifyCell/ReleaseDistrict hooks
+        /// marked. Entity capture still runs (cheap, <= 255 districts) so a host-side
+        /// CreateDistrict rides along with its first painted cells. Entity changes apply before
+        /// the cell mutation is built, keeping ValidateReferences satisfied.
+        /// </summary>
+        internal DistrictMutationV2 ObserveHostSourceDirty()
+        {
+            List<DistrictEntityStateV2> upsertEntities = new List<DistrictEntityStateV2>();
+            List<EntityIdentityV2> deleteEntities = new List<EntityIdentityV2>();
+            for (int i = 1; i < DistrictManager.instance.m_districts.m_buffer.Length && i <= byte.MaxValue; i++)
+            {
+                byte native = (byte)i; if (!DistrictGameAccess.Live(native)) continue;
+                EntityIdentityV2 identity;
+                if (!Ids.TryGetIdentity(native, out identity)) identity = Ids.Allocate(native);
+                DistrictEntityStateV2 actual = DistrictGameAccess.CaptureEntity(identity, native);
+                DistrictEntityStateV2 old;
+                if (!Committed.TryGetEntity(identity, out old) || old.RandomSeed != actual.RandomSeed || old.Style != actual.Style)
+                    upsertEntities.Add(actual);
+            }
+            EntityMapEntryV2[] mappings = Ids.SnapshotEntries();
+            for (int i = 0; i < mappings.Length; i++)
+                if (mappings[i].NativeId <= byte.MaxValue && !DistrictGameAccess.Live((byte)mappings[i].NativeId))
+                    deleteEntities.Add(mappings[i].Identity);
+
+            List<DistrictCellStateV2> changed = Committed.ReconcileCellsSourceDirty(CaptureShardSource);
+            if (upsertEntities.Count == 0 && deleteEntities.Count == 0 && changed.Count == 0) return null;
+            upsertEntities.Sort(delegate(DistrictEntityStateV2 a, DistrictEntityStateV2 b) { return a.Entity.EntityId.CompareTo(b.Entity.EntityId); });
+            deleteEntities.Sort(delegate(EntityIdentityV2 a, EntityIdentityV2 b) { return a.EntityId.CompareTo(b.EntityId); });
+            changed.Sort(delegate(DistrictCellStateV2 a, DistrictCellStateV2 b) { return a.Index.CompareTo(b.Index); });
+            DistrictMutationV2 mutation = new DistrictMutationV2(upsertEntities.ToArray(), deleteEntities.ToArray(), changed.ToArray());
+            Committed.Apply(mutation); // cells re-apply idempotently; entity validation runs here
+            for (int i = 0; i < deleteEntities.Count; i++) Ids.Retire(deleteEntities[i]);
+            return mutation;
+        }
+
+        private IDictionary<uint, DistrictCellStateV2> CaptureShardSource(int shard)
+        {
+            Dictionary<uint, DistrictCellStateV2> cells = new Dictionary<uint, DistrictCellStateV2>(DistrictShardedCellIndex.CellsPerShard);
+            uint start = (uint)(shard * DistrictShardedCellIndex.CellsPerShard);
+            for (uint offset = 0; offset < DistrictShardedCellIndex.CellsPerShard; offset++)
+            {
+                uint index = start + offset;
+                DistrictCellStateV2 cell = DistrictGameAccess.CaptureCell(index, Ids);
+                cells[index] = cell;
+            }
+            return cells;
+        }
     }
 
     public sealed class DistrictReplicaDomain : DistrictDomainBase, IReplicaDomainV2
@@ -276,7 +332,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))

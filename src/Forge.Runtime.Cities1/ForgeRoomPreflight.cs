@@ -21,6 +21,61 @@ namespace CsmForge.Runtime.Cities1
     /// </summary>
     internal static class ForgeRoomPreflight
     {
+        private static readonly object CacheGate = new object();
+        private static ForgeRoomPreflightReport cachedReport;
+        private static uint cachedPatchRevision;
+        private static bool evaluationInFlight;
+
+        /// <summary>UI thread: latest finished report, or null while the first evaluation runs.</summary>
+        internal static ForgeRoomPreflightReport PeekCached()
+        { lock (CacheGate) return cachedReport; }
+
+        internal static uint CachedPatchRevision()
+        { lock (CacheGate) return cachedPatchRevision; }
+
+        internal static bool EvaluationInFlight()
+        { lock (CacheGate) return evaluationInFlight; }
+
+        internal static void Invalidate()
+        { lock (CacheGate) { cachedReport = null; cachedPatchRevision = 0; evaluationInFlight = false; } }
+
+        /// <summary>
+        /// WP-1.6: queue the manifest collection onto the simulation thread — PackageManager,
+        /// PluginManager and SteamHelper are main-thread-affine, so a worker thread is not safe.
+        /// The UI thread only reads the cached immutable report and never blocks. force
+        /// re-collects even when a report for the current patch revision is already cached.
+        /// </summary>
+        internal static void RequestEvaluation(bool force, uint patchRevision)
+        {
+            lock (CacheGate)
+            {
+                if (evaluationInFlight) return;
+                if (!force && cachedReport != null && cachedPatchRevision == patchRevision) return;
+                evaluationInFlight = true;
+            }
+            LoadIdentity identity = RuntimeServices.Lifecycle.Current;
+            Action evaluation = delegate
+            {
+                ForgeRoomPreflightReport report = RuntimeServices.Lifecycle.IsCurrent(identity) ? EvaluateHost() : null;
+                lock (CacheGate)
+                {
+                    if (report != null) { cachedReport = report; cachedPatchRevision = patchRevision; }
+                    evaluationInFlight = false;
+                }
+            };
+            if (RuntimeServices.Scheduler.QueueSimulation(identity, evaluation)) return;
+            // Queue rejected (stale identity or no game thread): evaluate inline — at the main
+            // menu EvaluateHost exits before touching PackageManager, so this stays cheap.
+            ForgeRoomPreflightReport inline = null;
+            try { if (RuntimeServices.Lifecycle.IsCurrent(identity)) inline = EvaluateHost(); }
+            catch (Exception) { inline = null; }
+            lock (CacheGate)
+            {
+                if (inline != null) { cachedReport = inline; cachedPatchRevision = patchRevision; }
+                evaluationInFlight = false;
+            }
+        }
+
         public static ForgeRoomPreflightReport EvaluateHost()
         {
             if (!RuntimeServices.Patches.Installed)
@@ -54,13 +109,27 @@ namespace CsmForge.Runtime.Cities1
             }
             catch (Exception error)
             {
-                return Blocked("无法读取当前 DLC/Mod/资产清单：" + error.GetType().Name +
-                    "。请写入诊断日志后检查安装。");
+                // S2: surface the full cause chain (e.g. the aggregated Game Anarchy option list)
+                // instead of only the exception type name — the player must be able to act on it.
+                return Blocked("无法读取当前 DLC/Mod/资产清单：" + DescribeCause(error) +
+                    "。请按原因处理后重试；详细上下文见游戏日志。");
             }
         }
 
         private static ForgeRoomPreflightReport Blocked(string message)
         { return new ForgeRoomPreflightReport(false, "无法创建房间：" + message); }
+
+        /// <summary>Flattens the exception chain into one bounded, player-readable line.</summary>
+        private static string DescribeCause(Exception error)
+        {
+            StringBuilder value = new StringBuilder();
+            for (Exception current = error; current != null && value.Length < 600; current = current.InnerException)
+            {
+                if (value.Length != 0) value.Append(" < ");
+                value.Append(current.GetType().Name).Append(": ").Append(current.Message);
+            }
+            return value.ToString();
+        }
 
         private static string FriendlyIds(string[] ids)
         {

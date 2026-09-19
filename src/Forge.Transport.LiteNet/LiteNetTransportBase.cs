@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Threading;
 using LiteNetLib;
@@ -44,7 +45,7 @@ namespace CsmForge.Transport.LiteNet
 
         protected static byte[] ReadPacket(NetPacketReader reader)
         {
-            if (reader == null) throw new ArgumentNullException("reader");
+            Check.NotNull(reader, "reader");
             byte[] bytes = reader.GetRemainingBytes();
             return bytes == null || bytes.Length == 0 || bytes.Length > MaxPacketBytes ? null : bytes;
         }

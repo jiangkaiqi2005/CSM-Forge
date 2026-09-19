@@ -96,7 +96,7 @@ namespace CsmForge.Core
         {
             Check.Stamp(stamp);
             if (connectionBinding == Guid.Empty) throw new ArgumentException("Missing connection binding.", "connectionBinding");
-            if (root == null) throw new ArgumentNullException("root");
+            Check.NotNull(root, "root");
             if (pendingBatches < 0 || pendingBatches > 4096) throw new ArgumentOutOfRangeException("pendingBatches");
             Stamp = stamp;
             ConnectionBinding = connectionBinding;

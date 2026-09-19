@@ -153,14 +153,14 @@ namespace CsmForge.Core
 
         public void Seed(TransportLineStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (values.ContainsKey(value.Entity.EntityId)) throw new InvalidOperationException("Duplicate transport line identity.");
             values.Add(value.Entity.EntityId, value);
         }
 
         public void Apply(TransportLineMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
             for (int i = 0; i < mutation.Upserts.Length; i++)
             {
                 TransportLineStateV2 value = mutation.Upserts[i]; TransportLineStateV2 current;
@@ -248,7 +248,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(TransportLineIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind);
@@ -317,7 +317,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(TransportLineMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(MutationMagic);

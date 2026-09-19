@@ -43,7 +43,7 @@ namespace CsmForge.Runtime.Cities1
         public static string Apply(LoadIdentity load, StableNameStateV2 requested, uint nativeId)
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Name apply belongs to a stale load.");
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             IEnumerator action;
             using (RuntimeScopeGuard.EnterApply(load, StableNameAuthorityDomain.Id))
             {
@@ -180,7 +180,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             StableNameStateV2 requested = StableNameCodecV2.Decode(absoluteDelta);
             uint native = ResolveNative(requested.Key);
             string actual = StableNameGameAccess.Apply(Load, requested, native);

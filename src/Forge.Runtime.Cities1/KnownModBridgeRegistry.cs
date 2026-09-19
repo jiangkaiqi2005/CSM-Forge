@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Reflection;
 using HarmonyLib;
@@ -64,7 +65,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void InstallOptionalPatches(Harmony harmony)
         {
-            if (harmony == null) throw new ArgumentNullException("harmony");
+            Check.NotNull(harmony, "harmony");
             EnabledPluginCatalog enabled = EnabledPluginCatalog.Capture();
             lock (Gate)
             {

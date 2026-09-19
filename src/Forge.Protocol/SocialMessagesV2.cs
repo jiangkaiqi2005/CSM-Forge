@@ -98,7 +98,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeRoster(RosterSnapshotV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -129,7 +129,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeChatSubmit(ChatSubmitV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             { BinaryWriter writer = new BinaryWriter(stream); WriteString(writer, value.Text, 512); writer.Flush(); return stream.ToArray(); }
         }
@@ -142,7 +142,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeChatEvent(ChatEventV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); WriteMember(writer, value.Member);
@@ -162,7 +162,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodePresentation(PlayerPresentationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); WriteMember(writer, value.Member);

@@ -22,7 +22,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void Rebuild(IForgeAdapterContextV1 context)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             List<EntityMapEntryV2>[] building = new List<EntityMapEntryV2>[shardCount];
             EntityMapEntryV2[] mappings = context.SnapshotMappings();
             for (int i = 0; i < mappings.Length; i++)

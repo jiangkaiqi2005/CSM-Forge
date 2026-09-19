@@ -24,7 +24,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static SimulationClockStateV2 Apply(LoadIdentity load, SimulationClockStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Simulation clock apply belongs to a stale load.");
             if (PauseField == null || SpeedField == null) throw new MissingFieldException("SimulationManager pause/speed fields are unavailable.");
             SimulationManager manager = SimulationManager.instance;
@@ -80,7 +80,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))

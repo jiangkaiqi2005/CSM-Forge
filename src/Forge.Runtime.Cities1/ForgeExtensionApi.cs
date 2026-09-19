@@ -106,19 +106,19 @@ namespace CsmForge.Runtime.Cities1
 
         public static void Register(IForgeStateAdapterV1 adapter)
         {
-            if (adapter == null) throw new ArgumentNullException("adapter");
+            Check.NotNull(adapter, "adapter");
             RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, adapter, null, null);
         }
 
         public static void Register(IForgeStateAdapterV2 adapter)
         {
-            if (adapter == null) throw new ArgumentNullException("adapter");
+            Check.NotNull(adapter, "adapter");
             RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, adapter, null);
         }
 
         public static void Register(IForgeShardedStateAdapterV1 adapter)
         {
-            if (adapter == null) throw new ArgumentNullException("adapter");
+            Check.NotNull(adapter, "adapter");
             if (adapter.ShardCount <= 0 || adapter.ShardCount > 1024)
                 throw new ArgumentOutOfRangeException("adapter", "ShardCount must be 1..1024.");
             RegisterCore(adapter.AdapterId, adapter.SchemaVersion, adapter.GetType().Assembly, null, null, adapter);
@@ -209,7 +209,7 @@ namespace CsmForge.Runtime.Cities1
         {
             ValidateId(adapterId);
             if (schemaVersion == 0) throw new ArgumentOutOfRangeException("schemaVersion", "SchemaVersion must be non-zero.");
-            if (assembly == null) throw new ArgumentNullException("assembly");
+            Check.NotNull(assembly, "assembly");
             int implementations = (v1 == null ? 0 : 1) + (v2 == null ? 0 : 1) + (sharded == null ? 0 : 1);
             if (implementations != 1) throw new ArgumentException("Exactly one adapter state surface must be registered.");
             lock (Gate)

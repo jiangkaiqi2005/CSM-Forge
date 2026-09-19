@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Collections.Generic;
 using System.Net;
@@ -25,7 +26,7 @@ namespace CsmForge.Transport.LiteNet
             if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException("port");
             if (string.IsNullOrEmpty(key) || key.Length > 128) throw new ArgumentException("Invalid room key.", "key");
             EventBasedNetListener listener = new EventBasedNetListener();
-            NetManager manager = new NetManager(listener);
+            NetManager manager = new NetManager(listener) { AutoRecycle = true }; // WP-1.7: recycle pooled packets per receive
             listener.ConnectionRequestEvent += delegate(ConnectionRequest request) { request.AcceptIfKey(roomKey); };
             listener.PeerConnectedEvent += OnConnected;
             listener.PeerDisconnectedEvent += OnDisconnected;

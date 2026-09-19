@@ -22,6 +22,9 @@ namespace CsmForge.Runtime.Cities1
                 IAuthorityDomainV2[] domains = CreateHostDomains(load);
                 authority = new AuthorityCoordinatorV2(new SessionStamp(load.WorldId, load.Epoch), domains);
                 joins = new JoinCoordinator(MonotonicMilliseconds);
+                long gridVerifyNow = MonotonicMilliseconds();
+                districtVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
+                zoneVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);
                 hostDisplayName = displayName;
@@ -191,6 +194,7 @@ namespace CsmForge.Runtime.Cities1
         private void PumpSnapshotTransfers()
         {
             if (snapshotSave != null) return;
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
             {
                 if (peer.SnapshotCursor == null) continue;
@@ -201,12 +205,19 @@ namespace CsmForge.Runtime.Cities1
                     peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null;
                     continue;
                 }
-                SendServerFrame(peer, MessageKindV2.SnapshotChunk, SnapshotTransferMessagesV2.EncodeChunk(chunk));
+                if (!TrySendServerFrame(peer, MessageKindV2.SnapshotChunk, SnapshotTransferMessagesV2.EncodeChunk(chunk)))
+                {
+                    // WP-1.2: a dead download peer degrades to eviction, not a fenced room.
+                    if (dead == null) dead = new List<HostPeer>();
+                    dead.Add(peer);
+                    continue;
+                }
                 if (peer.SnapshotCursor.Complete)
                 {
                     peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null;
                 }
             }
+            EvictDeadHostPeers(dead);
         }
 
         private void HandleHostSessionFrame(HostPeer peer, byte[] bytes)
@@ -392,8 +403,11 @@ namespace CsmForge.Runtime.Cities1
                     SessionPlayerRoleV2.Client, peer.Live ? SessionPlayerPhaseV2.Live : SessionPlayerPhaseV2.Joining));
             if (values.Count == 0) return;
             byte[] payload = SocialMessagesV2.EncodeRoster(new RosterSnapshotV2(values.ToArray()));
+            // Tolerant on purpose (WP-1.2): BroadcastRoster also runs inside RemoveHostPeer, so a
+            // failed roster send must not evict recursively — the dead peer is dropped by its own
+            // failed-send path or transport disconnect event.
             foreach (HostPeer peer in hostPeers.Values)
-                if (peer.SessionReady) SendServerFrame(peer, MessageKindV2.RosterSnapshot, payload);
+                if (peer.SessionReady) TrySendServerFrame(peer, MessageKindV2.RosterSnapshot, payload);
         }
 
         private void ExpireHostJoins()

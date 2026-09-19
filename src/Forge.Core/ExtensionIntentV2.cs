@@ -28,7 +28,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(ExtensionPlayerIntentV2 intent)
         {
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))
             {

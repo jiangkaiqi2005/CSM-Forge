@@ -8,7 +8,7 @@ namespace CsmForge.Protocol
     {
         public static byte[] EncodeIntent(PlayerIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -47,7 +47,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeBatch(AuthorityBatch value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -93,7 +93,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeAppliedAck(AppliedAck value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

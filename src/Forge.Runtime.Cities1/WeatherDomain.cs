@@ -20,7 +20,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static WeatherStateV2 ApplyFull(LoadIdentity load, WeatherStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (!RuntimeServices.Lifecycle.IsCurrent(load))
                 throw new InvalidOperationException("Weather apply belongs to a stale load.");
             WeatherManager manager = WeatherManager.instance;
@@ -91,7 +91,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             WeatherStateV2 requested = WeatherDomainCodecV2.Decode(absoluteDelta);
             committed = WeatherGameAccess.ApplyFull(load, requested);
             if (!StateRoot.Equals(expectedAfterRoot))

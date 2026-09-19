@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.IO;
 using System.Reflection;
@@ -312,7 +313,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void ValidateShard(IForgeAdapterContextV1 context, int shardIndex)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             if (shardIndex < 0 || shardIndex >= GridResolution) throw new ArgumentOutOfRangeException("shardIndex");
         }
 

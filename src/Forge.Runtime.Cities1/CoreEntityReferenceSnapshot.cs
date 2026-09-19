@@ -18,7 +18,7 @@ namespace CsmForge.Runtime.Cities1
 
         private CoreEntityReferenceSnapshot(SavedEntityDomainV2[] domains)
         {
-            if (domains == null) throw new ArgumentNullException("domains");
+            Check.NotNull(domains, "domains");
             for (int i = 0; i < domains.Length; i++)
             {
                 SavedEntityDomainV2 domain = domains[i];

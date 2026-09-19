@@ -33,7 +33,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static byte[] Encode(ForgeSaveMetadata metadata)
         {
-            if (metadata == null) throw new ArgumentNullException("metadata");
+            Check.NotNull(metadata, "metadata");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -80,7 +80,7 @@ namespace CsmForge.Runtime.Cities1
 
         public ForgeSaveMetadataStore(RuntimeEventLog events)
         {
-            if (events == null) throw new ArgumentNullException("events");
+            Check.NotNull(events, "events");
             this.events = events;
         }
 

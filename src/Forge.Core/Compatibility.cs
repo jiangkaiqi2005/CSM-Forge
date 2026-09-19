@@ -11,10 +11,7 @@ namespace CsmForge.Core
         public Hash256 ConfigurationHash { get; private set; }
         public ComponentFingerprint(string id, Hash256 binaryHash, Hash256 configurationHash)
         {
-            if (string.IsNullOrEmpty(id) || id.Length > 128) throw new ArgumentException("Invalid component identity.", "id");
-            foreach (char value in id)
-                if (!((value >= 'a' && value <= 'z') || (value >= '0' && value <= '9') || value == '.' || value == ':' || value == '-' || value == '_'))
-                    throw new ArgumentException("Component IDs use canonical lowercase ASCII.", "id");
+            Check.CanonicalId(id, 128, "id", "Invalid component identity."); // D2: shared canonical guard
             if (binaryHash == null || configurationHash == null) throw new ArgumentNullException("binaryHash");
             Id = id; BinaryHash = binaryHash; ConfigurationHash = configurationHash;
         }
@@ -35,9 +32,13 @@ namespace CsmForge.Core
             GameBuildHash = gameBuildHash; SchemaHash = schemaHash;
             components = Collect(entries);
         }
+
+        /// <summary>Canonical, pre-validated component view; callers must not mutate (D1-1).</summary>
+        internal Dictionary<string, ComponentFingerprint> Components { get { return components; } }
+
         internal static Dictionary<string, ComponentFingerprint> Collect(IEnumerable<ComponentFingerprint> entries)
         {
-            if (entries == null) throw new ArgumentNullException("entries");
+            Check.NotNull(entries, "entries");
             Dictionary<string, ComponentFingerprint> result = new Dictionary<string, ComponentFingerprint>(StringComparer.Ordinal);
             foreach (ComponentFingerprint entry in entries)
             {
@@ -89,7 +90,7 @@ namespace CsmForge.Core
         // Validate every client before registering a transport connection in HostSession.
         public string[] Evaluate(CompatibilityManifest manifest)
         {
-            if (manifest == null) throw new ArgumentNullException("manifest");
+            Check.NotNull(manifest, "manifest");
             List<string> errors = new List<string>();
             if (!gameBuild.Equals(manifest.GameBuildHash)) errors.Add("game-build-mismatch");
             if (!schema.Equals(manifest.SchemaHash)) errors.Add("schema-mismatch");

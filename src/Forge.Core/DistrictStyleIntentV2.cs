@@ -26,7 +26,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(DistrictStyleIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(Marker);

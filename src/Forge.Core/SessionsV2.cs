@@ -138,7 +138,7 @@ namespace CsmForge.Core
 
         public JoinCoordinator(Func<long> monotonicMilliseconds)
         {
-            if (monotonicMilliseconds == null) throw new ArgumentNullException("monotonicMilliseconds");
+            Check.NotNull(monotonicMilliseconds, "monotonicMilliseconds");
             clock = monotonicMilliseconds;
         }
 

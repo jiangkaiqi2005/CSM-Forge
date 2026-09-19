@@ -56,7 +56,7 @@ namespace CsmForge.Core
 
         public SnapshotAssembler(SnapshotManifest manifest, Stream emptyTemporaryStorage)
         {
-            if (manifest == null) throw new ArgumentNullException("manifest");
+            Check.NotNull(manifest, "manifest");
             if (emptyTemporaryStorage == null || !emptyTemporaryStorage.CanRead ||
                 !emptyTemporaryStorage.CanWrite || !emptyTemporaryStorage.CanSeek || emptyTemporaryStorage.Length != 0)
                 throw new ArgumentException("An empty, readable, writable, seekable temporary stream is required.", "emptyTemporaryStorage");

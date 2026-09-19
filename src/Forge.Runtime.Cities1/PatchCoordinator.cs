@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Reflection;
 using CitiesHarmony.API;
@@ -17,7 +18,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CitiesPatchCoordinator(RuntimeEventLog events)
         {
-            if (events == null) throw new ArgumentNullException("events");
+            Check.NotNull(events, "events");
             this.events = events;
         }
 

@@ -45,7 +45,7 @@ namespace CsmForge.Core
         public TaxStateV2 Requested { get; private set; }
         public TaxIntentV2(TaxStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             Requested = requested;
         }
     }
@@ -58,7 +58,7 @@ namespace CsmForge.Core
 
         public void Upsert(TaxStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             values[value.Key] = value;
         }
 
@@ -87,7 +87,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(TaxStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -105,7 +105,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(TaxIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return Encode(value.Requested);
         }
         public static TaxIntentV2 DecodeIntent(byte[] bytes) { return new TaxIntentV2(Decode(bytes)); }

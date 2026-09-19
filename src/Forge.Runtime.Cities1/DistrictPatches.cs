@@ -173,6 +173,36 @@ namespace CsmForge.Runtime.Cities1
         }
     }
 
+
+    /// <summary>
+    /// WP-1.4b: DistrictManager.ModifyCell is the single grid-cell writer (the brush, mods and
+    /// ReleaseDistrictImplementation all land here). The postfix only flags the touched 512-cell
+    /// shard as source-dirty so the cheap reconcile re-reads it; the authoritative publish for
+    /// player brushes stays in DistrictToolApplyBrushAuthorityPatch.
+    /// </summary>
+    [HarmonyPatch(typeof(DistrictManager), "ModifyCell")]
+    internal static class DistrictModifyCellSourceDirtyPatch
+    {
+        public static void Postfix(int x, int z)
+        {
+            if (RuntimeScopeGuard.IsApplying) return;
+            if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
+            RuntimeServices.Multiplayer.MarkDistrictCellSourceDirty((uint)(z * 512 + x));
+        }
+    }
+
+    /// <summary>WP-1.4b: ReleaseDistrictImplementation clears cells across the whole map.</summary>
+    [HarmonyPatch(typeof(DistrictManager), "ReleaseDistrict")]
+    internal static class DistrictReleaseSourceDirtyPatch
+    {
+        public static void Postfix()
+        {
+            if (RuntimeScopeGuard.IsApplying) return;
+            if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
+            RuntimeServices.Multiplayer.MarkAllDistrictShardsSourceDirty();
+        }
+    }
+
     internal static class DistrictPolicyPatchHelper
     {
         public static bool District(DistrictPolicies.Policies policy, byte native, bool enabled)

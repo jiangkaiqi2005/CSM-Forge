@@ -37,7 +37,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureAbsolute(IForgeAdapterContextV1 context)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             DistrictManager manager = DistrictManager.instance;
             if (manager == null) throw new InvalidOperationException("DistrictManager is unavailable.");
             List<ParkState> states = new List<ParkState>();

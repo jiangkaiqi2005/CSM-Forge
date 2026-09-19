@@ -23,7 +23,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             ValidateShard(shardIndex);
             TerrainManager manager = TerrainManager.instance;
             ushort[] heights = manager == null ? null : manager.RawHeights;
@@ -51,7 +51,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyShard(IForgeAdapterContextV1 context, int shardIndex, byte[] state)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             if (state == null || state.Length == 0 || state.Length > Limits.FramePayloadBytes)
                 throw new InvalidDataException("Invalid terrain height shard size.");
             ValidateShard(shardIndex);

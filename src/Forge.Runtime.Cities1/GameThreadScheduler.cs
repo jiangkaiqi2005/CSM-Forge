@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using ICities;
 
@@ -19,7 +20,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void Attach(IThreading value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             lock (gate) threading = value;
             events.Record(RuntimeEventCode.ThreadingCreated, lifecycle.Current.Generation, null);
         }
@@ -42,7 +43,7 @@ namespace CsmForge.Runtime.Cities1
 
         private bool Queue(LoadIdentity identity, Action action, bool simulation)
         {
-            if (action == null) throw new ArgumentNullException("action");
+            Check.NotNull(action, "action");
             if (!lifecycle.IsCurrent(identity))
             {
                 events.Record(RuntimeEventCode.StaleWorkRejected, identity.Generation, "enqueue");

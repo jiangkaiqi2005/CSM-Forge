@@ -20,14 +20,14 @@ namespace CsmForge.Core
 
         public static Hash256 Compute(byte[] value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (SHA256 hash = SHA256.Create())
                 return new Hash256(hash.ComputeHash(value));
         }
 
         public static Hash256 Compute(Stream stream)
         {
-            if (stream == null) throw new ArgumentNullException("stream");
+            Check.NotNull(stream, "stream");
             using (SHA256 hash = SHA256.Create())
                 return new Hash256(hash.ComputeHash(stream));
         }

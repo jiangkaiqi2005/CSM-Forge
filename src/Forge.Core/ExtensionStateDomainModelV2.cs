@@ -42,7 +42,7 @@ namespace CsmForge.Core
 
         public ExtensionStateSnapshotV2(IEnumerable<ExtensionStateEntryV2> values)
         {
-            if (values == null) throw new ArgumentNullException("values");
+            Check.NotNull(values, "values");
             entries = Normalize(values);
             Root = ComputeAggregateRoot(entries);
         }
@@ -111,13 +111,13 @@ namespace CsmForge.Core
 
         public static byte[] Encode(ExtensionStateSnapshotV2 snapshot)
         {
-            if (snapshot == null) throw new ArgumentNullException("snapshot");
+            Check.NotNull(snapshot, "snapshot");
             return EncodeEntries(snapshot.Entries);
         }
 
         public static byte[] EncodeDelta(ExtensionStateEntryV2 entry)
         {
-            if (entry == null) throw new ArgumentNullException("entry");
+            Check.NotNull(entry, "entry");
             return EncodeEntries(new[] { entry });
         }
 

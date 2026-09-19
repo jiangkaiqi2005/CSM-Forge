@@ -103,7 +103,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void Apply(DemandControllerBridgeState value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             ValidateDemand(value.ResidentialDemand); ValidateDemand(value.CommercialDemand); ValidateDemand(value.WorkplaceDemand);
             Type type = ResolveType();
             if (type == null) throw new InvalidOperationException("Demand Controller is not loaded.");

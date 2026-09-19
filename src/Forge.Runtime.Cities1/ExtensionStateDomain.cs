@@ -24,7 +24,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CitiesExtensionStateRegistry(ForgeStateAdapterRegistration[] registrations, bool authoritative)
         {
-            if (registrations == null) throw new ArgumentNullException("registrations");
+            Check.NotNull(registrations, "registrations");
             adapters = (ForgeStateAdapterRegistration[])registrations.Clone();
             contexts = new ForgeAdapterContextV1[adapters.Length];
             List<EntryDescriptor> descriptors = new List<EntryDescriptor>();
@@ -89,7 +89,7 @@ namespace CsmForge.Runtime.Cities1
 
         public ExtensionStateEntryV2 ApplyOne(LoadIdentity load, ExtensionStateEntryV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             int entryIndex = FindEntryIndex(requested.AdapterId, requested.Key);
             if (entryIndex < 0) throw new InvalidOperationException("Extension delta references an unaccepted adapter state entry.");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension apply belongs to a stale load.");
@@ -229,7 +229,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             ExtensionStateEntryV2 requested = ExtensionStateCodecV2.DecodeDelta(absoluteDelta);
             int index = registry.FindEntryIndex(requested.AdapterId, requested.Key);
             if (index < 0 || index >= committed.Length) throw new InvalidOperationException("Extension delta references an unknown adapter state entry.");

@@ -218,7 +218,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected NetMutationV2 Reconcile(NetWorldSnapshotV2 before, int constructionCost, int refund)
         {
-            if (before == null) throw new ArgumentNullException("before");
+            Check.NotNull(before, "before");
             List<NetNodeStateV2> upsertNodes = new List<NetNodeStateV2>();
             List<EntityIdentityV2> deleteNodes = new List<EntityIdentityV2>();
             List<NetSegmentStateV2> upsertSegments = new List<NetSegmentStateV2>();
@@ -409,7 +409,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             NetMutationV2 mutation = NetDomainCodecV2.DecodeMutation(absoluteDelta);
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) ||

@@ -43,7 +43,7 @@ namespace CsmForge.Protocol
 
         public static byte[] Encode(Frame frame)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
+            Check.NotNull(frame, "frame");
             byte[] body;
             byte[] payload = frame.Payload;
             using (MemoryStream stream = new MemoryStream())
@@ -101,7 +101,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeIntent(Intent intent)
         {
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -125,7 +125,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeCommit(Commit commit)
         {
-            if (commit == null) throw new ArgumentNullException("commit");
+            Check.NotNull(commit, "commit");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

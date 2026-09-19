@@ -26,7 +26,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             ValidateShard(shardIndex);
             EnsureCache(context.IsAuthoritative, false);
             BuildingManager manager = BuildingManager.instance;

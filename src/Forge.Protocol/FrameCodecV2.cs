@@ -103,7 +103,7 @@ namespace CsmForge.Protocol
 
         public static byte[] Encode(SessionFrameV2 frame)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
+            Check.NotNull(frame, "frame");
             byte[] payload = frame.Payload;
             byte[] body;
             using (MemoryStream stream = new MemoryStream())
@@ -242,7 +242,7 @@ namespace CsmForge.Protocol
 
         public static byte[] Encode(BootstrapFrame frame)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
+            Check.NotNull(frame, "frame");
             byte[] payload = frame.Payload;
             byte[] body;
             using (MemoryStream stream = new MemoryStream())

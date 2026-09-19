@@ -31,7 +31,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public static byte[] EncodeIntent(WaterBudgetIntent value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return new byte[] { value.Night ? (byte)1 : (byte)0, (byte)value.Budget };
         }
         public static WaterBudgetIntent DecodeIntent(byte[] bytes)
@@ -41,7 +41,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public static byte[] EncodeState(WaterBudgetState value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return new byte[] { (byte)value.Day, (byte)value.Night };
         }
         public static WaterBudgetState DecodeState(byte[] bytes)
@@ -115,7 +115,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))

@@ -21,7 +21,7 @@ namespace CsmForge.Runtime.Cities1
         }
 
         public static bool Prefix(DistrictTool.Layer layer, byte districtOrPark, float brushRadius,
-            Vector3 startPosition, Vector3 endPosition, bool force, out IDisposable __state)
+            Vector3 startPosition, Vector3 endPosition, bool notOverride, out IDisposable __state)
         {
             __state = null;
             if (RuntimeScopeGuard.IsApplying || (layer & DistrictTool.Layer.Parks) == 0) return true;
@@ -62,7 +62,7 @@ namespace CsmForge.Runtime.Cities1
             try
             {
                 intent = ParkGridStateAdapter.EncodeBrush(kind, target, parkType, parkLevel,
-                    brushRadius, startPosition, endPosition, force);
+                    brushRadius, startPosition, endPosition, notOverride);
             }
             catch
             {

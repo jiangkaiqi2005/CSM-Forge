@@ -66,6 +66,34 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
                        source.index("internal static class DistrictCreateSlotBarrierPatch")]
         self.assertIn("bool notOverride, out DistrictBrushAuthorityState __state", patch)
         self.assertNotIn("bool force, out DistrictBrushAuthorityState __state", patch)
+        park = (RUNTIME / "ParkGridPatches.cs").read_text(encoding="utf-8")
+        self.assertIn("bool notOverride, out IDisposable __state", park)
+        self.assertNotIn("bool force, out IDisposable __state", park)
+
+    def test_client_segment_bulldoze_matches_cs1_dual_segment_coroutine(self):
+        source = (RUNTIME / "NetBulldozePatches.cs").read_text(encoding="utf-8")
+        patch = source[source.index("internal static class ClientBulldozeSegmentIntentPatch"):
+                       source.index("internal static class ClientBulldozeNodeIntentPatch")]
+        self.assertIn("parameters.Length == 2", patch)
+        self.assertIn("parameters[1].ParameterType == typeof(ushort)", patch)
+        self.assertIn("Prefix(ushort segment, ushort segment2, ref IEnumerator __result)", patch)
+        self.assertIn("TryResolveClientNetSegment(segment2, out entity2)", patch)
+        self.assertIn("NetIntentV2.DeleteSegment(entity2, false)", patch)
+
+    def test_harmony_prefix_names_match_real_cs1_metadata(self):
+        transport = (RUNTIME / "TransportLinePatches.cs").read_text(encoding="utf-8")
+        net = (RUNTIME / "NetPatches.cs").read_text(encoding="utf-8")
+        add_stop = transport[transport.index("internal static class ForgeTransportAddStopPatch"):
+                             transport.index("internal static class ForgeTransportRemoveStopPatch")]
+        create_line = transport[transport.index("internal static class ForgeTransportCreateLinePatch"):]
+        create_node = net[net.index("internal static class NetToolCreateNodeAuthorityPatch"):
+                          net.index("internal static class ClientNetManagerCreateNodeBarrierPatch")]
+        self.assertIn("Vector3 position, bool fixedPlatform, ref bool __result", add_stop)
+        self.assertNotIn("Vector3 newPos, bool fixedPlatform, ref bool __result", add_stop)
+        self.assertIn("Prefix(ref ushort lineID, ref bool __result)", create_line)
+        self.assertIn("Postfix(ref ushort lineID, bool __result)", create_line)
+        self.assertIn("ref ushort firstNode, ref ushort lastNode, ref ushort segment, ref int cost", create_node)
+        self.assertNotIn("ref ushort segmentID, ref int cost", create_node)
 
     def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")

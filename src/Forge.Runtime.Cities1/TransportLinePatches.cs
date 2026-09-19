@@ -164,14 +164,14 @@ namespace CsmForge.Runtime.Cities1
     [HarmonyPatch(typeof(TransportLine), "AddStop", new Type[] { typeof(ushort), typeof(int), typeof(Vector3), typeof(bool) })]
     internal static class ForgeTransportAddStopPatch
     {
-        public static bool Prefix(ushort lineID, int index, Vector3 newPos, bool fixedPlatform, ref bool __result)
+        public static bool Prefix(ushort lineID, int index, Vector3 position, bool fixedPlatform, ref bool __result)
         {
             if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
             if (RuntimeServices.Multiplayer.IsEditablePendingTransportLine(lineID)) return true;
             if (RuntimeServices.Multiplayer.IsPendingLocalTransportLine(lineID)) { __result = false; return false; }
             __result = false;
             RuntimeServices.Multiplayer.TryQueueTransportRoute(lineID, TransportLineIntentKindV2.AddStop,
-                index, newPos.x, newPos.y, newPos.z, fixedPlatform);
+                index, position.x, position.y, position.z, fixedPlatform);
             return false;
         }
 
@@ -229,18 +229,18 @@ namespace CsmForge.Runtime.Cities1
                 null, new Type[] { typeof(ushort).MakeByRefType(), typeof(Randomizer).MakeByRefType(), typeof(TransportInfo), typeof(bool) }, null);
         }
 
-        public static bool Prefix(ref ushort line, ref bool __result)
+        public static bool Prefix(ref ushort lineID, ref bool __result)
         {
             if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive) return true;
             if (ForgeTransportPlayerNewLineScope.Active) return true;
-            line = 0; __result = false;
+            lineID = 0; __result = false;
             return false;
         }
 
-        public static void Postfix(ref ushort line, bool __result)
+        public static void Postfix(ref ushort lineID, bool __result)
         {
             if (RuntimeScopeGuard.IsApplying || !TransportLinePatchHelper.ClientLive || !ForgeTransportPlayerNewLineScope.Active) return;
-            if (__result && line != 0) RuntimeServices.Multiplayer.RegisterPendingLocalTransportLine(line);
+            if (__result && lineID != 0) RuntimeServices.Multiplayer.RegisterPendingLocalTransportLine(lineID);
         }
     }
 }

@@ -39,6 +39,7 @@ internal static class Program
             RuntimeHelpers.RunClassConstructor(adapterType.TypeHandle);
             ProbeInvitationCodec(runtime);
             ProbeDistrictBrushHarmonyBinding(runtime, managedPath);
+            ProbeBulldozeGameSurface(managedPath);
             Console.WriteLine("PASS: " + AdapterTypeName + " initialized against " + managedPath);
             return 0;
         }
@@ -91,4 +92,56 @@ internal static class Program
                 throw new InvalidOperationException("District brush Harmony parameter mismatch at index " + i +
                     ": game=" + gameParameters[i].Name + ", prefix=" + prefixParameters[i].Name + ".");
     }
+
+    private static void ProbeBulldozeGameSurface(string managedPath)
+    {
+        Assembly game = null;
+        foreach (Assembly loaded in AppDomain.CurrentDomain.GetAssemblies())
+            if (loaded.GetName().Name == "Assembly-CSharp") { game = loaded; break; }
+        if (game == null)
+            game = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(managedPath, "Assembly-CSharp.dll"));
+
+        Type bulldozeTool = game.GetType("BulldozeTool", true);
+        MethodInfo[] methods = bulldozeTool.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        string[] required = { "DeleteSegment", "DeleteNode" };
+        int[] parameterCounts = { 2, 1 };
+        for (int nameIndex = 0; nameIndex < required.Length; nameIndex++)
+        {
+            bool found = false;
+            for (int i = 0; i < methods.Length; i++)
+            {
+                ParameterInfo[] parameters = methods[i].GetParameters();
+                if (methods[i].Name != required[nameIndex] || parameters.Length != parameterCounts[nameIndex] ||
+                    !typeof(System.Collections.IEnumerator).IsAssignableFrom(methods[i].ReturnType)) continue;
+                found = true;
+                for (int parameterIndex = 0; parameterIndex < parameters.Length; parameterIndex++)
+                    if (parameters[parameterIndex].ParameterType != typeof(ushort)) found = false;
+            }
+            if (!found)
+            {
+                string candidates = "";
+                for (int i = 0; i < methods.Length; i++)
+                {
+                    if (methods[i].Name.IndexOf("Delete", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (candidates.Length != 0) candidates += "; ";
+                    candidates += FormatMethod(methods[i]);
+                }
+                throw new MissingMethodException("BulldozeTool." + required[nameIndex] +
+                    " coroutine has an unexpected signature. Real delete methods: " + candidates);
+            }
+        }
+    }
+
+    private static string FormatMethod(MethodInfo method)
+    {
+        ParameterInfo[] parameters = method.GetParameters();
+        string result = method.ReturnType.FullName + " " + method.Name + "(";
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (i != 0) result += ", ";
+            result += parameters[i].ParameterType.FullName + " " + parameters[i].Name;
+        }
+        return result + ")";
+    }
+
 }

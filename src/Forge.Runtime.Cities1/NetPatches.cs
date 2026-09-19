@@ -40,7 +40,7 @@ namespace CsmForge.Runtime.Cities1
         public static bool Prefix(NetInfo info, NetTool.ControlPoint startPoint, NetTool.ControlPoint middlePoint,
             NetTool.ControlPoint endPoint, int maxSegments, bool test, bool testEnds, bool visualize,
             bool autoFix, bool needMoney, bool invert, bool switchDir, ushort relocateBuildingID,
-            ref ushort firstNode, ref ushort lastNode, ref ushort segmentID, ref int cost, ref int productionRate,
+            ref ushort firstNode, ref ushort lastNode, ref ushort segment, ref int cost, ref int productionRate,
             ref ToolBase.ToolErrors __result, out NetToolAuthorityState __state)
         {
             __state = null;
@@ -54,7 +54,7 @@ namespace CsmForge.Runtime.Cities1
             bool road = info != null && info.m_class != null && info.m_class.m_service == ItemClass.Service.Road;
             if (!road || relocateBuildingID != 0)
             {
-                firstNode = lastNode = segmentID = 0; cost = productionRate = 0;
+                firstNode = lastNode = segment = 0; cost = productionRate = 0;
                 __result = ToolBase.ToolErrors.ObjectCollision;
                 return false;
             }
@@ -69,7 +69,7 @@ namespace CsmForge.Runtime.Cities1
                 if (valid) valid = TryEncodePoint(endPoint, out end);
                 bool queued = valid && RuntimeServices.Multiplayer.TrySubmitNetIntent(NetIntentV2.Create(info.name,
                     start, middle, end, maxSegments, testEnds, autoFix, invert, switchDir, (uint)NetTool.m_zoneGridFlags));
-                firstNode = lastNode = segmentID = 0; cost = productionRate = 0;
+                firstNode = lastNode = segment = 0; cost = productionRate = 0;
                 __result = queued ? ToolBase.ToolErrors.None : ToolBase.ToolErrors.ObjectCollision;
                 if (!queued) RuntimeServices.Lifecycle.Fence("Road player intent could not be queued");
                 return false;
@@ -92,7 +92,7 @@ namespace CsmForge.Runtime.Cities1
                 return true;
             }
 
-            firstNode = lastNode = segmentID = 0; cost = productionRate = 0;
+            firstNode = lastNode = segment = 0; cost = productionRate = 0;
             __result = ToolBase.ToolErrors.ObjectCollision;
             return false;
         }

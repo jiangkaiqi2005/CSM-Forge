@@ -4,6 +4,24 @@
 > 方法论前置结论：**不按直觉砍 80%**。按异常类型拆账后，真正"确定可删"的是少数；
 > 大头是"合并样板（保护不减、行数减半）"和"失败响应分级（降低每个门禁的破坏半径）"。
 > 裁剪一律走 D4 的打点裁决流程，用证据说话。
+>
+> **施工核销（feat/wp-2-gate-rationalization 分支起）**：
+> - D1-1 已实现：`CompatibilityManifest.Components` 内部访问器 +
+>   `CompatibilityPolicyV2` 构造期缓存 expected，`Evaluate` 不再重复 Collect/重排序。
+> - D1-4 已评估：v1 `HostSession`/`ReplicaSession`/`ParameterWorld` 在运行时无引用，
+>   但由 SessionTests 作为参考内核测试覆盖——保留为参考内核，不删除、不标废弃；
+>   随 v2 演进再归档。
+> - D2 首轮已完成：`Check` 升为 public 并新增 `NotNull/Condition/InRange/CanonicalId`；
+>   单行 `X == null` 模式 177 处全部转换（ANE throw 224→48，-79%）；
+>   两处 canonical 字符集循环合并为 `Check.CanonicalId`。
+>   **剩余**：48 处复合/多行 ANE、AE 216、AOORE 84 的继续转换；
+>   桥反射面校验（GA/InfiniteGoods 各自的 RequiredMethod/RequiredProperty）合并待做。
+> - D3 已在 WP-1.2 部分落地（广播容错驱逐 + UI 停止走调度），`FenceSession` 前的
+>   "踢可疑 peer 观察一轮"中间档仍待做。
+> - D4 打点原语已落地：`Forge.Core/GateCounter`（GateCategory 五类，
+>   Wire/Invariant/Lifecycle/Thread/Contract）+ `CheckAndGateTests` 6 项回归；
+>   已接线 4 处高价值站点（V3.FenceSession、EvictDeadHostPeers、
+>   AuthorityCoordinatorV2.Fence）；逐门禁接线与 E3/E4 判决按本文件流程继续。
 
 ## 0. 现状量化（基线）
 

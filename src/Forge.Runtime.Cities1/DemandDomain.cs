@@ -30,7 +30,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public static byte[] Encode(DemandStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return new byte[] { (byte)value.Residential, (byte)value.Commercial, (byte)value.Workplace };
         }
 
@@ -94,7 +94,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             DemandStateV2 actual = DemandGameAccess.ApplyReplica(load, DemandCodecV2.Decode(absoluteDelta));
             if (!actual.Root.Equals(expectedAfterRoot)) throw new InvalidOperationException("Demand replica root mismatch.");
         }

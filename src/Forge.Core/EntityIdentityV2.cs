@@ -139,7 +139,7 @@ namespace CsmForge.Core
 
         public void RestoreSnapshot(IEnumerable<EntityMapEntryV2> entries, ulong highestIssuedId)
         {
-            if (entries == null) throw new ArgumentNullException("entries");
+            Check.NotNull(entries, "entries");
             byEntity.Clear();
             byNative.Clear();
             retired.Clear();

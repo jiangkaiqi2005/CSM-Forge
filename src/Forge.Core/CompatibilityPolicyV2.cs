@@ -20,10 +20,7 @@ namespace CsmForge.Core
 
         public CompatibilityRuleV2(string prefix, CompatibilityRequirementV2 hostRequirement, bool allowClientExtra)
         {
-            if (string.IsNullOrEmpty(prefix) || prefix.Length > 128) throw new ArgumentException("Invalid compatibility prefix.", "prefix");
-            foreach (char value in prefix)
-                if (!((value >= 'a' && value <= 'z') || (value >= '0' && value <= '9') || value == '.' || value == ':' || value == '-' || value == '_'))
-                    throw new ArgumentException("Compatibility prefixes use canonical lowercase ASCII.", "prefix");
+            Check.CanonicalId(prefix, 128, "prefix", "Invalid compatibility prefix."); // D2: shared canonical guard
             if (!Enum.IsDefined(typeof(CompatibilityRequirementV2), hostRequirement)) throw new ArgumentOutOfRangeException("hostRequirement");
             Prefix = prefix;
             HostRequirement = hostRequirement;
@@ -41,11 +38,13 @@ namespace CsmForge.Core
         private readonly CompatibilityManifest host;
         private readonly CompatibilityRuleV2[] rules;
         private readonly string[] hostErrors;
+        private readonly Dictionary<string, ComponentFingerprint> expected;
 
         public CompatibilityPolicyV2(CompatibilityManifest hostManifest, IEnumerable<CompatibilityRuleV2> policyRules)
         {
             if (hostManifest == null || policyRules == null) throw new ArgumentNullException("hostManifest");
             host = hostManifest;
+            expected = host.Components; // D1-1: reuse the manifest's pre-validated dictionary; no per-Evaluate re-Collect
             List<CompatibilityRuleV2> collected = new List<CompatibilityRuleV2>();
             Dictionary<string, bool> seen = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (CompatibilityRuleV2 rule in policyRules)
@@ -73,14 +72,14 @@ namespace CsmForge.Core
 
         public string[] Evaluate(CompatibilityManifest remote)
         {
-            if (remote == null) throw new ArgumentNullException("remote");
+            Check.NotNull(remote, "remote");
             List<string> errors = new List<string>();
             if (!host.GameBuildHash.Equals(remote.GameBuildHash)) errors.Add("game-build-mismatch");
             if (!host.SchemaHash.Equals(remote.SchemaHash)) errors.Add("schema-mismatch");
             for (int i = 0; i < hostErrors.Length; i++) errors.Add(hostErrors[i]);
 
-            Dictionary<string, ComponentFingerprint> expected = CompatibilityManifest.Collect(host.Entries);
-            Dictionary<string, ComponentFingerprint> actual = CompatibilityManifest.Collect(remote.Entries);
+            Dictionary<string, ComponentFingerprint> expected = this.expected;             // D1-1: cached at construction
+            Dictionary<string, ComponentFingerprint> actual = remote.Components;           // D1-1: pre-validated by the manifest
 
             foreach (KeyValuePair<string, ComponentFingerprint> pair in expected)
             {

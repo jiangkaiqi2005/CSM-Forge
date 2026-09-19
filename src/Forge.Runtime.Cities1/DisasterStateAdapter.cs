@@ -21,7 +21,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureAbsolute(IForgeAdapterContextV1 context)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             DisasterManager manager = DisasterManager.instance;
             if (manager == null) throw new InvalidOperationException("DisasterManager is unavailable.");
             List<DisasterState> values = new List<DisasterState>();

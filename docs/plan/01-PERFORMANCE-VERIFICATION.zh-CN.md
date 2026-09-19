@@ -119,10 +119,11 @@
 - **验收**：单测 195/195；net35 构建 0 警告 0 错误；真机确认"打开开房面板不再卡顿、
   检查期间显示'正在检查'、按钮在报告落地后解锁"。
 
-### WP-1.7 LiteNetLib 池回收（待做）
+### WP-1.7 LiteNetLib 池回收（已实现）
 
-- `LiteNetServerTransport`/`LiteNetClientTransport` 的 NetManager 设 `AutoRecycle = true`
-  （或每条退出路径 `reader.Recycle()`）。一行止血每包 GC 压力。
+- `LiteNetServerTransport`/`LiteNetClientTransport` 的 NetManager 构造已设
+  `AutoRecycle = true`（`{ AutoRecycle = true }` 初始化器），每次接收后回收池化包，
+  消除逐包 GC 压力。
 
 ### WP-1.8 LocalIpv4 修复（S1）—— 已实现，已真机验证
 

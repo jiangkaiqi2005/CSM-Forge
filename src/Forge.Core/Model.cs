@@ -32,11 +32,16 @@ namespace CsmForge.Core
         public override int GetHashCode() { return WorldId.GetHashCode() ^ Epoch.GetHashCode(); }
     }
 
-    internal static class Check
+    /// <summary>
+    /// Shared guard helpers (D2): every call preserves the exact exception type the inline check
+    /// used to throw, so converting a call site changes no observable behavior. Public because
+    /// Protocol and Runtime constructor validation converts to the same helpers.
+    /// </summary>
+    public static class Check
     {
         public static byte[] Copy(byte[] bytes, int maximum, bool allowEmpty)
         {
-            if (bytes == null) throw new ArgumentNullException("bytes");
+            Check.NotNull(bytes, "bytes");
             if (bytes.Length > maximum || (!allowEmpty && bytes.Length == 0))
                 throw new ArgumentException("Payload length is outside the permitted bounds.", "bytes");
             return (byte[])bytes.Clone();
@@ -45,6 +50,32 @@ namespace CsmForge.Core
         public static void Stamp(SessionStamp stamp)
         {
             if (!stamp.IsValid) throw new ArgumentException("Uninitialized session stamp.", "stamp");
+        }
+
+        public static void NotNull(object value, string name)
+        {
+            if (value == null) throw new ArgumentNullException(name);
+        }
+
+        public static void Condition(bool valid, string name, string message)
+        {
+            if (!valid) throw new ArgumentException(message, name);
+        }
+
+        public static void InRange(long value, long minimum, long maximum, string name)
+        {
+            if (value < minimum || value > maximum) throw new ArgumentOutOfRangeException(name);
+        }
+
+        public static void CanonicalId(string value, int maximumLength, string name, string message)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length > maximumLength) throw new ArgumentException(message, name);
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == ':' || ch == '-' || ch == '_'))
+                    throw new ArgumentException(message, name);
+            }
         }
     }
 
@@ -153,7 +184,7 @@ namespace CsmForge.Core
         {
             Check.Stamp(stamp);
             if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer identity.", "transferId");
-            if (image == null) throw new ArgumentNullException("image");
+            Check.NotNull(image, "image");
             Stamp = stamp;
             Revision = revision;
             TransferId = transferId;

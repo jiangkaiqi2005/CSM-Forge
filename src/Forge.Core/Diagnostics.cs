@@ -83,7 +83,7 @@ namespace CsmForge.Core
         }
         public bool TryPost(T item)
         {
-            if (item == null) throw new ArgumentNullException("item");
+            Check.NotNull(item, "item");
             lock (gate)
             {
                 if (queue.Count == capacity) return false;

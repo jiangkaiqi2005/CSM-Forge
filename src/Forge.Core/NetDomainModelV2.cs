@@ -340,7 +340,7 @@ namespace CsmForge.Core
 
         public void Apply(NetMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
             HashSet<ulong> deletedSegments = new HashSet<ulong>();
             for (int i = 0; i < mutation.DeleteSegments.Length; i++)
             {
@@ -381,7 +381,7 @@ namespace CsmForge.Core
 
         private void UpsertNode(NetNodeStateV2 value, bool allowReplace)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             NetNodeStateV2 current;
             if (nodes.TryGetValue(value.Entity.EntityId, out current))
             {
@@ -394,7 +394,7 @@ namespace CsmForge.Core
 
         private void UpsertSegment(NetSegmentStateV2 value, bool allowReplace)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             NetNodeStateV2 start, end;
             if (!nodes.TryGetValue(value.StartNode.EntityId, out start) || !start.Entity.Equals(value.StartNode) ||
                 !nodes.TryGetValue(value.EndNode.EntityId, out end) || !end.Entity.Equals(value.EndNode))
@@ -457,7 +457,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(NetIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind);
@@ -558,7 +558,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(NetMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

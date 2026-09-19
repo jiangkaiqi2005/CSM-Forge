@@ -207,7 +207,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static byte[] EncodeIntent(uint magic, DecorationIntent value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream()) using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))
             {
                 writer.Write(magic); writer.Write((byte)value.Kind);

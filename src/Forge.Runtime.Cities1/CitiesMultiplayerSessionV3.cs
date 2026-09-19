@@ -568,6 +568,7 @@ namespace CsmForge.Runtime.Cities1
             if (dead == null) return;
             for (int i = 0; i < dead.Count; i++)
             {
+                GateCounter.Record(GateCategory.Lifecycle); // D4: per-peer degradation evidence
                 events.Record(RuntimeEventCode.Error, load.Generation, "peer-send-failed:" + dead[i].TransportId);
                 RemoveHostPeer(dead[i]);
             }
@@ -646,6 +647,7 @@ namespace CsmForge.Runtime.Cities1
 
         private void FenceSession(string reason)
         {
+            GateCounter.Record(GateCategory.Lifecycle); // D4: fence-frequency evidence for gate pruning
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); pendingBuildings.Clear(); }
             lifecycle.Fence(reason);

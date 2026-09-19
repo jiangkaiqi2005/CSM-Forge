@@ -20,7 +20,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static CompatibilityCapabilityReport From(CompatibilityManifest manifest)
         {
-            if (manifest == null) throw new ArgumentNullException("manifest");
+            Check.NotNull(manifest, "manifest");
             CompatibilityCapabilityReport report = new CompatibilityCapabilityReport();
             List<string> blocked = new List<string>();
             ComponentFingerprint[] entries = manifest.Entries;

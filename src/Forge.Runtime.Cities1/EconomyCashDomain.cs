@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static EconomyCashStateV2 ApplyReplica(LoadIdentity load, EconomyCashStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (!RuntimeServices.Lifecycle.IsCurrent(load))
                 throw new InvalidOperationException("Economy cash apply belongs to a stale load.");
             EconomyManager manager = EconomyManager.instance;
@@ -78,7 +78,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering &&

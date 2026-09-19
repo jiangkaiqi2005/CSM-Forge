@@ -14,7 +14,7 @@ namespace CsmForge.Runtime.Cities1
         public SavedEntityDomainV2(ushort domainId, ulong highestIssuedId, EntityMapEntryV2[] entries)
         {
             if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");
-            if (entries == null) throw new ArgumentNullException("entries");
+            Check.NotNull(entries, "entries");
             DomainId = domainId;
             HighestIssuedId = highestIssuedId;
             Entries = (EntityMapEntryV2[])entries.Clone();
@@ -31,7 +31,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static byte[] Encode(IEnumerable<SavedEntityDomainV2> domains)
         {
-            if (domains == null) throw new ArgumentNullException("domains");
+            Check.NotNull(domains, "domains");
             List<SavedEntityDomainV2> values = new List<SavedEntityDomainV2>(domains);
             if (values.Count > MaxDomains) throw new InvalidDataException("Too many entity-map domains.");
             values.Sort(delegate(SavedEntityDomainV2 a, SavedEntityDomainV2 b) { return a.DomainId.CompareTo(b.DomainId); });

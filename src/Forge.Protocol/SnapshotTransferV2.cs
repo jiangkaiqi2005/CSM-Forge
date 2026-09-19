@@ -44,7 +44,7 @@ namespace CsmForge.Protocol
     {
         public static byte[] EncodeChunk(SnapshotChunkV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] data = value.Data;
             using (MemoryStream stream = new MemoryStream())
             {
@@ -73,7 +73,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeProgress(SnapshotProgressV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] result = new byte[44];
             Buffer.BlockCopy(value.SnapshotId.ToByteArray(), 0, result, 0, 16);
             Buffer.BlockCopy(value.TransferId.ToByteArray(), 0, result, 16, 16);

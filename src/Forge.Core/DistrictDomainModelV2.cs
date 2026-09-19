@@ -126,7 +126,7 @@ namespace CsmForge.Core
         public void SeedEntity(DistrictEntityStateV2 value) { UpsertEntity(value, false); }
         public void SeedCell(DistrictCellStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             ValidateReferences(value);
             if (value.IsEmpty) return;
             if (cells.ContainsKey(value.Index)) throw new InvalidOperationException("Duplicate district cell.");
@@ -135,7 +135,7 @@ namespace CsmForge.Core
 
         public void Apply(DistrictMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
             for (int i = 0; i < mutation.UpsertEntities.Length; i++) UpsertEntity(mutation.UpsertEntities[i], true);
             for (int i = 0; i < mutation.Cells.Length; i++)
             {
@@ -165,7 +165,7 @@ namespace CsmForge.Core
 
         private void UpsertEntity(DistrictEntityStateV2 value, bool allowReplace)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             DistrictEntityStateV2 current;
             if (entities.TryGetValue(value.Entity.EntityId, out current))
             {
@@ -225,7 +225,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(DistrictPaintIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.TargetKind);
@@ -252,7 +252,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(DistrictMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             List<EntityIdentityV2> identities = GatherIdentities(value);
             if (identities.Count > 255) throw new InvalidDataException("District mutation identity dictionary is too large.");
             Dictionary<ulong, byte> tokens = new Dictionary<ulong, byte>();

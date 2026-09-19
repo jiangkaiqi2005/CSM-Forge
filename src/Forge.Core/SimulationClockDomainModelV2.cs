@@ -22,7 +22,7 @@ namespace CsmForge.Core
 
         public SimulationClockIntentV2(SimulationClockStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             Requested = requested;
         }
     }
@@ -33,7 +33,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(SimulationClockStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return new byte[] { (byte)(value.Paused ? 1 : 0), (byte)value.Speed };
         }
 
@@ -46,7 +46,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(SimulationClockIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return Encode(value.Requested);
         }
 

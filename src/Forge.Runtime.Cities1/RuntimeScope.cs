@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 
 namespace CsmForge.Runtime.Cities1
@@ -9,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal RuntimeScope(Action release)
         {
-            if (release == null) throw new ArgumentNullException("release");
+            Check.NotNull(release, "release");
             this.release = release;
         }
 

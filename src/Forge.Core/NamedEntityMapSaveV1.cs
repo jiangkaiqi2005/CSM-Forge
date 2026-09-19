@@ -14,7 +14,7 @@ namespace CsmForge.Core
         public NamedEntityMapSnapshotV1(string namespaceId, ulong highestIssuedId, EntityMapEntryV2[] entries)
         {
             ValidateNamespace(namespaceId);
-            if (entries == null) throw new ArgumentNullException("entries");
+            Check.NotNull(entries, "entries");
             NamespaceId = namespaceId;
             HighestIssuedId = highestIssuedId;
             Entries = (EntityMapEntryV2[])entries.Clone();
@@ -44,7 +44,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(IEnumerable<NamedEntityMapSnapshotV1> snapshots)
         {
-            if (snapshots == null) throw new ArgumentNullException("snapshots");
+            Check.NotNull(snapshots, "snapshots");
             List<NamedEntityMapSnapshotV1> values = new List<NamedEntityMapSnapshotV1>(snapshots);
             if (values.Count > MaximumNamespaces) throw new InvalidDataException("Too many named entity-map namespaces.");
             values.Sort(delegate(NamedEntityMapSnapshotV1 a, NamedEntityMapSnapshotV1 b)

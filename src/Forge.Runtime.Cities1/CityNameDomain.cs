@@ -16,7 +16,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static CityNameStateV2 Apply(LoadIdentity load, CityNameStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("City-name apply belongs to a stale load.");
             CityInfoPanel panel = CityInfoPanel.instance;
             if (panel == null) throw new InvalidOperationException("CityInfoPanel is unavailable.");
@@ -74,7 +74,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CityNameStateV2 requested = CityNameCodecV2.Decode(absoluteDelta);
             committed = CityNameGameAccess.Apply(load, requested);
             if (!StateRoot.Equals(expectedAfterRoot)) throw new InvalidOperationException("City-name replica root mismatch.");

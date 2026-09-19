@@ -81,7 +81,7 @@ namespace CsmForge.Core
         public ReplicaDecision Receive(Guid authenticatedSource, Commit commit)
         {
             Enter();
-            if (commit == null) throw new ArgumentNullException("commit");
+            Check.NotNull(commit, "commit");
             if (authenticatedSource != hostConnection) return ReplicaDecision.WrongSource;
             if (!commit.Stamp.Equals(Stamp)) return ReplicaDecision.WrongSession;
             if (Phase == ReplicaPhase.Disconnected) return ReplicaDecision.Disconnected;

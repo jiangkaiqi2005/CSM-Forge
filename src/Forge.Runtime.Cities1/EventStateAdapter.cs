@@ -31,7 +31,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureAbsolute(IForgeAdapterContextV1 context)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             EventManager manager = EventManager.instance;
             if (manager == null) throw new InvalidOperationException("EventManager is unavailable.");
             CoreEntityReferenceSnapshot core = CoreEntityReferenceSnapshot.Capture();

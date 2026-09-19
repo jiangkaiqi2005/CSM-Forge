@@ -33,7 +33,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static byte[] Capture(IForgeAdapterContextV1 context)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             Surface s = Resolve();
             if (s == null) throw new InvalidOperationException("Exact TM:PE 11.9.4.1 persistent-rule surface is unavailable.");
             Snapshot value = s.Capture(context);
@@ -42,7 +42,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void Apply(IForgeAdapterContextV1 context, byte[] bytes)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             Surface s = Resolve();
             if (s == null) throw new InvalidOperationException("Exact TM:PE 11.9.4.1 persistent-rule surface is unavailable.");
             s.Apply(context, Decode(bytes));

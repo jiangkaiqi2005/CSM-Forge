@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -24,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static void Declare(Assembly assembly, ForgeModCompatibilityKind kind)
         {
-            if (assembly == null) throw new ArgumentNullException("assembly");
+            Check.NotNull(assembly, "assembly");
             if (!Enum.IsDefined(typeof(ForgeModCompatibilityKind), kind)) throw new ArgumentOutOfRangeException("kind");
             string key = assembly.FullName;
             if (string.IsNullOrEmpty(key)) throw new ArgumentException("Assembly identity is unavailable.", "assembly");

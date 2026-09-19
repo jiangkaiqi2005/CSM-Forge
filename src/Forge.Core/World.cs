@@ -22,7 +22,7 @@ namespace CsmForge.Core
         public static WorldExecution Rejected() { return new WorldExecution(false, null, null); }
         public static WorldExecution Success(byte[] bytes, Hash256 hash)
         {
-            if (hash == null) throw new ArgumentNullException("hash");
+            Check.NotNull(hash, "hash");
             return new WorldExecution(true, Check.Copy(bytes, Limits.CommandBytes, false), hash);
         }
     }

@@ -23,7 +23,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(CityNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] text = Encoding.UTF8.GetBytes(value.Name);
             using (MemoryStream stream = new MemoryStream())
             {

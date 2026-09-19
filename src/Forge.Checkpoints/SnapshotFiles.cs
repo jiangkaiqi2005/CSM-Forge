@@ -42,7 +42,7 @@ namespace CsmForge.Checkpoints
 
         public SnapshotReadCursor(SnapshotFileDescriptor descriptor, Guid transferId)
         {
-            if (descriptor == null) throw new ArgumentNullException("descriptor");
+            Check.NotNull(descriptor, "descriptor");
             if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer id.", "transferId");
             this.descriptor = descriptor; this.transferId = transferId;
             stream = new FileStream(descriptor.Path, FileMode.Open, FileAccess.Read, FileShare.Read);

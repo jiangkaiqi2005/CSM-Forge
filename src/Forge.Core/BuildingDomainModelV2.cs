@@ -78,12 +78,12 @@ namespace CsmForge.Core
         private BuildingResultV2() { }
         public static BuildingResultV2 Created(BuildingStateV2 state)
         {
-            if (state == null) throw new ArgumentNullException("state");
+            Check.NotNull(state, "state");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Created, Entity = state.Entity, State = state };
         }
         public static BuildingResultV2 Updated(BuildingStateV2 state)
         {
-            if (state == null) throw new ArgumentNullException("state");
+            Check.NotNull(state, "state");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Updated, Entity = state.Entity, State = state };
         }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity) { return Deleted(entity, 0); }

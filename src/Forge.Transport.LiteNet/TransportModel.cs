@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Collections.Generic;
 
@@ -40,7 +41,7 @@ namespace CsmForge.Transport.LiteNet
 
         public bool TryAdd(TransportEvent item)
         {
-            if (item == null) throw new ArgumentNullException("item");
+            Check.NotNull(item, "item");
             byte[] data = item.Payload;
             int size = data == null ? 0 : data.Length;
             lock (gate)

@@ -32,7 +32,7 @@ namespace CsmForge.Runtime.Cities1
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
         {
-            if (context == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context");
             ValidateShard(shardIndex);
             BuildingManager manager = BuildingManager.instance;
             if (manager == null) throw new InvalidOperationException("BuildingManager is unavailable.");

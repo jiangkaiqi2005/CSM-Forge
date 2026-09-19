@@ -54,7 +54,7 @@ namespace CsmForge.Core
         public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
         public void Set(StableNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (string.IsNullOrEmpty(value.Name)) values.Remove(value.Key); else values[value.Key] = value.Name;
         }
         public void Remove(StableNameKeyV2 key) { values.Remove(key); }
@@ -85,7 +85,7 @@ namespace CsmForge.Core
         private const uint Magic = 0x324E5346u; // FSN2
         public static byte[] Encode(StableNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] text = Encoding.UTF8.GetBytes(value.Name ?? string.Empty);
             using (MemoryStream stream = new MemoryStream())
             {

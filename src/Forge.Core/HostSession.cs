@@ -130,7 +130,7 @@ namespace CsmForge.Core
         public SubmitResult Submit(Guid authenticatedConnection, Intent intent)
         {
             Enter();
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             busy = true;
             try { return SubmitCore(authenticatedConnection, intent); }
             finally { busy = false; }

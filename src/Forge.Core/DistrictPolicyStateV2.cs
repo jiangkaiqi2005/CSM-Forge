@@ -37,7 +37,7 @@ namespace CsmForge.Core
         public DistrictPolicySnapshotV2(ulong cityServices, ulong cityTaxation, ulong cityPlanning,
             ulong citySpecial, DistrictPolicyStateV2[] values)
         {
-            if (values == null) throw new ArgumentNullException("values");
+            Check.NotNull(values, "values");
             if (values.Length > 127) throw new ArgumentException("Too many district policy entries.", "values");
             CityServices = cityServices;
             CityTaxation = cityTaxation;
@@ -90,9 +90,9 @@ namespace CsmForge.Core
         public DistrictAuthorityEnvelopeV2(DistrictMutationV2 districtMutation, Hash256 districtAfterRoot,
             DistrictPolicySnapshotV2 policies)
         {
-            if (districtMutation == null) throw new ArgumentNullException("districtMutation");
-            if (districtAfterRoot == null) throw new ArgumentNullException("districtAfterRoot");
-            if (policies == null) throw new ArgumentNullException("policies");
+            Check.NotNull(districtMutation, "districtMutation");
+            Check.NotNull(districtAfterRoot, "districtAfterRoot");
+            Check.NotNull(policies, "policies");
             DistrictMutation = districtMutation;
             DistrictAfterRoot = districtAfterRoot;
             Policies = policies;
@@ -123,7 +123,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodePolicySnapshot(DistrictPolicySnapshotV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             DistrictPolicyStateV2[] districts = value.Districts;
             using (MemoryStream stream = new MemoryStream())
             {
@@ -180,7 +180,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeEnvelope(DistrictAuthorityEnvelopeV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] district = DistrictDomainCodecV2.EncodeMutation(value.DistrictMutation);
             byte[] policies = EncodePolicySnapshot(value.Policies);
             using (MemoryStream stream = new MemoryStream())

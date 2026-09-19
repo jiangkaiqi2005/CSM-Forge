@@ -67,26 +67,12 @@ namespace CsmForge.Runtime.Cities1
 
     internal static class GameAnarchyBridge
     {
-        private const string AssemblyName = "GameAnarchy";
-        private static readonly Version SupportedVersion = new Version(1, 3, 1, 0);
-        private const string SettingsTypeName = "GameAnarchy.ModSettings.ModSetting";
-        private static readonly string[] LocalOnly =
-        {
-            "AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset",
-            "OptionsPanelCategoriesUpdated", "ToolButtonPresent", "ToolButtonPositionX", "ToolButtonPositionY"
-        };
+        private static readonly string AssemblyName = ModCompatibilityCatalog.Default.GameAnarchy.AssemblyName;
+        private static readonly Version SupportedVersion = new Version(ModCompatibilityCatalog.Default.GameAnarchy.SupportedVersion);
+        private static readonly string SettingsTypeName = ModCompatibilityCatalog.Default.GameAnarchy.SettingsTypeName;
+        private static readonly string[] LocalOnly = ModCompatibilityCatalog.Default.GameAnarchy.LocalOnlySettings;
         private static readonly string[] MoneyMutationMethods = { "OnPreSimulationFrame", "ChargeInterest", "AutoAddMoney", "SetStartMoney", "AddMoneyManually", "SubstrateMoneyManually", "ModifyMoney", "AddLoanAmount" };
-        private static readonly string[] UnsupportedBooleanSettings =
-        {
-            "UnlockInfoViews", "UnlockBasicRoads", "UnlockAllRoads", "UnlockTrainTrack", "UnlockMetroTrack",
-            "UnlockPolicies", "UnlockPublicTransport", "UnlockUniqueBuildings", "UnlockLandscaping",
-            "RemoveNoisePollution", "RemoveGroundPollution", "RemoveWaterPollution", "RemoveDeath",
-            "RemoveGarbage", "RemoveCrime", "MaximizeAttractiveness", "MaximizeEntertainment",
-            "MaximizeLandValue", "MaximizeEducationCoverage", "MaximizeFireCoverage",
-            "RemovePlayerBuildingFire", "RemoveResidentialBuildingFire", "RemoveIndustrialBuildingFire",
-            "RemoveCommercialBuildingFire", "RemoveOfficeBuildingFire", "RemoveParkBuildingFire",
-            "RemoveMuseumFire", "RemoveCampusBuildingFire", "RemoveAirportBuildingFire"
-        };
+        private static readonly string[] UnsupportedBooleanSettings = ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings;
         [ThreadStatic] private static bool applying;
         private static bool patched;
         private static Assembly compatibleAssembly;
@@ -99,7 +85,7 @@ namespace CsmForge.Runtime.Cities1
         {
             type = ResolveType(SettingsTypeName); instance = null;
             if (type == null) return false;
-            string[] holders = { "GameAnarchy.Patches.BuildingAIPatch", "GameAnarchy.Patches.BulldozeToolPatch" };
+            string[] holders = ModCompatibilityCatalog.Default.GameAnarchy.HolderTypeNames;
             for (int i = 0; i < holders.Length; i++)
             {
                 Type holder = type.Assembly.GetType(holders[i], false);
@@ -145,7 +131,7 @@ namespace CsmForge.Runtime.Cities1
                     violations.Add(UnsupportedBooleanSettings[i]);
             if (RequiredValue(properties, values, "CurrentUnlockMode") != 0L || RequiredValue(properties, values, "CurrentMilestoneLevel") != 0L)
                 violations.Add("CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)");
-            if (RequiredValue(properties, values, "OilDepletionRate") != 100L || RequiredValue(properties, values, "OreDepletionRate") != 100L)
+            if (RequiredValue(properties, values, "OilDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate || RequiredValue(properties, values, "OreDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOreDepletionRate)
                 violations.Add("OilDepletionRate/OreDepletionRate (both rates must be 100)");
             if (RequiredValue(properties, values, "BuildingSpreadFireProbability") != 0L ||
                 RequiredValue(properties, values, "TreeSpreadFireProbability") != 0L)
@@ -278,6 +264,9 @@ namespace CsmForge.Runtime.Cities1
                 Type resources = assemblies[i].GetType("GameAnarchy.Extension.OilAndOreResourceExtension", false);
                 Type milestones = assemblies[i].GetType("GameAnarchy.Extension.MilestonesExtension", false);
                 Type fire = assemblies[i].GetType("GameAnarchy.Managers.FireControlManager", false);
+                // The audited-type names above are pinned in ModCompatibilityCatalog (D-gate).
+                for (int r = 0; r < ModCompatibilityCatalog.Default.GameAnarchy.RequiredTypeNames.Length; r++)
+                    if (assemblies[i].GetType(ModCompatibilityCatalog.Default.GameAnarchy.RequiredTypeNames[r], false) == null) { economy = null; break; }
                 if (settings == null || economy == null || city == null || resources == null || milestones == null || fire == null) continue;
                 try
                 {

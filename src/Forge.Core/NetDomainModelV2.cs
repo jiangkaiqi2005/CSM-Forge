@@ -331,9 +331,23 @@ namespace CsmForge.Core
     {
         private readonly SortedDictionary<ulong, NetNodeStateV2> nodes = new SortedDictionary<ulong, NetNodeStateV2>();
         private readonly SortedDictionary<ulong, NetSegmentStateV2> segments = new SortedDictionary<ulong, NetSegmentStateV2>();
+        private Hash256 cachedRoot;
         public int NodeCount { get { return nodes.Count; } }
         public int SegmentCount { get { return segments.Count; } }
-        public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
+
+        /// <summary>
+        /// WP-1.4c: the canonical encoding is memoized and every mutating path clears it —
+        /// repeated Root reads on a surviving index stay cheap, and a missed invalidation is a
+        /// stale-root bug caught by NetStateIndexCachedRootTests.
+        /// </summary>
+        public Hash256 Root
+        {
+            get
+            {
+                if (cachedRoot == null) cachedRoot = Hash256.Compute(EncodeCanonical());
+                return cachedRoot;
+            }
+        }
 
         public void SeedNode(NetNodeStateV2 value) { UpsertNode(value, false); }
         public void SeedSegment(NetSegmentStateV2 value) { UpsertSegment(value, false); }
@@ -341,6 +355,7 @@ namespace CsmForge.Core
         public void Apply(NetMutationV2 mutation)
         {
             Check.NotNull(mutation, "mutation");
+            cachedRoot = null; // WP-1.4c: mutation invalidates the memoized root even if it rejects later
             HashSet<ulong> deletedSegments = new HashSet<ulong>();
             for (int i = 0; i < mutation.DeleteSegments.Length; i++)
             {
@@ -387,9 +402,9 @@ namespace CsmForge.Core
             {
                 if (!current.Entity.Equals(value.Entity)) throw new InvalidOperationException("Net node generation conflict.");
                 if (!allowReplace) throw new InvalidOperationException("Net node already exists.");
-                nodes[value.Entity.EntityId] = value; return;
+                nodes[value.Entity.EntityId] = value; cachedRoot = null; return;
             }
-            nodes.Add(value.Entity.EntityId, value);
+            nodes.Add(value.Entity.EntityId, value); cachedRoot = null;
         }
 
         private void UpsertSegment(NetSegmentStateV2 value, bool allowReplace)
@@ -404,9 +419,9 @@ namespace CsmForge.Core
             {
                 if (!current.Entity.Equals(value.Entity)) throw new InvalidOperationException("Net segment generation conflict.");
                 if (!allowReplace) throw new InvalidOperationException("Net segment already exists.");
-                segments[value.Entity.EntityId] = value; return;
+                segments[value.Entity.EntityId] = value; cachedRoot = null; return;
             }
-            segments.Add(value.Entity.EntityId, value);
+            segments.Add(value.Entity.EntityId, value); cachedRoot = null;
         }
 
         private byte[] EncodeCanonical()

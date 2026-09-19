@@ -169,7 +169,14 @@ namespace CsmForge.Runtime.Cities1
             Committed = CaptureWorld();
         }
 
-        public Hash256 CurrentRoot { get { return CaptureWorld().Root; } }
+        /// <summary>
+        /// WP-1.4c: the committed root is cached - reading it no longer walks the whole graph.
+        /// Live captures happen only at explicit diff points (ExecutePlayer, ObserveHostChanges,
+        /// Reconcile). A live write that bypasses the NetTool/bulldoze patches stays invisible
+        /// here and is caught by the cadence-driven full observe (PollObservedHostNetFull).
+        /// </summary>
+        public Hash256 CurrentRoot { get { return Committed.Root; } }
+        public Hash256 CommittedRoot { get { return Committed.Root; } }
 
         public bool TryResolveNode(uint nativeId, out EntityIdentityV2 entity) { return NodeIds.TryGetIdentity(nativeId, out entity); }
         public bool TryResolveSegment(uint nativeId, out EntityIdentityV2 entity) { return SegmentIds.TryGetIdentity(nativeId, out entity); }

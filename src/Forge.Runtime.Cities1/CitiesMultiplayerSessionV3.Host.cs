@@ -25,6 +25,7 @@ namespace CsmForge.Runtime.Cities1
                 long gridVerifyNow = MonotonicMilliseconds();
                 districtVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
                 zoneVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
+                netVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);
                 hostDisplayName = displayName;

@@ -133,6 +133,24 @@
   一个 tick 内同步（钩子路径）、无操作时区划 reconcile 零成本（节拍窗口）、
   人工绕过（未钩写入口）在窗口内被全量校验纠正。
 
+### WP-1.4c 路网根缓存语义 + 节拍全量兜底（第三片）—— 已实现，待真机验收
+
+- **语义变更**：`NetDomainBase.CurrentRoot` 由"每次读取全量 `CaptureWorld()`"改为
+  **返回缓存 `Committed.Root`**（提交快照的根，Reconcile/Apply 时更新）。
+  每次 修路提交/StateRoot 断言/Metadata.Update 从 1-5 次全路网遍历降为 0 次；
+  live 捕获只剩显式 diff 点（`ExecutePlayer` 前后、`ObserveHostChanges`）。
+- **语义代价（有意接受并记录）**：`StateRoot` 从"live"变"committed"后，
+  Submit 时 `AssertDomain` 不再能发现"绕过 patch 的路网写"；该检测移交给
+  **节拍驱动全量 Observe**——`PollObservedHostNetFull`（`NetSessionBridge.cs`）在
+  WP-1.1 的 5 秒窗口重捕获 live 图并发布 diff（接 `NetPatches`/`NetBulldozePatches`
+  未覆盖的写入口），与 WP-1.4b 的两级校验模式一致。
+- **可测面回归**（`NetStateIndexCachedRootTests` 5 项）：`NetStateIndexV2.Root` 记忆化 +
+  Apply/Upsert/删除全部失效缓存——"缓存失效遗漏"正是缓存语义下最危险的错误，
+  插入顺序无关性与种子/Apply 等价性一并钉死。
+- **验收**：单测 220/220（+5）；net35 构建 0 警告 0 错误；真机验收项：修路点击延迟下降
+  （每次点击全路网遍历 ~5 次 → ~3 次，剩余由后续增量捕获消减）、节拍窗口内
+  绕过写被自动发布。
+
 ### WP-1.5 哈希移出主线程（依赖 WP-1.4）
 
 - tick 边界主线程只拷贝脏分片字节（双缓冲/代际指针），SHA-256 与编码在工作线程；

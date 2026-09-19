@@ -38,6 +38,7 @@ internal static class Program
             Type adapterType = runtime.GetType(AdapterTypeName, true);
             RuntimeHelpers.RunClassConstructor(adapterType.TypeHandle);
             ProbeInvitationCodec(runtime);
+            ProbeDistrictBrushHarmonyBinding(runtime, managedPath);
             Console.WriteLine("PASS: " + AdapterTypeName + " initialized against " + managedPath);
             return 0;
         }
@@ -62,5 +63,32 @@ internal static class Program
         IPEndPoint endpoint = args[1] as IPEndPoint;
         if (endpoint == null || endpoint.Address.ToString() != "192.0.2.10" || endpoint.Port != 4230 ||
             (string)args[2] != "probe-key") throw new InvalidOperationException("Forge LAN invitation changed values.");
+    }
+
+    private static void ProbeDistrictBrushHarmonyBinding(Assembly runtime, string managedPath)
+    {
+        Assembly game = null;
+        foreach (Assembly loaded in AppDomain.CurrentDomain.GetAssemblies())
+            if (loaded.GetName().Name == "Assembly-CSharp") { game = loaded; break; }
+        if (game == null)
+            game = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.Combine(managedPath, "Assembly-CSharp.dll"));
+
+        Type districtTool = game.GetType("DistrictTool", true);
+        MethodInfo original = null;
+        foreach (MethodInfo candidate in districtTool.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            if (candidate.Name == "ApplyBrush" && candidate.GetParameters().Length == 6) { original = candidate; break; }
+        if (original == null) throw new MissingMethodException("DistrictTool", "ApplyBrush");
+
+        Type patch = runtime.GetType("CsmForge.Runtime.Cities1.DistrictToolApplyBrushAuthorityPatch", true);
+        MethodInfo prefix = patch.GetMethod("Prefix", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        if (prefix == null) throw new MissingMethodException(patch.FullName, "Prefix");
+        ParameterInfo[] gameParameters = original.GetParameters();
+        ParameterInfo[] prefixParameters = prefix.GetParameters();
+        if (prefixParameters.Length < gameParameters.Length)
+            throw new InvalidOperationException("District brush Prefix omits game parameters.");
+        for (int i = 0; i < gameParameters.Length; i++)
+            if (gameParameters[i].Name != prefixParameters[i].Name || gameParameters[i].ParameterType != prefixParameters[i].ParameterType)
+                throw new InvalidOperationException("District brush Harmony parameter mismatch at index " + i +
+                    ": game=" + gameParameters[i].Name + ", prefix=" + prefixParameters[i].Name + ".");
     }
 }

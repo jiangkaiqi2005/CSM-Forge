@@ -60,6 +60,13 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("public string FailureDetail", coordinator)
         self.assertIn("Forge 补丁安装失败：", preflight)
 
+    def test_district_brush_prefix_uses_the_real_cs1_parameter_name(self):
+        source = (RUNTIME / "DistrictPatches.cs").read_text(encoding="utf-8")
+        patch = source[source.index("internal static class DistrictToolApplyBrushAuthorityPatch"):
+                       source.index("internal static class DistrictCreateSlotBarrierPatch")]
+        self.assertIn("bool notOverride, out DistrictBrushAuthorityState __state", patch)
+        self.assertNotIn("bool force, out DistrictBrushAuthorityState __state", patch)
+
     def test_forge_pages_have_one_navigation_owner_and_do_not_stack_click_targets(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
         self.assertIn("private static readonly Type[] ManagedPanelTypes", source)

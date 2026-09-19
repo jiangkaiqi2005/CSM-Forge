@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
         }
 
         public static bool Prefix(DistrictTool.Layer layer, byte districtOrPark, float brushRadius,
-            Vector3 startPosition, Vector3 endPosition, bool force, out DistrictBrushAuthorityState __state)
+            Vector3 startPosition, Vector3 endPosition, bool notOverride, out DistrictBrushAuthorityState __state)
         {
             __state = null;
             if (RuntimeScopeGuard.IsApplying) return true;

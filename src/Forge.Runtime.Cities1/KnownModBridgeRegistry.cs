@@ -1,44 +1,60 @@
 using System;
 using System.Reflection;
-using ColossalFramework;
-using ColossalFramework.Plugins;
 using HarmonyLib;
-using ICities;
 
 namespace CsmForge.Runtime.Cities1
 {
+    internal sealed class KnownModBridgeDescriptor
+    {
+        private readonly Action registerAdapters;
+        private readonly Action<Harmony> installPatches;
+        private readonly Action reset;
+
+        public string UserModTypeName { get; private set; }
+
+        public KnownModBridgeDescriptor(string userModTypeName, Action register, Action<Harmony> install, Action resetState)
+        {
+            if (string.IsNullOrEmpty(userModTypeName)) throw new ArgumentException("Known Mod type is missing.", "userModTypeName");
+            UserModTypeName = userModTypeName;
+            registerAdapters = register;
+            installPatches = install;
+            reset = resetState;
+        }
+
+        public void RegisterIfActive(EnabledPluginCatalog catalog)
+        {
+            if (catalog != null && catalog.ContainsUserMod(UserModTypeName) && registerAdapters != null) registerAdapters();
+        }
+
+        public void InstallIfActive(EnabledPluginCatalog catalog, Harmony harmony)
+        {
+            if (catalog != null && catalog.ContainsUserMod(UserModTypeName) && installPatches != null) installPatches(harmony);
+        }
+
+        public void Reset() { if (reset != null) reset(); }
+    }
+
     internal static class KnownModBridgeRegistry
     {
         private static readonly object Gate = new object();
         private static bool demandControllerPatched;
+        private static readonly KnownModBridgeDescriptor[] Bridges =
+        {
+            new KnownModBridgeDescriptor("DemandController.DemandController", RegisterDemandController, InstallDemandController, ResetDemandController),
+            new KnownModBridgeDescriptor("GameAnarchy.Mod", RegisterGameAnarchy, GameAnarchyBridge.InstallOptionalPatches, GameAnarchyBridge.ResetPatchState),
+            new KnownModBridgeDescriptor("InfiniteGoodsMod.ModIdentity", RegisterInfiniteGoods, InfiniteGoodsBridge.InstallOptionalPatches, InfiniteGoodsBridge.ResetPatchState),
+            new KnownModBridgeDescriptor("EightyOne2.Mod", RegisterEightyOne, EightyOne2Bridge.InstallOptionalPatches, EightyOne2Bridge.ResetPatchState),
+            new KnownModBridgeDescriptor("NetworkMultitool.Mod", null, NetworkMultitoolBridge.InstallOptionalPatches, NetworkMultitoolBridge.ResetPatchState)
+        };
 
         internal static void RegisterAvailable()
         {
+            EnabledPluginCatalog enabled = EnabledPluginCatalog.Capture();
             lock (Gate)
             {
                 if (!Registered(TreeStateAdapter.Adapter)) ForgeExtensionApi.Register(new TreeStateAdapter());
                 if (!Registered(PropStateAdapter.Adapter)) ForgeExtensionApi.Register(new PropStateAdapter());
-                if (IsEnabled("DemandController.DemandController") && DemandControllerBridge.IsAvailable &&
-                    !Registered(DemandControllerBridgeAdapter.Adapter))
-                    ForgeExtensionApi.Register(new DemandControllerBridgeAdapter());
-                if (IsEnabled("GameAnarchy.Mod") && GameAnarchyBridge.IsAvailable && !Registered(GameAnarchyBridgeAdapter.Adapter))
-                    ForgeExtensionApi.Register(new GameAnarchyBridgeAdapter());
-                if (IsEnabled("InfiniteGoodsMod.ModIdentity") && InfiniteGoodsBridge.IsAvailable)
-                {
-                    if (!Registered(InfiniteGoodsBridgeAdapter.Adapter))
-                        ForgeExtensionApi.Register(new InfiniteGoodsBridgeAdapter());
-                    if (!Registered(InfiniteGoodsBuildingBufferAdapter.Adapter))
-                        ForgeExtensionApi.Register(new InfiniteGoodsBuildingBufferAdapter());
-                }
-                if (IsEnabled("EightyOne2.Mod") && EightyOne2Bridge.IsAvailable)
-                {
-                    if (!Registered(EightyOne2BridgeAdapter.Adapter))
-                        ForgeExtensionApi.Register(new EightyOne2BridgeAdapter());
-                    if (!Registered(EightyOne2ElectricityGridAdapter.Adapter))
-                        ForgeExtensionApi.Register(new EightyOne2ElectricityGridAdapter());
-                    if (!Registered(EightyOne2WaterGridAdapter.Adapter))
-                        ForgeExtensionApi.Register(new EightyOne2WaterGridAdapter());
-                }
+                for (int i = 0; i < Bridges.Length; i++) Bridges[i].RegisterIfActive(enabled);
                 // TM:PE remains a blocked-mod.  Keep its audited bridge code dormant until the
                 // UI-write audit and real multi-machine validation promote it to Supported.
                 // A blocked mod must not be patched or registered merely because its assembly is
@@ -49,22 +65,10 @@ namespace CsmForge.Runtime.Cities1
         internal static void InstallOptionalPatches(Harmony harmony)
         {
             if (harmony == null) throw new ArgumentNullException("harmony");
+            EnabledPluginCatalog enabled = EnabledPluginCatalog.Capture();
             lock (Gate)
             {
-                MethodInfo refresh = IsEnabled("DemandController.DemandController")
-                    ? DemandControllerBridge.ResolveRefresh() : null;
-                if (refresh != null && !demandControllerPatched)
-                {
-                    MethodInfo prefix = typeof(KnownModBridgeRegistry).GetMethod("DemandControllerRefreshPrefix",
-                        BindingFlags.Static | BindingFlags.NonPublic);
-                    if (prefix == null) throw new MissingMethodException("Demand Controller bridge prefix is unavailable.");
-                    harmony.Patch(refresh, new HarmonyMethod(prefix));
-                    demandControllerPatched = true;
-                }
-                if (IsEnabled("GameAnarchy.Mod")) GameAnarchyBridge.InstallOptionalPatches(harmony);
-                if (IsEnabled("InfiniteGoodsMod.ModIdentity")) InfiniteGoodsBridge.InstallOptionalPatches(harmony);
-                if (IsEnabled("EightyOne2.Mod")) EightyOne2Bridge.InstallOptionalPatches(harmony);
-                if (IsEnabled("NetworkMultitool.Mod")) NetworkMultitoolBridge.InstallOptionalPatches(harmony);
+                for (int i = 0; i < Bridges.Length; i++) Bridges[i].InstallIfActive(enabled, harmony);
                 // TM:PE is intentionally not patched while its compatibility kind is blocked-mod.
             }
         }
@@ -73,33 +77,55 @@ namespace CsmForge.Runtime.Cities1
         {
             lock (Gate)
             {
-                demandControllerPatched = false;
-                GameAnarchyBridge.ResetPatchState();
-                InfiniteGoodsBridge.ResetPatchState();
-                EightyOne2Bridge.ResetPatchState();
-                NetworkMultitoolBridge.ResetPatchState();
+                for (int i = 0; i < Bridges.Length; i++) Bridges[i].Reset();
             }
         }
+
+        private static void RegisterDemandController()
+        {
+            if (DemandControllerBridge.IsAvailable && !Registered(DemandControllerBridgeAdapter.Adapter))
+                ForgeExtensionApi.Register(new DemandControllerBridgeAdapter());
+        }
+
+        private static void RegisterGameAnarchy()
+        {
+            if (GameAnarchyBridge.IsAvailable && !Registered(GameAnarchyBridgeAdapter.Adapter))
+                ForgeExtensionApi.Register(new GameAnarchyBridgeAdapter());
+        }
+
+        private static void RegisterInfiniteGoods()
+        {
+            if (!InfiniteGoodsBridge.IsAvailable) return;
+            if (!Registered(InfiniteGoodsBridgeAdapter.Adapter)) ForgeExtensionApi.Register(new InfiniteGoodsBridgeAdapter());
+            if (!Registered(InfiniteGoodsBuildingBufferAdapter.Adapter)) ForgeExtensionApi.Register(new InfiniteGoodsBuildingBufferAdapter());
+        }
+
+        private static void RegisterEightyOne()
+        {
+            if (!EightyOne2Bridge.IsAvailable) return;
+            if (!Registered(EightyOne2BridgeAdapter.Adapter)) ForgeExtensionApi.Register(new EightyOne2BridgeAdapter());
+            if (!Registered(EightyOne2ElectricityGridAdapter.Adapter)) ForgeExtensionApi.Register(new EightyOne2ElectricityGridAdapter());
+            if (!Registered(EightyOne2WaterGridAdapter.Adapter)) ForgeExtensionApi.Register(new EightyOne2WaterGridAdapter());
+        }
+
+        private static void InstallDemandController(Harmony harmony)
+        {
+            MethodInfo refresh = DemandControllerBridge.ResolveRefresh();
+            if (refresh == null || demandControllerPatched) return;
+            MethodInfo prefix = typeof(KnownModBridgeRegistry).GetMethod("DemandControllerRefreshPrefix",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            if (prefix == null) throw new MissingMethodException("Demand Controller bridge prefix is unavailable.");
+            harmony.Patch(refresh, new HarmonyMethod(prefix));
+            demandControllerPatched = true;
+        }
+
+        private static void ResetDemandController() { demandControllerPatched = false; }
 
         private static bool Registered(string adapterId)
         {
             string[] values = ForgeExtensionApi.RegisteredAdapterIds;
             for (int i = 0; i < values.Length; i++)
                 if (StringComparer.Ordinal.Equals(values[i], adapterId)) return true;
-            return false;
-        }
-
-        private static bool IsEnabled(string userModTypeName)
-        {
-            PluginManager manager = Singleton<PluginManager>.instance;
-            if (manager == null) return false;
-            foreach (PluginManager.PluginInfo plugin in manager.GetPluginsInfo())
-            {
-                if (plugin == null || !plugin.isEnabled) continue;
-                IUserMod userMod = plugin.userModInstance as IUserMod;
-                if (userMod != null && StringComparer.Ordinal.Equals(userMod.GetType().FullName, userModTypeName))
-                    return true;
-            }
             return false;
         }
 

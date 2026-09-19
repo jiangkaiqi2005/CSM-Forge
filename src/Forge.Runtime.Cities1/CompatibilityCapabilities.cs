@@ -48,10 +48,10 @@ namespace CsmForge.Runtime.Cities1
             return "dlc-expansion=" + ExpansionDlc +
                 "; dlc-content=" + ModderPackDlc +
                 "; assets=" + Assets +
-                "; dependency-mods=" + DependencyMods +
+                "; dependency-mod-components=" + DependencyMods +
                 "; client-only-mods=" + ClientOnlyMods +
                 "; synchronized-mods=" + SynchronizedMods +
-                "; exact-mods=" + ExactMods +
+                "; exact-mod-components=" + ExactMods +
                 "; blocked-mods=" + BlockedMods +
                 "; state-adapters=" + StateAdapters +
                 "; extension-identity-namespaces=" + ExtensionIdentityServices.Maps.ActiveNamespaces().Length;

@@ -49,7 +49,7 @@ namespace CsmForge.Runtime.Cities1
 
                 return new ForgeRoomPreflightReport(true,
                     "开房检查通过：" + report.SynchronizedMods + " 个 Forge 同步 Mod，" +
-                    report.ExactMods + " 个需客户端完全一致的 Mod，" + report.Assets +
+                    report.ExactMods + " 个来自已启用插件、需客户端完全一致的 Mod 组件，" + report.Assets +
                     " 个需客户端具备的资产。创建后仍会逐个核对加入者清单。");
             }
             catch (Exception error)

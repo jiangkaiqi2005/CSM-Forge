@@ -186,6 +186,7 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
         self.assertIn("report.BlockedIds", source)
         self.assertIn("当前城市已被安全隔离", source)
         self.assertIn("创建后仍会逐个核对加入者清单", source)
+        self.assertIn("来自已启用插件、需客户端完全一致的 Mod 组件", source)
         self.assertIn("ForgeRoomPreflight.EvaluateHost()", ui)
         self.assertIn("重新检查 DLC / Mod / 资产", ui)
 

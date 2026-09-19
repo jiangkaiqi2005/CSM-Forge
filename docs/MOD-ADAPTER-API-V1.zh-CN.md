@@ -10,6 +10,21 @@ Forge 扩展层把 DLC 专属系统与第三方 Mod 接入同一条 Host Authori
 
 任何 adapter 都不得把 CS1 原生 `BuildingId / NetId / ParkId / EventId / VehicleId / DisasterId ...` 当作网络身份发送。实体型扩展必须通过 `IForgeAdapterContextV1` 使用 `EntityIdentityV2`。
 
+## 责任边界
+
+CSM-Forge 核心只负责房间协议、Host Authority、Stable ID、快照/恢复、兼容握手，以及运行 adapter 的确定性生命周期。核心不负责理解每个第三方 Mod 的全部业务规则或复制其 UI。
+
+第三方 Mod 或独立兼容桥负责：
+
+- 识别该 Mod 的本地语义写操作；
+- 把共享写入口转换为 Forge intent；
+- 捕获并投影该 Mod 自己拥有的绝对状态；
+- 声明经过审计的兼容类别和 schema 版本。
+
+CSM-Forge 只从 CS1 `PluginManager` 的 `isEnabled` 状态构造启用插件快照；程序集仅仅被 Mono 加载不代表 Mod 已启用。内置兼容桥通过统一描述符消费该快照。增加一个旧 Mod 的内置桥时，只增加一个描述符和对应 adapter，不得向房间、传输或 Authority 核心添加 Mod 名称分支。能够修改自身代码的 Mod 应优先直接使用本扩展接口，而不是把业务知识继续放进 CSM-Forge。
+
+`ExactMatch` 只证明二进制与配置一致，不代表该 Mod 的共享模拟行为已经获得支持。没有安全写入口封闭和真实多机证据时，不得把 ExactMatch 写成 gameplay validated。
+
 ## Adapter 类型
 
 ### `IForgeStateAdapterV1`

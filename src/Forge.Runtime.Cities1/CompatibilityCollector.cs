@@ -4,11 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using ColossalFramework;
 using ColossalFramework.Packaging;
-using ColossalFramework.Plugins;
 using CsmForge.Core;
-using ICities;
 
 namespace CsmForge.Runtime.Cities1
 {
@@ -32,25 +29,18 @@ namespace CsmForge.Runtime.Cities1
             List<ComponentFingerprint> entries = new List<ComponentFingerprint>();
             HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (PluginManager.PluginInfo plugin in Singleton<PluginManager>.instance.GetPluginsInfo())
+            EnabledPluginCatalog.Entry[] enabledPlugins = EnabledPluginCatalog.Capture().Entries;
+            for (int pluginIndex = 0; pluginIndex < enabledPlugins.Length; pluginIndex++)
             {
-                if (plugin == null || !plugin.isEnabled) continue;
-                IUserMod userMod = plugin.userModInstance as IUserMod;
-                string typeName = userMod == null ? null : userMod.GetType().FullName;
-                List<Assembly> assemblies = plugin.GetAssemblies();
-                foreach (Assembly assembly in assemblies)
+                EnabledPluginCatalog.Entry plugin = enabledPlugins[pluginIndex];
+                string typeName = plugin.UserModTypeName;
+                Assembly[] assemblies = plugin.Assemblies;
+                for (int assemblyIndex = 0; assemblyIndex < assemblies.Length; assemblyIndex++)
                 {
+                    Assembly assembly = assemblies[assemblyIndex];
                     if (assembly == null) continue;
                     string category = ModCategory(typeName, assembly);
-                    string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
-                    Add(entries, seen, id, BinaryHash(assembly), ModConfigurationHash(typeName, assembly));
-                }
-
-                if (assemblies.Count == 0 && userMod != null)
-                {
-                    Assembly assembly = userMod.GetType().Assembly;
-                    string category = ModCategory(typeName, assembly);
-                    string id = category + ":" + Workshop(plugin.publishedFileID.AsUInt64) + ":" + Canonical(assembly.GetName().Name);
+                    string id = category + ":" + Workshop(plugin.PublishedFileId) + ":" + Canonical(assembly.GetName().Name);
                     Add(entries, seen, id, BinaryHash(assembly), ModConfigurationHash(typeName, assembly));
                 }
             }

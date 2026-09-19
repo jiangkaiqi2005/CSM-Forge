@@ -56,13 +56,18 @@ class FixedSimulationModBridgeContractTests(unittest.TestCase):
 
     def test_disabled_known_mod_assemblies_do_not_activate_bridges(self) -> None:
         registry = (RUNTIME / "KnownModBridgeRegistry.cs").read_text(encoding="utf-8-sig")
+        catalog = (RUNTIME / "EnabledPluginCatalog.cs").read_text(encoding="utf-8-sig")
         bridge = (RUNTIME / "GameAnarchyBridge.cs").read_text(encoding="utf-8-sig")
         for type_name in [
             "DemandController.DemandController", "GameAnarchy.Mod", "InfiniteGoodsMod.ModIdentity",
             "EightyOne2.Mod", "NetworkMultitool.Mod",
         ]:
-            self.assertIn(f'IsEnabled("{type_name}")', registry)
-        self.assertIn("plugin.isEnabled", registry)
+            self.assertEqual(registry.count(f'"{type_name}"'), 1)
+        self.assertIn("KnownModBridgeDescriptor", registry)
+        self.assertIn("EnabledPluginCatalog.Capture()", registry)
+        self.assertNotIn("GetPluginsInfo()", registry)
+        self.assertIn("plugin.isEnabled", catalog)
+        self.assertIn("ContainsUserMod", catalog)
         self.assertIn("DeclaredMethod(setter)", bridge)
 
 

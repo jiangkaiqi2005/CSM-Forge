@@ -42,11 +42,20 @@ class ModCompatibilityFrameworkContractTests(unittest.TestCase):
         self.assertEqual(collector.count("SteamHelper.GetOwnedExpansionMask()"), 1)
         self.assertEqual(collector.count("SteamHelper.GetOwnedModderPackMask()"), 1)
 
+    def test_manifest_uses_the_shared_runtime_enabled_plugin_catalog(self) -> None:
+        collector = (RUNTIME / "CompatibilityCollector.cs").read_text(encoding="utf-8-sig")
+        catalog = (RUNTIME / "EnabledPluginCatalog.cs").read_text(encoding="utf-8-sig")
+        self.assertIn("EnabledPluginCatalog.Capture()", collector)
+        self.assertNotIn("GetPluginsInfo()", collector)
+        self.assertIn("plugin.isEnabled", catalog)
+        self.assertIn("plugin.userModInstance as IUserMod", catalog)
+
     def test_public_adapter_documentation_locks_authority_model(self) -> None:
         docs = (REPO / "docs" / "MOD-ADAPTER-API-V1.zh-CN.md").read_text(encoding="utf-8-sig")
         for value in [
             "IForgeShardedStateAdapterV1", "IForgeInteractiveShardedStateAdapterV1",
             "ForgeCompatibilityApi.Declare", "sync-mod:*", "EntityIdentityV2", "Command Replay",
+            "责任边界", "isEnabled", "ExactMatch", "gameplay validated",
         ]:
             self.assertIn(value, docs)
 

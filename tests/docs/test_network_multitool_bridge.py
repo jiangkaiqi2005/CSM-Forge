@@ -56,8 +56,8 @@ class NetworkMultitoolBridgeContractTests(unittest.TestCase):
         self.assertIn("NetworkMultitoolBridge.TryExecuteHost", net)
         self.assertIn("RuntimeScopeGuard.EnterApply(Load, Id)", net)
         registry = (RUNTIME / "KnownModBridgeRegistry.cs").read_text(encoding="utf-8-sig")
-        self.assertIn("NetworkMultitoolBridge.InstallOptionalPatches(harmony)", registry)
-        self.assertIn("NetworkMultitoolBridge.ResetPatchState()", registry)
+        self.assertIn('new KnownModBridgeDescriptor("NetworkMultitool.Mod", null, NetworkMultitoolBridge.InstallOptionalPatches', registry)
+        self.assertIn("NetworkMultitoolBridge.ResetPatchState)", registry)
 
     def test_absolute_projection_orders_topology_dependencies(self) -> None:
         net = (RUNTIME / "NetDomain.cs").read_text(encoding="utf-8-sig")

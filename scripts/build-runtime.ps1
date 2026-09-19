@@ -174,8 +174,11 @@ $sourceCommit = (& git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
     throw 'Could not resolve the package source commit.'
 }
-$sourceRef = (& git -C $repo branch --show-current).Trim()
+$sourceRef = (@(& git -C $repo branch --show-current) -join '').Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the package source ref.' }
+if ([string]::IsNullOrWhiteSpace($sourceRef)) {
+    $sourceRef = if ([string]::IsNullOrWhiteSpace($env:GITHUB_HEAD_REF)) { 'detached-head' } else { $env:GITHUB_HEAD_REF }
+}
 $dlls = @(Get-ChildItem -LiteralPath $stage -File -Filter '*.dll' | Sort-Object Name | ForEach-Object {
     [ordered]@{
         name = $_.Name

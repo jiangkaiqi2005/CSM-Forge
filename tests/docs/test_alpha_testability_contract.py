@@ -21,6 +21,7 @@ class AlphaTestabilityContractTests(unittest.TestCase):
         self.assertIn("README-CANDIDATE.txt", build)
         self.assertIn("BUILD_INFO.json", build)
         self.assertIn("source_commit=$sourceCommit", build)
+        self.assertIn("detached-head", build)
         self.assertIn("gameplay_validation='NOT RUN BY CI'", build)
         self.assertLess(build.index("README-CANDIDATE.txt"), build.rindex("SHA256SUMS.txt"))
 

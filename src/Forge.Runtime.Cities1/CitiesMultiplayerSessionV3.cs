@@ -57,6 +57,9 @@ namespace CsmForge.Runtime.Cities1
         private LoadIdentity load;
         private CompatibilityManifest localManifest;
         private CompatibilityPolicy hostPolicy;
+        private VerificationCadence districtVerifyCadence;
+        private VerificationCadence zoneVerifyCadence;
+        private const long GridVerifyIntervalMilliseconds = 5000;
         private LiteNetServerTransport server;
         private LiteNetClientTransport client;
         private AuthorityCoordinatorV2 authority;
@@ -200,6 +203,7 @@ namespace CsmForge.Runtime.Cities1
             try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; clientSnapshot = null; snapshotSave = null;
             authority = null; replica = null; joins = null;
+            districtVerifyCadence = null; zoneVerifyCadence = null;
             ClearAllDomainReferences();
             hostPolicy = null; localManifest = null; publishedSnapshot = null;
             hostPeers.Clear(); memberGenerations.Clear(); clientManifestPages = null; clientOffer = null;
@@ -321,6 +325,23 @@ namespace CsmForge.Runtime.Cities1
                 else if (replica != null) RuntimeServices.Metadata.Update(load, replica.Revision, replica.CurrentRoot);
             }
             catch (Exception error) { FenceSession("session-after-tick:" + error.GetType().Name); }
+        }
+
+        /// <summary>
+        /// Expensive full-grid reconciles (district 262k cells, zone 32k blocks) run on a cadence
+        /// instead of every tick (WP-1.1). Patch-driven publishes stay immediate; any net/zone/
+        /// district authority commit forces the next poll (BroadcastBatch).
+        /// </summary>
+        internal bool DistrictVerificationDue()
+        {
+            VerificationCadence cadence = districtVerifyCadence;
+            return cadence != null && cadence.ShouldVerify(MonotonicMilliseconds());
+        }
+
+        internal bool ZoneVerificationDue()
+        {
+            VerificationCadence cadence = zoneVerifyCadence;
+            return cadence != null && cadence.ShouldVerify(MonotonicMilliseconds());
         }
 
         private void DrainBudgetIntents()
@@ -526,6 +547,15 @@ namespace CsmForge.Runtime.Cities1
             foreach (HostPeer peer in hostPeers.Values)
                 if (peer.Live || peer.StateSubscribed)
                     SendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch));
+            // Net/zone/district game writes cascade into each other's grids (a new segment creates
+            // zoned blocks; a brush moves district cells), so re-verify those grids next poll
+            // instead of waiting out the cadence window (WP-1.1).
+            if (batch.DomainId == NetAuthorityDomain.Id || batch.DomainId == ZoneAuthorityDomain.Id ||
+                batch.DomainId == DistrictAuthorityDomain.Id)
+            {
+                if (districtVerifyCadence != null) districtVerifyCadence.Force();
+                if (zoneVerifyCadence != null) zoneVerifyCadence.Force();
+            }
         }
 
         private void SetSnapshotPause()

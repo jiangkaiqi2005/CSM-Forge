@@ -209,6 +209,9 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostZones()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostZones == null || authority == null || snapshotSave != null) return;
+            // WP-1.1: the 32k-block sparse capture no longer runs every tick. Net/zone commits
+            // force the next poll immediately (BroadcastBatch); this cadence poll is the safety net.
+            if (!ZoneVerificationDue()) return;
             Hash256 before = hostZones.StateRoot;
             ZoneMutationV2 mutation = hostZones.ReconcileWorld();
             PublishObservedZoneMutation(before, mutation);

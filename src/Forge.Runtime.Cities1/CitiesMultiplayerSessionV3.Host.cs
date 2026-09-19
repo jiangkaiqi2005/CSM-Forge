@@ -22,6 +22,9 @@ namespace CsmForge.Runtime.Cities1
                 IAuthorityDomainV2[] domains = CreateHostDomains(load);
                 authority = new AuthorityCoordinatorV2(new SessionStamp(load.WorldId, load.Epoch), domains);
                 joins = new JoinCoordinator(MonotonicMilliseconds);
+                long gridVerifyNow = MonotonicMilliseconds();
+                districtVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
+                zoneVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);
                 hostDisplayName = displayName;

@@ -32,21 +32,32 @@
 
 ## 2. 工作包
 
-### WP-1.1 低频安全点验证（收益最大，独立可做）
+### WP-1.1 低频安全点验证（收益最大，独立可做）—— 已实现，待真机验收
 
-- **改动**：`CitiesMultiplayerSessionV3.cs:320` `AfterSimulationTick` 不再每 tick 读取
-  `authority.CurrentRoot`；根哈希只在下列安全点计算：
-  1. 进入暂停 / 恢复暂停；
-  2. 存档（快照/检查点）时；
-  3. 有客户端完成加入、被踢、断开时；
-  4. 周期性定时器（建议先 5 秒，budgets.json 的 `automatic_resync_window=300000` 之内可调）。
-- **运行期一致性**：沿用现有意图/命令转发（host 提交 batch → 副本按序应用），
-  不新增机制。
-- **发散检测延迟**：从"下一 tick"变为"最多 N 秒"。接受理由：检测后的恢复路径
-  （已验证快照 + 追赶）成本远低于每 tick 全量验证；原版 CSM 连检测都没有。
-- **注意**：快速档（3x）大城市下 N 秒内的批量变化变大，验证须分帧分批，单次预算 ≤ 4ms。
-- **验收**：PERF 窗口新增 `verify.count/avgMs/maxMs` 计量点；联机稳态 frame.avgMs 下降；
-  既有 root-mismatch 测试用例全绿。
+- **诊断修正（实现时逐行复核）**：原评估认为 `AfterSimulationTick` 每 tick 读取的
+  `authority.CurrentRoot` 是开销点——复核后确认它是内核缓存属性
+  （`AuthoritySessionV2.cs` 仅在 PublishBatch 时更新），读取便宜。真正的每 tick
+  O(城市) 成本在**观测轮询路径**：
+  - `PollObservedHostDistricts` → `PublishObservedHostDistrict` → `ObserveHostWorld() →
+    ReconcileAll()`：无条件全量遍历 262,144 个区划网格单元（`DistrictPolicyPolling.cs`、
+    `DistrictDomain.cs:268`）；
+  - `PollObservedHostZones` → `ReconcileWorld() → CaptureSparse`：无条件全量遍历
+    32,768 个区格（`NetSessionBridge.cs`、`ZoneDomain.cs:137-139`）。
+  另注意：`NetDomainBase.CurrentRoot`（`NetDomain.cs:172`）每次读取都全量
+  `CaptureWorld()`，作用于意图提交/观测发布路径（每次修路约 3-5 次全路网遍历）——
+  属于 WP-1.4 增量根的范围，本工作包不动它。
+- **实现**（分支 `feat/wp-1.1-lazy-root-verification`）：
+  - `Forge.Core/VerificationCadence`：单调时钟节拍器，`ShouldVerify`（窗口消费语义）+
+    `Force()`（安全点/权威提交后立即触发）；`CadenceTests` 7 项确定性回归测试。
+  - 区划/区格轮询接入 5 秒窗口（`GridVerifyIntervalMilliseconds`）；brush/策略补丁
+    驱动的发布保持即时；`BroadcastBatch` 在 Net/Zone/District 批次后 Force 两个节拍器，
+    "修路 → 新区块 → 区格同步"仍在一 tick 内收敛（与旧行为一致）。
+  - `AfterSimulationTick` 保持不变（读取确认为缓存语义）。
+- **残留风险**：未被补丁覆盖的宿主侧区划/区格写最多延迟一个窗口（5 秒）才发布；
+  由 Force 钩子 + 定时窗口两级兜底。副本端 Committed 索引随发布批次推进，语义不变。
+- **验收**：单测 190/190（含 7 项新增）；net35 构建 0 警告 0 错误；真机日志对比待
+  E3/E4（注意：`[CSM-Forge][PERF]` 计时器存在于安装版构建但不在本分支源码中，
+  属构建溯源断链 S 项，需先回移才能出对比数据）。
 
 ### WP-1.2 P1 分级响应（"卡死感"的另一半）
 

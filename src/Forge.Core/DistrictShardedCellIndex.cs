@@ -42,7 +42,7 @@ namespace CsmForge.Core
 
         public int ShardOf(uint cellIndex)
         {
-            if (cellIndex >= ShardCount * CellsPerShard) throw new ArgumentOutOfRangeException("cellIndex");
+            Check.OutOfRange(cellIndex >= ShardCount * CellsPerShard, "cellIndex");
             return (int)(cellIndex / CellsPerShard);
         }
 
@@ -62,7 +62,7 @@ namespace CsmForge.Core
 
         public void MarkSourceDirty(int shard)
         {
-            if (shard < 0 || shard >= ShardCount) throw new ArgumentOutOfRangeException("shard");
+            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
             sourceDirty[shard] = true;
         }
 
@@ -127,7 +127,7 @@ namespace CsmForge.Core
         /// </summary>
         public DistrictCellStateV2[] ReconcileShard(int shard, IDictionary<uint, DistrictCellStateV2> sourceCells)
         {
-            if (shard < 0 || shard >= ShardCount) throw new ArgumentOutOfRangeException("shard");
+            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
             if (sourceCells == null) throw new ArgumentNullException("sourceCells");
             List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
             List<uint> removals = new List<uint>();
@@ -183,7 +183,7 @@ namespace CsmForge.Core
 
         public Hash256 ShardRoot(int shard)
         {
-            if (shard < 0 || shard >= ShardCount) throw new ArgumentOutOfRangeException("shard");
+            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
             if (shardRoots[shard] == null) shardRoots[shard] = ComputeShardRoot(shard);
             return shardRoots[shard];
         }

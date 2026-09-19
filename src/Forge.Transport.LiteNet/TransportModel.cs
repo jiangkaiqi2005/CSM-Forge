@@ -33,8 +33,8 @@ namespace CsmForge.Transport.LiteNet
 
         public BoundedTransportQueue(int maxEvents, int maxBytes)
         {
-            if (maxEvents < 8 || maxEvents > 4096) throw new ArgumentOutOfRangeException("maxEvents");
-            if (maxBytes < 65536 || maxBytes > 64 * 1024 * 1024) throw new ArgumentOutOfRangeException("maxBytes");
+            Check.OutOfRange(maxEvents < 8 || maxEvents > 4096, "maxEvents");
+            Check.OutOfRange(maxBytes < 65536 || maxBytes > 64 * 1024 * 1024, "maxBytes");
             this.maxEvents = maxEvents;
             this.maxBytes = maxBytes;
         }

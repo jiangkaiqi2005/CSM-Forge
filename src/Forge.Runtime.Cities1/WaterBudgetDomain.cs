@@ -10,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
         public int Budget { get; private set; }
         public WaterBudgetIntent(bool night, int budget)
         {
-            if (budget < 0 || budget > 255) throw new ArgumentOutOfRangeException("budget");
+            Check.OutOfRange(budget < 0 || budget > 255, "budget");
             Night = night; Budget = budget;
         }
     }
@@ -21,7 +21,7 @@ namespace CsmForge.Runtime.Cities1
         public int Night { get; private set; }
         public WaterBudgetState(int day, int night)
         {
-            if (day < 0 || day > 255 || night < 0 || night > 255) throw new ArgumentOutOfRangeException("day");
+            Check.OutOfRange(day < 0 || day > 255 || night < 0 || night > 255, "day");
             Day = day; Night = night;
         }
         public Hash256 Root { get { return Hash256.Compute(new byte[] { (byte)Day, (byte)Night }); } }

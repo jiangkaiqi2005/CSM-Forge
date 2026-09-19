@@ -107,7 +107,7 @@ namespace CsmForge.Core
         {
             ValidatePrefab(prefabKey);
             if (start == null || middle == null || end == null) throw new ArgumentNullException("controlPoint");
-            if (maxSegments <= 0 || maxSegments > 1024) throw new ArgumentOutOfRangeException("maxSegments");
+            Check.OutOfRange(maxSegments <= 0 || maxSegments > 1024, "maxSegments");
             return new NetIntentV2
             {
                 Kind = NetIntentKindV2.Create, PrefabKey = prefabKey, Start = start, Middle = middle, End = end,
@@ -298,7 +298,7 @@ namespace CsmForge.Core
             UpsertSegments = Copy(upsertSegments, "upsertSegments");
             DeleteSegments = Copy(deleteSegments, "deleteSegments");
             if (ConstructionCount > 4096) throw new ArgumentException("Net mutation is too large.");
-            if (constructionCost < 0 || refund < 0) throw new ArgumentOutOfRangeException("cost");
+            Check.OutOfRange(constructionCost < 0 || refund < 0, "cost");
             ConstructionCost = constructionCost; Refund = refund;
         }
 

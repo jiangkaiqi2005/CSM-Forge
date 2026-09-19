@@ -19,7 +19,7 @@ namespace CsmForge.Checkpoints
         {
             if (snapshotId == Guid.Empty || root == null || string.IsNullOrEmpty(path) || contentHash == null)
                 throw new ArgumentException("Snapshot descriptor is incomplete.");
-            if (length <= 0 || length > MaximumBytes) throw new ArgumentOutOfRangeException("length");
+            Check.OutOfRange(length <= 0 || length > MaximumBytes, "length");
             SnapshotId = snapshotId; Revision = revision; Root = root; Path = path; Length = length; ContentHash = contentHash;
         }
 

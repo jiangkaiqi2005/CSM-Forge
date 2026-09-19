@@ -14,7 +14,7 @@ namespace CsmForge.Runtime.Cities1
 
         public StableMappingShardIndex(int shardCount)
         {
-            if (shardCount <= 0) throw new ArgumentOutOfRangeException("shardCount");
+            Check.OutOfRange(shardCount <= 0, "shardCount");
             this.shardCount = shardCount;
         }
 
@@ -41,7 +41,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EntityMapEntryV2[] Get(int shardIndex)
         {
-            if (shardIndex < 0 || shardIndex >= shardCount) throw new ArgumentOutOfRangeException("shardIndex");
+            Check.OutOfRange(shardIndex < 0 || shardIndex >= shardCount, "shardIndex");
             if (entries == null) throw new InvalidOperationException("Stable mapping shard index has not been built.");
             return entries[shardIndex];
         }

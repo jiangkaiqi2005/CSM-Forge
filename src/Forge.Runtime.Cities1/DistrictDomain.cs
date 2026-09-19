@@ -35,7 +35,7 @@ namespace CsmForge.Runtime.Cities1
         public static DistrictCellStateV2 CaptureCell(uint index, EntityIdMapV2 ids)
         {
             DistrictManager manager = DistrictManager.instance;
-            if (manager == null || index >= manager.m_districtGrid.Length) throw new ArgumentOutOfRangeException("index");
+            Check.OutOfRange(manager == null || index >= manager.m_districtGrid.Length, "index");
             DistrictManager.Cell cell = manager.m_districtGrid[index];
             return new DistrictCellStateV2(index,
                 ResolveCellDistrict(cell.m_district1, cell.m_alpha1, ids), cell.m_alpha1,

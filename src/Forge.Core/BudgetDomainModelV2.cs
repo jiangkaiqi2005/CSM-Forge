@@ -33,7 +33,7 @@ namespace CsmForge.Core
         public int Budget { get; private set; }
         public BudgetStateV2(BudgetKeyV2 key, int budget)
         {
-            if (budget < 0 || budget > 255) throw new ArgumentOutOfRangeException("budget");
+            Check.OutOfRange(budget < 0 || budget > 255, "budget");
             Key = key; Budget = budget;
         }
     }

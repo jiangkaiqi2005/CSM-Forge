@@ -17,7 +17,7 @@ namespace CsmForge.Runtime.Cities1
 
         private static void Validate(int value)
         {
-            if (value < 0 || value > 100) throw new ArgumentOutOfRangeException("demand");
+            Check.OutOfRange(value < 0 || value > 100, "demand");
         }
 
         public Hash256 Root

@@ -19,8 +19,8 @@ namespace CsmForge.Core
         {
             Check.Stamp(stamp);
             Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer identity.");
-            if (totalBytes < 1 || totalBytes > Limits.SnapshotBytes) throw new ArgumentOutOfRangeException("totalBytes");
-            if (chunkBytes < 1 || chunkBytes > 32768) throw new ArgumentOutOfRangeException("chunkBytes");
+            Check.OutOfRange(totalBytes < 1 || totalBytes > Limits.SnapshotBytes, "totalBytes");
+            Check.OutOfRange(chunkBytes < 1 || chunkBytes > 32768, "chunkBytes");
             long count = (totalBytes + chunkBytes - 1) / chunkBytes;
             if (count > 8192) throw new ArgumentException("Too many snapshot chunks.");
             Check.NotNull(contentHash, "contentHash"); Check.NotNull(stateHash, "stateHash"); // WP-2: per-argument reporting
@@ -31,7 +31,7 @@ namespace CsmForge.Core
 
         public int LengthOf(int index)
         {
-            if (index < 0 || index >= ChunkCount) throw new ArgumentOutOfRangeException("index");
+            Check.OutOfRange(index < 0 || index >= ChunkCount, "index");
             return (int)Math.Min(ChunkBytes, TotalBytes - (long)index * ChunkBytes);
         }
     }

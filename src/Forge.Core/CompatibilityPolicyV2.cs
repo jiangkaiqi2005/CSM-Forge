@@ -21,7 +21,7 @@ namespace CsmForge.Core
         public CompatibilityRuleV2(string prefix, CompatibilityRequirementV2 hostRequirement, bool allowClientExtra)
         {
             Check.CanonicalId(prefix, 128, "prefix", "Invalid compatibility prefix."); // D2: shared canonical guard
-            if (!Enum.IsDefined(typeof(CompatibilityRequirementV2), hostRequirement)) throw new ArgumentOutOfRangeException("hostRequirement");
+            Check.OutOfRange(!Enum.IsDefined(typeof(CompatibilityRequirementV2), hostRequirement), "hostRequirement");
             Prefix = prefix;
             HostRequirement = hostRequirement;
             AllowClientExtra = allowClientExtra;

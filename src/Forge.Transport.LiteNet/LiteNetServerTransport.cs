@@ -23,7 +23,7 @@ namespace CsmForge.Transport.LiteNet
 
         public bool Start(int port, string key)
         {
-            if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException("port");
+            Check.OutOfRange(port < 1 || port > 65535, "port");
             Check.Condition(string.IsNullOrEmpty(key) || key.Length > 128, "key", "Invalid room key.");
             EventBasedNetListener listener = new EventBasedNetListener();
             NetManager manager = new NetManager(listener) { AutoRecycle = true }; // WP-1.7: recycle pooled packets per receive

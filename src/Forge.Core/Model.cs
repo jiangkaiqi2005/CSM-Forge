@@ -68,6 +68,12 @@ namespace CsmForge.Core
             if (value < minimum || value > maximum) throw new ArgumentOutOfRangeException(name);
         }
 
+        /// <summary>WP-2: pass the VIOLATION condition - throws ArgumentOutOfRangeException(name).</summary>
+        public static void OutOfRange(bool violation, string name)
+        {
+            if (violation) throw new ArgumentOutOfRangeException(name);
+        }
+
         public static void CanonicalId(string value, int maximumLength, string name, string message)
         {
             if (string.IsNullOrEmpty(value) || value.Length > maximumLength) throw new ArgumentException(message, name);
@@ -92,7 +98,7 @@ namespace CsmForge.Core
         public Intent(SessionStamp stamp, ulong requestId, ulong expectedRevision, byte[] bytes)
         {
             Check.Stamp(stamp);
-            if (requestId == 0) throw new ArgumentOutOfRangeException("requestId");
+            Check.OutOfRange(requestId == 0, "requestId");
             Stamp = stamp;
             RequestId = requestId;
             ExpectedRevision = expectedRevision;

@@ -24,8 +24,8 @@ namespace CsmForge.Core
         public static BuildingIntentV2 Create(string prefabKey, float x, float y, float z, float angle, byte length, int constructionCost)
         {
             ValidatePrefab(prefabKey); ValidateFloat(x); ValidateFloat(y); ValidateFloat(z); ValidateFloat(angle);
-            if (length == 0) throw new ArgumentOutOfRangeException("length");
-            if (constructionCost < 0 || constructionCost > 1000000000) throw new ArgumentOutOfRangeException("constructionCost");
+            Check.OutOfRange(length == 0, "length");
+            Check.OutOfRange(constructionCost < 0 || constructionCost > 1000000000, "constructionCost");
             return new BuildingIntentV2 { Kind = BuildingIntentKindV2.Create, PrefabKey = prefabKey, X = x, Y = y, Z = z,
                 Angle = angle, Length = length, ConstructionCost = constructionCost };
         }
@@ -62,8 +62,8 @@ namespace CsmForge.Core
             Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             BuildingIntentV2.ValidatePrefab(prefabKey); BuildingIntentV2.ValidateFloat(x); BuildingIntentV2.ValidateFloat(y);
             BuildingIntentV2.ValidateFloat(z); BuildingIntentV2.ValidateFloat(angle);
-            if (length == 0) throw new ArgumentOutOfRangeException("length");
-            if (constructionCost < 0 || constructionCost > 1000000000) throw new ArgumentOutOfRangeException("constructionCost");
+            Check.OutOfRange(length == 0, "length");
+            Check.OutOfRange(constructionCost < 0 || constructionCost > 1000000000, "constructionCost");
             Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Angle = angle; Length = length;
             BuildIndex = buildIndex; ConstructionCost = constructionCost;
         }
@@ -90,7 +90,7 @@ namespace CsmForge.Core
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity, int refundAmount)
         {
             Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
-            if (refundAmount < 0 || refundAmount > 1000000000) throw new ArgumentOutOfRangeException("refundAmount");
+            Check.OutOfRange(refundAmount < 0 || refundAmount > 1000000000, "refundAmount");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Deleted, Entity = entity, RefundAmount = refundAmount };
         }
     }

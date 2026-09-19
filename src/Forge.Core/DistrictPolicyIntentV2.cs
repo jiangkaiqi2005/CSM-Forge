@@ -25,7 +25,7 @@ namespace CsmForge.Core
                 throw new ArgumentException("District policy requires a stable district identity.", "district");
             if (targetKind == DistrictPolicyTargetKindV2.City && district.IsValid)
                 throw new ArgumentException("City policy must not carry a district identity.", "district");
-            if (policyValue == 0) throw new ArgumentOutOfRangeException("policyValue");
+            Check.OutOfRange(policyValue == 0, "policyValue");
             TargetKind = targetKind;
             District = district;
             PolicyValue = policyValue;

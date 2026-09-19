@@ -19,8 +19,12 @@
 >   Check.Condition 的断言式/违规式语义反了，被测试套件当场抓住并修正**
 >   （这正是"先写确定性回归再动结构"纪律的价值案例）；ANE 总数 224→25（-89%），
 >   AE 总数 216→130（剩余为多行/复合条件与 message-only 变体，继续按批转换）。
->   **剩余**：AE 130 的多行变体、AOORE 84（`Check.InRange` 需逐处提取边界）；
->   桥反射面校验已合并（见下）。
+> - **D2 第三轮已完成（WP-2c）**：新增 `Check.OutOfRange(violation, name)`（违规语义，
+>   异常类型逐字保留）并转换全部 71 处单行 AOORE——AOORE 单行模式清零；
+>   多子句复合条件原样保留为违规条件。**剩余**：AE 130 的多行变体、
+>   AOORE 少量多行变体（跨行条件），按批继续。
+>   **桥反射面校验已合并**：`BridgeSurfaceValidator`（GA/IG 共用，
+>   requireVoid 保留 IG 语义，异常逐字一致）。
 > - D3 已在 WP-1.2 部分落地（广播容错驱逐 + UI 停止走调度），`FenceSession` 前的
 >   "踢可疑 peer 观察一轮"中间档仍待做。
 > - **D2 桥反射面校验已合并**：`BridgeSurfaceValidator`（Runtime.Cities1）统一

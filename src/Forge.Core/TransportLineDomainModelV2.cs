@@ -119,7 +119,7 @@ namespace CsmForge.Core
             }
             else if (!target.IsValid) throw new ArgumentException("Invalid transport line target.", "target");
             bool route = kind == TransportLineIntentKindV2.AddStop || kind == TransportLineIntentKindV2.RemoveStop || kind == TransportLineIntentKindV2.MoveStop;
-            if (route && stopIndex < -1) throw new ArgumentOutOfRangeException("stopIndex");
+            Check.OutOfRange(route && stopIndex < -1, "stopIndex");
             if ((kind == TransportLineIntentKindV2.AddStop || kind == TransportLineIntentKindV2.MoveStop) && stop == null)
                 throw new ArgumentNullException("stop");
             Kind = kind; Target = target; PrefabKey = prefabKey;

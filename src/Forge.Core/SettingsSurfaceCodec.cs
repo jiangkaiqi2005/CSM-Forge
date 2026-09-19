@@ -48,7 +48,7 @@ namespace CsmForge.Core
             if (localOnlySettings == null || blockedBooleanSettings == null || fixedValueRules == null)
                 throw new ArgumentNullException("surface policy");
             Check.Condition(string.IsNullOrEmpty(surfaceName), "surfaceName", "Invalid surface name.");
-            if (maximumStateBytes < MinimumStateBytes) throw new ArgumentOutOfRangeException("maximumStateBytes");
+            Check.OutOfRange(maximumStateBytes < MinimumStateBytes, "maximumStateBytes");
 
             List<PropertyInfo> selected = new List<PropertyInfo>();
             List<string> selectedNames = new List<string>();

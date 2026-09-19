@@ -26,7 +26,7 @@ namespace CsmForge.Runtime.Cities1
         public static void Declare(Assembly assembly, ForgeModCompatibilityKind kind)
         {
             Check.NotNull(assembly, "assembly");
-            if (!Enum.IsDefined(typeof(ForgeModCompatibilityKind), kind)) throw new ArgumentOutOfRangeException("kind");
+            Check.OutOfRange(!Enum.IsDefined(typeof(ForgeModCompatibilityKind), kind), "kind");
             string key = assembly.FullName;
             Check.Condition(string.IsNullOrEmpty(key), "assembly", "Assembly identity is unavailable.");
             lock (Gate)

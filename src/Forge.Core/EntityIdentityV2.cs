@@ -34,7 +34,7 @@ namespace CsmForge.Core
         public EntityMapEntryV2(EntityIdentityV2 identity, uint nativeId)
         {
             Check.Condition(!identity.IsValid, "identity", "Invalid entity identity.");
-            if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
+            Check.OutOfRange(nativeId == 0, "nativeId");
             Identity = identity;
             NativeId = nativeId;
         }
@@ -63,7 +63,7 @@ namespace CsmForge.Core
 
         public EntityIdentityV2 Allocate(uint nativeId)
         {
-            if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
+            Check.OutOfRange(nativeId == 0, "nativeId");
             if (byNative.ContainsKey(nativeId)) throw new InvalidOperationException("Native ID is already bound.");
             if (nextEntityId == ulong.MaxValue) throw new InvalidOperationException("Entity identity space exhausted.");
             EntityIdentityV2 identity = new EntityIdentityV2(++nextEntityId, 1);
@@ -76,7 +76,7 @@ namespace CsmForge.Core
         public void BindKnown(EntityIdentityV2 identity, uint nativeId)
         {
             Check.Condition(!identity.IsValid, "identity", "Invalid entity identity.");
-            if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
+            Check.OutOfRange(nativeId == 0, "nativeId");
             if (retired.Contains(identity.EntityId)) throw new InvalidOperationException("Retired entity identity cannot be rebound.");
             Entry current;
             if (byEntity.TryGetValue(identity.EntityId, out current))

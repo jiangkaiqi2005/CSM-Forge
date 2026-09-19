@@ -12,8 +12,8 @@ namespace CsmForge.Protocol
 
         public IntentReceiptV2(ulong operationCounter, AuthoritySubmitDecisionV2 decision, ulong revision)
         {
-            if (operationCounter == 0) throw new ArgumentOutOfRangeException("operationCounter");
-            if (!Enum.IsDefined(typeof(AuthoritySubmitDecisionV2), decision)) throw new ArgumentOutOfRangeException("decision");
+            Check.OutOfRange(operationCounter == 0, "operationCounter");
+            Check.OutOfRange(!Enum.IsDefined(typeof(AuthoritySubmitDecisionV2), decision), "decision");
             if (decision == AuthoritySubmitDecisionV2.Committed && revision == 0)
                 throw new ArgumentException("Committed receipt requires a revision.");
             OperationCounter = operationCounter;

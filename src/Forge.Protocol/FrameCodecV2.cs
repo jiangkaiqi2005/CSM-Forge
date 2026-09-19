@@ -55,12 +55,12 @@ namespace CsmForge.Protocol
         public SessionFrameV2(SessionLane lane, MessageKindV2 kind, SessionStamp stamp, Guid connectionBinding,
             ulong sequence, Guid correlationId, ushort payloadSchemaVersion, byte[] bytes)
         {
-            if (!Enum.IsDefined(typeof(SessionLane), lane)) throw new ArgumentOutOfRangeException("lane");
-            if (!Enum.IsDefined(typeof(MessageKindV2), kind)) throw new ArgumentOutOfRangeException("kind");
+            Check.OutOfRange(!Enum.IsDefined(typeof(SessionLane), lane), "lane");
+            Check.OutOfRange(!Enum.IsDefined(typeof(MessageKindV2), kind), "kind");
             Check.Condition(!stamp.IsValid, "stamp", "Invalid session stamp.");
             Check.Condition(connectionBinding == Guid.Empty, "connectionBinding", "Missing connection binding.");
-            if (sequence == 0) throw new ArgumentOutOfRangeException("sequence");
-            if (payloadSchemaVersion == 0) throw new ArgumentOutOfRangeException("payloadSchemaVersion");
+            Check.OutOfRange(sequence == 0, "sequence");
+            Check.OutOfRange(payloadSchemaVersion == 0, "payloadSchemaVersion");
             if (bytes == null || bytes.Length > Limits.FramePayloadBytes)
                 throw new ArgumentException("Invalid frame payload.", "bytes");
             if (ExpectedLane(kind) != lane) throw new ArgumentException("Message kind is not valid on this lane.");
@@ -223,7 +223,7 @@ namespace CsmForge.Protocol
 
         public BootstrapFrame(BootstrapKind kind, byte[] bytes)
         {
-            if (!Enum.IsDefined(typeof(BootstrapKind), kind)) throw new ArgumentOutOfRangeException("kind");
+            Check.OutOfRange(!Enum.IsDefined(typeof(BootstrapKind), kind), "kind");
             if (bytes == null || bytes.Length > BootstrapCodec.MaxPayloadBytes)
                 throw new ArgumentException("Bootstrap payload is outside the allowed range.", "bytes");
             Kind = kind;

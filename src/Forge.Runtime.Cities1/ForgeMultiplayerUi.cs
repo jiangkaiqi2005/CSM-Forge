@@ -364,12 +364,12 @@ namespace CsmForge.Runtime.Cities1
                 case MultiplayerSessionMode.Offline: return "尚未连接。";
                 case MultiplayerSessionMode.StartingHost: return "正在创建房间……";
                 case MultiplayerSessionMode.Hosting:
-                    return "房间运行中 · " + Math.Max(1, value.Players.Length) + " 人 · 城市版本 " + value.Revision;
+                    return "房间运行中 · " + Math.Max(1, value.Players.Length) + " 人";
                 case MultiplayerSessionMode.ConnectingClient: return "正在连接并核对游戏内容……";
                 case MultiplayerSessionMode.ClientCatchingUp:
-                    return "正在同步房主城市…… · 城市版本 " + value.Revision;
+                    return "正在同步房主城市……";
                 case MultiplayerSessionMode.ClientLive:
-                    return "已加入房间 · " + Math.Max(1, value.Players.Length) + " 人 · 城市版本 " + value.Revision;
+                    return "已加入房间 · " + Math.Max(1, value.Players.Length) + " 人";
                 case MultiplayerSessionMode.Faulted:
                     return "联机已停止。诊断代码：" + value.Detail;
                 default: return "正在更新联机状态……";
@@ -555,7 +555,7 @@ namespace CsmForge.Runtime.Cities1
             players = Label("玩家：读取中……", 92);
             Button("玩家列表", 132, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgePlayersPanel>(); });
             Button("多人聊天（快捷键 T）", 184, delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeChatPanel>(); });
-            invite = Button("邀请 Steam 好友", 236, InviteFriends);
+            invite = Button("复制直连邀请并打开 Steam", 236, InviteFriends);
             Button("停止房间 / 断开", 288,
                 delegate { ForgeMultiplayerUi.OpenChildPanel<ForgeLeaveConfirmPanel>(); });
             Button("关闭", 350, delegate { ForgeMultiplayerUi.CloseOrBack(this); });

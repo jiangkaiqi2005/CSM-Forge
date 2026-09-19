@@ -12,9 +12,13 @@ namespace CsmForge.Runtime.Cities1
         private const uint Magic = 0x31555046u; // FPU1
         private const int Shards = 256;
         internal const string Adapter = "builtin.path-results";
+        private static PathUnitStateAdapter current;
         private readonly Dictionary<EntityIdentityV2, State> replicaStates = new Dictionary<EntityIdentityV2, State>();
         private readonly byte[][] replicaShards = new byte[Shards][];
+        private readonly StableMappingShardIndex mappingShards = new StableMappingShardIndex(Shards);
         private int capturesUntilReconcile;
+
+        public PathUnitStateAdapter() { current = this; }
 
         public string AdapterId { get { return Adapter; } }
         public uint SchemaVersion { get { return 1; } }
@@ -25,6 +29,7 @@ namespace CsmForge.Runtime.Cities1
             if (native == 0 || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
             EntityIdMapV2 ids = ExtensionIdentityServices.Maps.GetOrAttach(Adapter); EntityIdentityV2 ignored;
             if (!ids.TryGetIdentity(native, out ignored)) ids.Allocate(native);
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         internal static EntityIdentityV2 ResolveHostIdentity(uint native)
@@ -55,6 +60,7 @@ namespace CsmForge.Runtime.Cities1
                 uint native; if (ids.TryGetNative(identities[i], out native) && !Live(manager, native) && !ids.Retire(identities[i]))
                     throw new InvalidOperationException("Released Host Path identity could not be retired.");
             }
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
@@ -62,11 +68,12 @@ namespace CsmForge.Runtime.Cities1
             if (context == null) throw new ArgumentNullException("context"); ValidateShard(shardIndex);
             if (!context.IsAuthoritative && replicaShards[shardIndex] != null) return (byte[])replicaShards[shardIndex].Clone();
             PathManager manager = PathManager.instance; if (manager == null) throw new InvalidOperationException("PathManager is unavailable.");
-            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHostMappings(context, manager); capturesUntilReconcile = Shards; }
-            EntityMapEntryV2[] mappings = context.SnapshotMappings(); List<State> values = new List<State>();
+            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHostMappings(context, manager); mappingShards.Invalidate(); capturesUntilReconcile = Shards; }
+            if (!mappingShards.IsValid) mappingShards.Rebuild(context);
+            EntityMapEntryV2[] mappings = mappingShards.Get(shardIndex); List<State> values = new List<State>();
             for (int i = 0; i < mappings.Length; i++)
             {
-                EntityMapEntryV2 mapping = mappings[i]; if ((int)((mapping.Identity.EntityId - 1UL) % Shards) != shardIndex) continue;
+                EntityMapEntryV2 mapping = mappings[i];
                 if (!Live(manager, mapping.NativeId)) continue;
                 values.Add(CaptureOne(context, manager, mapping));
             }

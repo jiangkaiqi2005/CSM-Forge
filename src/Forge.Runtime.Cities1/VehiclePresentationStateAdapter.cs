@@ -16,6 +16,7 @@ namespace CsmForge.Runtime.Cities1
         private static VehiclePresentationStateAdapter current;
         private readonly byte[][] replicaShards = new byte[Shards][];
         private readonly Dictionary<ushort, EntityIdentityV2> replicaPathByNative = new Dictionary<ushort, EntityIdentityV2>();
+        private readonly StableMappingShardIndex mappingShards = new StableMappingShardIndex(Shards);
         private int capturesUntilReconcile;
 
         public VehiclePresentationStateAdapter() { current = this; }
@@ -29,6 +30,7 @@ namespace CsmForge.Runtime.Cities1
             if (native == 0 || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
             EntityIdMapV2 ids = ExtensionIdentityServices.Maps.GetOrAttach(Adapter); EntityIdentityV2 ignored;
             if (!ids.TryGetIdentity(native, out ignored)) ids.Allocate(native);
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         internal static void ReconcileReleasedHostVehicles()
@@ -36,6 +38,7 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive || VehicleManager.instance == null) return;
             EntityIdMapV2 ids = ExtensionIdentityServices.Maps.GetOrAttach(Adapter); EntityMapEntryV2[] entries = ids.SnapshotEntries();
             for (int i = 0; i < entries.Length; i++) if (!Live(entries[i].NativeId)) ids.Retire(entries[i].Identity);
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
@@ -43,11 +46,12 @@ namespace CsmForge.Runtime.Cities1
             if (context == null) throw new ArgumentNullException("context"); ValidateShard(shardIndex);
             if (!context.IsAuthoritative && replicaShards[shardIndex] != null) return (byte[])replicaShards[shardIndex].Clone();
             VehicleManager manager = VehicleManager.instance; if (manager == null) throw new InvalidOperationException("VehicleManager is unavailable.");
-            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHost(context, manager); capturesUntilReconcile = Shards; }
-            EntityMapEntryV2[] mappings = context.SnapshotMappings(); List<State> values = new List<State>();
+            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHost(context, manager); mappingShards.Invalidate(); capturesUntilReconcile = Shards; }
+            if (!mappingShards.IsValid) mappingShards.Rebuild(context);
+            EntityMapEntryV2[] mappings = mappingShards.Get(shardIndex); List<State> values = new List<State>();
             for (int i = 0; i < mappings.Length; i++)
             {
-                EntityMapEntryV2 mapping = mappings[i]; if ((int)((mapping.Identity.EntityId - 1UL) % Shards) != shardIndex || !Live(mapping.NativeId)) continue;
+                EntityMapEntryV2 mapping = mappings[i]; if (!Live(mapping.NativeId)) continue;
                 Vehicle data = manager.m_vehicles.m_buffer[(ushort)mapping.NativeId]; VehicleInfo info = data.Info;
                 if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("Vehicle prefab is unavailable.");
                 State value = new State
@@ -145,8 +149,18 @@ namespace CsmForge.Runtime.Cities1
 
         private static EntityIdentityV2 Stable(StableNameTargetKindV2 kind, uint native, bool host)
         {
-            if (native == 0) return default(EntityIdentityV2); EntityIdentityV2 identity;
-            if (!RuntimeServices.Multiplayer.TryResolveStableNameIdentity(kind, native, host, out identity)) throw new InvalidOperationException("Vehicle references an unmapped stable entity."); return identity;
+            if (native == 0) return default(EntityIdentityV2);
+            if (kind == StableNameTargetKindV2.Building)
+            {
+                BuildingManager manager = BuildingManager.instance;
+                if (manager == null || native >= (uint)manager.m_buildings.m_buffer.Length ||
+                    manager.m_buildings.m_buffer[(ushort)native].m_flags == Building.Flags.None)
+                    return default(EntityIdentityV2);
+            }
+            EntityIdentityV2 identity;
+            if (!RuntimeServices.Multiplayer.TryResolveStableNameIdentity(kind, native, host, out identity))
+                throw new InvalidOperationException("Vehicle references a live unmapped stable entity.");
+            return identity;
         }
 
         private static ushort Resolve(StableNameTargetKindV2 kind, EntityIdentityV2 identity)

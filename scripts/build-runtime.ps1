@@ -127,7 +127,7 @@ First two-machine test:
 1. Back up the Host city and install the exact same ZIP + CitiesHarmony on both machines.
 2. Run VERIFY-INSTALL.ps1 on both machines and compare source_commit + manifest_sha256.
 3. Host enters the city to share, presses Esc, then chooses FORGE 多人联机 -> 创建房间（当前城市作为房主）.
-4. Host opens CSM-Forge multiplayer from the pause menu and chooses 邀请 Steam 好友. Forge copies the direct-connect invitation and opens the official Steam friends overlay; paste the invitation to the friend. Automatic Steam click-to-join is disabled because two real CS1 runs hit native access violations in the manually declared Steam ABI. This is direct UDP discovery only and does not provide NAT traversal or relay.
+4. Host opens CSM-Forge multiplayer from the pause menu and chooses 复制直连邀请并打开 Steam. Forge copies the direct-connect invitation and opens the official Steam friends overlay; paste the invitation to the friend. Automatic Steam click-to-join is disabled because two real CS1 runs hit native access violations in the manually declared Steam ABI. This is direct UDP discovery only and does not provide NAT traversal or relay.
 5. Client stays at the main menu, chooses FORGE 联机, pastes the invitation text, then chooses 加入房间. Forge downloads and loads the Host snapshot automatically; the Client must not load a placeholder city first.
 6. Wait until Client status is ClientLive before editing.
 7. Test pause/speed, one road, one building, zoning, district brush/policy, tax/budget, area unlock and one transport line.

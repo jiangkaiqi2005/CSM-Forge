@@ -17,6 +17,7 @@ namespace CsmForge.Runtime.Cities1
         private readonly byte[][] replicaShards = new byte[Shards][];
         private readonly Dictionary<EntityIdentityV2, uint> replicaOwners = new Dictionary<EntityIdentityV2, uint>();
         private readonly Dictionary<ushort, EntityIdentityV2> replicaPathByNative = new Dictionary<ushort, EntityIdentityV2>();
+        private readonly StableMappingShardIndex mappingShards = new StableMappingShardIndex(Shards);
         private int capturesUntilReconcile;
 
         public CitizenInstancePresentationStateAdapter() { current = this; }
@@ -30,6 +31,7 @@ namespace CsmForge.Runtime.Cities1
             if (native == 0 || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
             EntityIdMapV2 ids = ExtensionIdentityServices.Maps.GetOrAttach(Adapter); EntityIdentityV2 ignored;
             if (!ids.TryGetIdentity(native, out ignored)) ids.Allocate(native);
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         internal static void ReconcileReleasedHostInstances()
@@ -37,6 +39,7 @@ namespace CsmForge.Runtime.Cities1
             if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive || CitizenManager.instance == null) return;
             EntityIdMapV2 ids = ExtensionIdentityServices.Maps.GetOrAttach(Adapter); EntityMapEntryV2[] entries = ids.SnapshotEntries();
             for (int i = 0; i < entries.Length; i++) if (!Live(entries[i].NativeId)) ids.Retire(entries[i].Identity);
+            if (current != null) current.mappingShards.Invalidate();
         }
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
@@ -44,11 +47,12 @@ namespace CsmForge.Runtime.Cities1
             if (context == null) throw new ArgumentNullException("context"); ValidateShard(shardIndex);
             if (!context.IsAuthoritative && replicaShards[shardIndex] != null) return (byte[])replicaShards[shardIndex].Clone();
             CitizenManager manager = CitizenManager.instance; if (manager == null) throw new InvalidOperationException("CitizenManager is unavailable.");
-            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHost(context, manager); capturesUntilReconcile = Shards; }
-            EntityMapEntryV2[] mappings = context.SnapshotMappings(); List<State> values = new List<State>();
+            if (context.IsAuthoritative && capturesUntilReconcile-- <= 0) { ReconcileHost(context, manager); mappingShards.Invalidate(); capturesUntilReconcile = Shards; }
+            if (!mappingShards.IsValid) mappingShards.Rebuild(context);
+            EntityMapEntryV2[] mappings = mappingShards.Get(shardIndex); List<State> values = new List<State>();
             for (int i = 0; i < mappings.Length; i++)
             {
-                EntityMapEntryV2 mapping = mappings[i]; if ((int)((mapping.Identity.EntityId - 1UL) % Shards) != shardIndex || !Live(mapping.NativeId)) continue;
+                EntityMapEntryV2 mapping = mappings[i]; if (!Live(mapping.NativeId)) continue;
                 CitizenInstance data = manager.m_instances.m_buffer[(ushort)mapping.NativeId]; CitizenInfo info = data.Info;
                 if (info == null || string.IsNullOrEmpty(info.name)) throw new InvalidOperationException("CitizenInstance prefab is unavailable.");
                 State value = new State
@@ -134,7 +138,18 @@ namespace CsmForge.Runtime.Cities1
 
         private static bool Live(uint native)
         { return CitizenManager.instance != null && native != 0 && native < CitizenManager.instance.m_instances.m_buffer.Length && (int)CitizenManager.instance.m_instances.m_buffer[(ushort)native].m_flags != 0; }
-        private static EntityIdentityV2 StableBuilding(ushort native, bool host) { if (native == 0) return default(EntityIdentityV2); EntityIdentityV2 value; if (!RuntimeServices.Multiplayer.TryResolveStableNameIdentity(StableNameTargetKindV2.Building, native, host, out value)) throw new InvalidOperationException("CitizenInstance references an unmapped Building identity."); return value; }
+        private static EntityIdentityV2 StableBuilding(ushort native, bool host)
+        {
+            if (native == 0) return default(EntityIdentityV2);
+            BuildingManager manager = BuildingManager.instance;
+            if (manager == null || native >= manager.m_buildings.m_buffer.Length ||
+                manager.m_buildings.m_buffer[native].m_flags == Building.Flags.None)
+                return default(EntityIdentityV2);
+            EntityIdentityV2 value;
+            if (!RuntimeServices.Multiplayer.TryResolveStableNameIdentity(StableNameTargetKindV2.Building, native, host, out value))
+                throw new InvalidOperationException("CitizenInstance references a live unmapped Building identity.");
+            return value;
+        }
         private static ushort ResolveBuilding(EntityIdentityV2 identity) { if (!identity.IsValid) return 0; uint native; if (!RuntimeServices.Multiplayer.TryResolveStableNameNative(StableNameTargetKindV2.Building, identity, false, out native) || native == 0 || native > ushort.MaxValue) throw new InvalidOperationException("CitizenInstance Building reference is unavailable."); return (ushort)native; }
 
         private static byte[] Encode(int shard, IList<State> values)

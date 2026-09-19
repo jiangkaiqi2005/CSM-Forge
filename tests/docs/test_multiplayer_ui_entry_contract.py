@@ -215,7 +215,8 @@ class MultiplayerUiEntryContractTests(unittest.TestCase):
 
     def test_visible_invitation_action_is_honest_about_lan_transport(self):
         source = (RUNTIME / "ForgeMultiplayerUi.cs").read_text(encoding="utf-8")
-        self.assertIn("邀请 Steam 好友", source)
+        self.assertIn("复制直连邀请并打开 Steam", source)
+        self.assertNotIn('Button("邀请 Steam 好友"', source)
         self.assertIn("直连邀请码", source)
         self.assertIn("不提供 NAT 穿透", source)
         self.assertIn("GameOverlayDialog.Friends", source)

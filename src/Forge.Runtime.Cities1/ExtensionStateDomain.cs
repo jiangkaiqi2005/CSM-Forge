@@ -251,20 +251,16 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostExtensions()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostExtensions == null || authority == null || snapshotSave != null) return;
-            for (int i = 0; i < 8; i++)
+            ExtensionObservedChange change;
+            if (!hostExtensions.PollNextHostEntry(out change) || change == null) return;
+            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ExtensionStateAuthorityDomain.Id,
+                change.BeforeRoot, change.AfterRoot, change.Delta);
+            if (batch == null || authority.IsFenced)
             {
-                ExtensionObservedChange change;
-                if (!hostExtensions.PollNextHostEntry(out change)) return;
-                if (change == null) continue;
-                AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, ExtensionStateAuthorityDomain.Id,
-                    change.BeforeRoot, change.AfterRoot, change.Delta);
-                if (batch == null || authority.IsFenced)
-                {
-                    FenceSession("observed-extension-change-could-not-commit");
-                    return;
-                }
-                BroadcastBatch(batch);
+                FenceSession("observed-extension-change-could-not-commit");
+                return;
             }
+            BroadcastBatch(batch);
         }
     }
 }

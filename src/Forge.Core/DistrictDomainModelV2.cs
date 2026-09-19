@@ -145,10 +145,34 @@ namespace CsmForge.Core
     public sealed class DistrictStateIndexV2
     {
         private readonly SortedDictionary<ulong, DistrictEntityStateV2> entities = new SortedDictionary<ulong, DistrictEntityStateV2>();
-        private readonly SortedDictionary<uint, DistrictCellStateV2> cells = new SortedDictionary<uint, DistrictCellStateV2>();
+        private readonly DistrictShardedCellIndex cells = new DistrictShardedCellIndex(); // WP-1.4: sharded, incremental roots
         public int EntityCount { get { return entities.Count; } }
-        public int CellCount { get { return cells.Count; } }
-        public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
+        public int CellCount { get { return cells.CellCount; } }
+
+        /// <summary>
+        /// WP-1.4: the root is entities + the sharded cell aggregate, so a cell change only
+        /// re-encodes one 512-cell shard instead of hashing all 262k cells on every read.
+        /// Magic bumped to FGD3: host and replica must run the same root formula (a mixed
+        /// fleet fails the schema check by design).
+        /// </summary>
+        public Hash256 Root
+        {
+            get
+            {
+                using (MemoryStream stream = new MemoryStream())
+                {
+                    BinaryWriter writer = new BinaryWriter(stream);
+                    writer.Write(0x33444746u); // FGD3
+                    writer.Write((ushort)entities.Count);
+                    foreach (DistrictEntityStateV2 entity in entities.Values)
+                    {
+                        WriteIdentity(writer, entity.Entity); writer.Write(entity.RandomSeed); writer.Write(entity.Style);
+                    }
+                    writer.Write(cells.AggregateRoot.ToArray());
+                    writer.Flush(); return Hash256.Compute(stream.ToArray());
+                }
+            }
+        }
 
         public void SeedEntity(DistrictEntityStateV2 value) { UpsertEntity(value, false); }
         public void SeedCell(DistrictCellStateV2 value)
@@ -157,8 +181,7 @@ namespace CsmForge.Core
             // and ValidateReferences.
             ValidateReferences(value);
             if (value.IsEmpty) return;
-            if (cells.ContainsKey(value.Index)) throw new InvalidOperationException("Duplicate district cell.");
-            cells.Add(value.Index, value);
+            cells.ApplyCell(value.Index, value);
         }
 
         public void Apply(DistrictMutationV2 mutation)
@@ -168,14 +191,14 @@ namespace CsmForge.Core
             for (int i = 0; i < mutation.Cells.Length; i++)
             {
                 DistrictCellStateV2 cell = mutation.Cells[i]; ValidateReferences(cell);
-                if (cell.IsEmpty) cells.Remove(cell.Index); else cells[cell.Index] = cell;
+                cells.ApplyCell(cell.Index, cell); // empty cell = removal (semantics unchanged)
             }
             for (int i = 0; i < mutation.DeleteEntities.Length; i++)
             {
                 EntityIdentityV2 id = mutation.DeleteEntities[i]; DistrictEntityStateV2 current;
                 if (!entities.TryGetValue(id.EntityId, out current) || !current.Entity.Equals(id))
                     throw new InvalidOperationException("Cannot delete unknown or stale district entity.");
-                foreach (DistrictCellStateV2 cell in cells.Values)
+                foreach (DistrictCellStateV2 cell in cells.Cells)
                     for (int slot = 0; slot < 4; slot++)
                         if (cell.AlphaAt(slot) != 0 && cell.IdentityAt(slot).Equals(id))
                             throw new InvalidOperationException("Cannot delete a district still referenced by the grid.");
@@ -189,7 +212,22 @@ namespace CsmForge.Core
             if (!id.IsValid || !entities.TryGetValue(id.EntityId, out current) || !current.Entity.Equals(id)) return false;
             value = current; return true;
         }
-        public bool TryGetCell(uint index, out DistrictCellStateV2 value) { return cells.TryGetValue(index, out value); }
+        public bool TryGetCell(uint index, out DistrictCellStateV2 value) { return cells.TryGetCell(index, out value); }
+
+        /// <summary>WP-1.4: mark a grid shard as possibly drifted from the game (Harmony hooks).</summary>
+        public void MarkCellSourceDirty(uint cellIndex) { cells.MarkSourceDirtyForCell(cellIndex); }
+
+        /// <summary>WP-1.4: cheap reconcile of source-dirty shards; returns changed cell count.</summary>
+        public int ReconcileCellsSourceDirty(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        { return cells.ReconcileSourceDirty(source); }
+
+        /// <summary>WP-1.4: full verification reconcile over all 512 shards; catches bypassed writes.</summary>
+        public int ReconcileCellsFull(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        { return cells.ReconcileAll(source); }
+
+        /// <summary>WP-1.4: cached shard aggregate must always equal a full recompute.</summary>
+        public Hash256 CellAggregateRoot { get { return cells.AggregateRoot; } }
+        public Hash256 RecomputedCellAggregateRoot { get { return cells.RecomputeFullAggregateRoot(); } }
 
         private void UpsertEntity(DistrictEntityStateV2 value, bool allowReplace)
         {
@@ -216,29 +254,8 @@ namespace CsmForge.Core
             }
         }
 
-        private byte[] EncodeCanonical()
-        {
-            using (MemoryStream stream = new MemoryStream())
-            {
-                BinaryWriter writer = new BinaryWriter(stream);
-                writer.Write(0x32444746u); // FGD2
-                writer.Write((ushort)entities.Count);
-                foreach (DistrictEntityStateV2 entity in entities.Values)
-                {
-                    WriteIdentity(writer, entity.Entity); writer.Write(entity.RandomSeed); writer.Write(entity.Style);
-                }
-                writer.Write((uint)cells.Count);
-                foreach (DistrictCellStateV2 cell in cells.Values)
-                {
-                    writer.Write(cell.Index);
-                    for (int slot = 0; slot < 4; slot++)
-                    {
-                        writer.Write(cell.AlphaAt(slot)); WriteIdentity(writer, cell.IdentityAt(slot));
-                    }
-                }
-                writer.Flush(); return stream.ToArray();
-            }
-        }
+        // WP-1.4: the old EncodeCanonical (full 262k-cell walk per Root read) is gone; the root
+        // formula above hashes entities plus the sharded cell aggregate instead.
 
         internal static void WriteIdentity(BinaryWriter writer, EntityIdentityV2 value)
         {

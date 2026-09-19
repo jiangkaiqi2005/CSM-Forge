@@ -94,17 +94,25 @@
   `CellEquivalent`/`ApplyCell` 的 null 比较——值类型无 null 可言，校验保留在构造器内。
 - **验收**：单测 209/209；net35 构建 0 警告 0 错误；真机 PERF 对比待 E3/E4。
 
-### WP-1.4 脏分片 + 增量根（治本）
+### WP-1.4 脏分片/增量根（治本）—— 第一片已实现，待真机验收
 
-- **写入点脏标记**：Harmony 前缀挂在各 Manager 的变更入口（模式已由
-  GameAnarchy setter prefix 验证可行）；标记粒度 = 分片。
-- **分片规范**：区划网格按行带分片（参照 `TreePropStateAdapters` 已有 512 分片先例）、
-  路网按 node/segment id 段分片；每片独立根，聚合根 = 各片根的规范聚合
-  （复用 `AuthorityCoordinatorV2.AggregateRoot` 的编码纪律）。
-- **快照/加入路径不变**：绝对增量与全量快照仍按现有通道，只是根的计算变增量。
-- **风险**：漏标写入口 → 假阴性发散检测。缓解：保留低频全量校验兜底（WP-1.1 的定时点），
-  两级校验互补。
-- **验收**：注入"绕过脏标记的写"的回归测试必须能被定时全量校验捕获（确定性失败先行的仓库惯例）。
+- **已实现（Core）**：`Forge.Core/DistrictShardedCellIndex`——262,144 格按 512 分片 × 512 槽
+  组织（TreePropStateAdapters 分片先例），每片缓存规范根、聚合根 = 512 片根的哈希；
+  单格变更只重编码所在分片。两类独立的脏概念：hash-dirty（内部，聚合根懒重算）与
+  source-dirty（运行时提示，Harmony 钩子置位、re-读该分片的 reconcile 清除）。
+- **确定性失败回归（DistrictShardedCellIndexTests，4 项）**：核心一项是
+  `BypassedWriteIsInvisibleToCheapReconcileAndCaughtByFullVerify`——绕过 source-dirty
+  标记的写对廉价路径不可见（根保持旧值），必然被全量校验捕获并收敛到与诚实直写一致的根；
+  另有 source-dirty 驱动廉价路径、根稳定性与插入顺序无关、边界与空格移除。
+- **已接入**：`DistrictStateIndexV2` 的 cells 换成分片索引；`Root` 公式升级为
+  FGD3（实体 + 分片聚合根）——之前每次 Root 读取都全量编码 + 哈希 262k 格，
+  现在只重算 hash-dirty 分片；`ReconcileCellsSourceDirty`/`ReconcileCellsFull`
+  供运行时两级校验使用，与 WP-1.1 的 VerificationCadence 窗口衔接
+  （窗口触发 = 全量校验；Harmony 钩子置位 = 廉价路径）。
+- **剩余（下一片）**：Harmony 在 DistrictManager 变更点置 source-dirty（运行时廉价路径）；
+  `NetDomain.CaptureWorld` 的同构分片化；根公式升级 FGD3 需要宿主/副本同版本
+  （混跑由 schema 检查按设计拒绝）。
+- **验收**：单测 213/213（+4）；net35 构建 0 警告 0 错误；真机 PERF 对比待 E3/E4。
 
 ### WP-1.5 哈希移出主线程（依赖 WP-1.4）
 

@@ -25,12 +25,27 @@ namespace CsmForge.Core
         public string[] KnownSynchronizedModTypes { get; private set; }
         public GameAnarchySurfaceData GameAnarchy { get; private set; }
         public InfiniteGoodsSurfaceData InfiniteGoods { get; private set; }
+        public IList<ModEntryData> Mods { get; private set; }
+
+        /// <summary>WP-3.2b: generic per-mod entry lookup (userModType -> manifest entry).</summary>
+        public bool TryGetModEntry(string userModType, out ModEntryData entry)
+        {
+            entry = null;
+            if (userModType == null || Mods == null) return false;
+            for (int i = 0; i < Mods.Count; i++)
+            {
+                if (Mods[i] == null || !StringComparer.Ordinal.Equals(Mods[i].UserModType, userModType)) continue;
+                entry = Mods[i]; return true;
+            }
+            return false;
+        }
 
         private ModCompatibilityDocument() { }
 
         private ModCompatibilityDocument(string dependencyModType, string blockedModType,
             string[] clientOnlyModTypes, string demandController, string gameAnarchy, string infiniteGoods,
-            string eightyOne2, string networkMultitool, GameAnarchySurfaceData ga, InfiniteGoodsSurfaceData ig)
+            string eightyOne2, string networkMultitool, GameAnarchySurfaceData ga, InfiniteGoodsSurfaceData ig,
+            IList<ModEntryData> mods)
         {
             DependencyModType = dependencyModType; BlockedModType = blockedModType;
             ClientOnlyModTypes = clientOnlyModTypes;
@@ -42,22 +57,48 @@ namespace CsmForge.Core
                 demandController, gameAnarchy, infiniteGoods, eightyOne2, networkMultitool
             };
             GameAnarchy = ga; InfiniteGoods = ig;
+            Mods = mods ?? new List<ModEntryData>();
         }
 
         public static ModCompatibilityDocument BuiltIn()
         {
+            string dependency = "CitiesHarmony.Mod";
+            string blocked = "TrafficManager.Lifecycle.TrafficManagerMod";
+            string demand = "DemandController.DemandController";
+            string gameAnarchy = "GameAnarchy.Mod";
+            string infiniteGoods = "InfiniteGoodsMod.ModIdentity";
+            string eightyOne2 = "EightyOne2.Mod";
+            string networkMultitool = "NetworkMultitool.Mod";
+            string[] clientOnly =
+            {
+                "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
+                "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod",
+                "AchieveIt.ModInfo", "ACME.Mod", "PrecisionEngineering.Mod"
+            };
+            GameAnarchySurfaceData ga = GameAnarchySurfaceData.BuiltIn();
+            InfiniteGoodsSurfaceData ig = InfiniteGoodsSurfaceData.BuiltIn();
+
+            List<ModEntryData> mods = new List<ModEntryData>
+            {
+                new ModEntryData(dependency, "dependency"),
+                new ModEntryData(blocked, "blocked"),
+                new ModEntryData(demand, "synchronized", "DemandController.Settings"),
+                new ModEntryData(gameAnarchy, "synchronized", ga.SettingsTypeName,
+                    ga.AssemblyName, ga.SupportedVersion, ga.HolderTypeNames,
+                    ga.LocalOnlySettings, ga.UnsupportedBooleanSettings,
+                    new[] { "OilDepletionRate/OreDepletionRate (both rates must be 100)", "BuildingSpreadFireProbability/TreeSpreadFireProbability (fire-spread overrides)", "CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)" },
+                    new[] { "OilDepletionRate", "OreDepletionRate", "BuildingSpreadFireProbability", "TreeSpreadFireProbability", "CurrentUnlockMode", "CurrentMilestoneLevel" },
+                    new[] { ga.FixedOilDepletionRate, ga.FixedOilDepletionRate, ga.FixedSpreadFireProbability, ga.FixedSpreadFireProbability, 0L, 0L }),
+                new ModEntryData(infiniteGoods, "synchronized"),
+                new ModEntryData(eightyOne2, "synchronized"),
+                new ModEntryData(networkMultitool, "synchronized")
+            };
+            foreach (string clientOnlyEntry in clientOnly)
+                mods.Add(new ModEntryData(clientOnlyEntry, "client-only"));
+
             return new ModCompatibilityDocument(
-                "CitiesHarmony.Mod",
-                "TrafficManager.Lifecycle.TrafficManagerMod",
-                new[]
-                {
-                    "LoadingScreenMod.Mod", "MyFirstMod.DestroyChirperMod", "RemoveChirper.RemoveChirper",
-                    "ChirpRemover.ChirpRemover", "MoreAspectRatios.MoreAspectRatios", "FPSCamera.Mod",
-                    "AchieveIt.ModInfo", "ACME.Mod", "PrecisionEngineering.Mod"
-                },
-                "DemandController.DemandController", "GameAnarchy.Mod", "InfiniteGoodsMod.ModIdentity",
-                "EightyOne2.Mod", "NetworkMultitool.Mod",
-                GameAnarchySurfaceData.BuiltIn(), InfiniteGoodsSurfaceData.BuiltIn());
+                dependency, blocked, clientOnly, demand, gameAnarchy, infiniteGoods,
+                eightyOne2, networkMultitool, ga, ig, mods);
         }
 
         /// <summary>Strict schema reader; every field is required and bounds-checked.</summary>
@@ -88,8 +129,21 @@ namespace CsmForge.Core
             InfiniteGoodsSurfaceData ig;
             if (!InfiniteGoodsSurfaceData.TryParse(infiniteGoodsNode, out ig)) return false;
 
+            List<ModEntryData> mods = new List<ModEntryData>();
+            JsonNode modsNode;
+            if (node.TryGet("mods", out modsNode) && modsNode != null)
+            {
+                if (modsNode.Kind != JsonKind.Array || modsNode.Items.Count > 512) return false;
+                for (int i = 0; i < modsNode.Items.Count; i++)
+                {
+                    ModEntryData entry;
+                    if (!ModEntryData.TryParse(modsNode.Items[i], out entry)) return false;
+                    mods.Add(entry);
+                }
+            }
+
             document = new ModCompatibilityDocument(dependency, blocked, clientOnly, demand, gameAnarchy,
-                infiniteGoods, eightyOne2, multiTool, ga, ig);
+                infiniteGoods, eightyOne2, multiTool, ga, ig, mods);
             return true;
         }
 
@@ -222,9 +276,123 @@ namespace CsmForge.Core
         }
     }
 
-    /// <summary>Parse-side helpers shared by the typed readers (not a document itself).</summary>
-    internal static class ModCompatibilityDocumentParse
+
+    /// <summary>
+    /// WP-3.2b: one generic mod entry of the multi-mod manifest. Category is one of
+    /// "client-only" / "synchronized" / "blocked" / "dependency"; the settings surface is
+    /// required for "synchronized" and ignored otherwise. Unknown fields are ignored
+    /// (forward compatible); any malformed field rejects the whole document.
+    /// </summary>
+    public sealed class ModEntryData
     {
+        public string UserModType { get; private set; }
+        public string Category { get; private set; }
+        public string AssemblyName { get; private set; }
+        public string SupportedVersion { get; private set; }
+        public string SettingsTypeName { get; private set; }
+        public string[] HolderTypeNames { get; private set; }
+        public string[] LocalOnlySettings { get; private set; }
+        public string[] BlockedBooleanSettings { get; private set; }
+        public string[] FixedValueLabels { get; private set; }
+        public string[] FixedValuePropertyNames { get; private set; }
+        public long[] FixedValueRequired { get; private set; }
+
+        private ModEntryData() { }
+
+        internal ModEntryData(string userModType, string category)
+        { UserModType = userModType; Category = category; }
+
+        internal ModEntryData(string userModType, string category, string settingsTypeName)
+        { UserModType = userModType; Category = category; SettingsTypeName = settingsTypeName; }
+
+        internal ModEntryData(string userModType, string category, string settingsTypeName,
+            string assemblyName, string supportedVersion, string[] holderTypeNames,
+            string[] localOnlySettings, string[] blockedBooleanSettings,
+            string[] fixedValueLabels, string[] fixedValuePropertyNames, long[] fixedValueRequired)
+        {
+            UserModType = userModType; Category = category; SettingsTypeName = settingsTypeName;
+            AssemblyName = assemblyName; SupportedVersion = supportedVersion;
+            HolderTypeNames = holderTypeNames; LocalOnlySettings = localOnlySettings;
+            BlockedBooleanSettings = blockedBooleanSettings;
+            FixedValueLabels = fixedValueLabels; FixedValuePropertyNames = fixedValuePropertyNames;
+            FixedValueRequired = fixedValueRequired;
+        }
+
+        public static bool TryParse(JsonNode node, out ModEntryData entry)
+        {
+            entry = null;
+            if (node == null || node.Kind != JsonKind.Object) return false;
+            ModEntryData result = new ModEntryData();
+            string userModType, category;
+            if (!ModCompatibilityDocumentParse.RequireText(node, "userModType", out userModType)) return false;
+            if (!ModCompatibilityDocumentParse.RequireText(node, "category", out category)) return false;
+            result.UserModType = userModType; result.Category = category;
+            if (result.Category != "client-only" && result.Category != "synchronized" &&
+                result.Category != "blocked" && result.Category != "dependency") return false;
+
+            JsonNode field;
+            if (node.TryGet("assemblyName", out field) && field.Kind == JsonKind.String) result.AssemblyName = field.Text;
+            if (node.TryGet("supportedVersion", out field) && field.Kind == JsonKind.String) result.SupportedVersion = field.Text;
+            if (node.TryGet("settingsTypeName", out field) && field.Kind == JsonKind.String) result.SettingsTypeName = field.Text;
+
+            string[] holders;
+            if (ModCompatibilityDocumentParse.RequireTextArray(node, "holderTypeNames", 8, 256, out holders))
+                result.HolderTypeNames = holders;
+
+            string[] localOnly;
+            if (ModCompatibilityDocumentParse.RequireTextArray(node, "localOnlySettings", 512, 256, out localOnly))
+                result.LocalOnlySettings = localOnly;
+
+            string[] blocked;
+            if (ModCompatibilityDocumentParse.RequireTextArray(node, "blockedBooleanSettings", 512, 256, out blocked))
+                result.BlockedBooleanSettings = blocked;
+
+            // fixedValues: parallel arrays of property name / required value / shared violation label
+            JsonNode fixedNames, fixedRequired, fixedLabels;
+            bool hasNames = node.TryGet("fixedValuePropertyNames", out fixedNames) && fixedNames != null && fixedNames.Kind == JsonKind.Array;
+            bool hasRequired = node.TryGet("fixedValueRequired", out fixedRequired) && fixedRequired != null && fixedRequired.Kind == JsonKind.Array;
+            bool hasLabels = node.TryGet("fixedValueLabels", out fixedLabels) && fixedLabels != null && fixedLabels.Kind == JsonKind.Array;
+            if (hasNames || hasRequired || hasLabels)
+            {
+                if (!hasNames || !hasRequired || !hasLabels) return false;
+                if (fixedNames.Items.Count != fixedRequired.Items.Count ||
+                    fixedNames.Items.Count != fixedLabels.Items.Count ||
+                    fixedNames.Items.Count > 128) return false;
+                var propertyNames = new string[fixedNames.Items.Count];
+                var labels = new string[fixedNames.Items.Count];
+                var required = new long[fixedNames.Items.Count];
+                for (int i = 0; i < fixedNames.Items.Count; i++)
+                {
+                    JsonNode nameNode = fixedNames.Items[i], labelNode = fixedLabels.Items[i], valueNode = fixedRequired.Items[i];
+                    if (nameNode == null || nameNode.Kind != JsonKind.String || nameNode.Text.Length == 0 || nameNode.Text.Length > 256) return false;
+                    if (labelNode == null || labelNode.Kind != JsonKind.String || labelNode.Text.Length == 0 || labelNode.Text.Length > 256) return false;
+                    if (valueNode == null || valueNode.Kind != JsonKind.Number || !valueNode.HasInteger) return false;
+                    if (valueNode.Integer < 0 || valueNode.Integer > 1000) return false;
+                    propertyNames[i] = nameNode.Text; labels[i] = labelNode.Text; required[i] = valueNode.Integer;
+                }
+                result.FixedValuePropertyNames = propertyNames;
+                result.FixedValueLabels = labels;
+                result.FixedValueRequired = required;
+            }
+
+            // synchronized entries must carry a settings type name
+            if (result.Category == "synchronized" &&
+                (result.SettingsTypeName == null || result.SettingsTypeName.Length == 0 || result.SettingsTypeName.Length > 256)) return false;
+            entry = result; return true;
+        }
+    }
+
+    public static class ModCompatibilityDocumentParse
+    {
+        public static bool RequireText(JsonNode node, string key, out string value)
+        {
+            value = null;
+            JsonNode field;
+            if (!node.TryGet(key, out field) || field == null || field.Kind != JsonKind.String ||
+                field.Text.Length == 0 || field.Text.Length > 256) return false;
+            value = field.Text; return true;
+        }
+
         public static bool TryLong(JsonNode node, string key, long minimum, long maximum, out long value)
         {
             value = 0;

@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.IO;
 using System.Threading;
 using CsmForge.Core;
 using ICities;
@@ -13,6 +14,7 @@ namespace CsmForge.Runtime.Cities1
         public string Description { get { return "主菜单加入房间；进入城市后从暂停菜单创建和管理房间。真实多机玩法仍待验证。"; } }
         public void OnEnabled()
         {
+            InitializeCompatibilityCatalog();
             BuiltInDlcAdapters.RegisterAll();
             ForgeExtensionApi.Register(new DistrictParkControlsAdapter());
             ForgeExtensionApi.Register(new DistrictParkDeepScalarAdapter());
@@ -31,6 +33,26 @@ namespace CsmForge.Runtime.Cities1
             UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
         }
         public void OnDisabled() { ForgeMultiplayerUi.Shutdown(); RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+
+        /// <summary>WP-3.2: external compat documents replace the built-in set wholesale; any
+        /// failure leaves the test-pinned built-in set in force (fail closed).</summary>
+        private static void InitializeCompatibilityCatalog()
+        {
+            try
+            {
+                string location = typeof(ForgeMod).Assembly.Location;
+                string compatDirectory = string.IsNullOrEmpty(location)
+                    ? null : Path.Combine(Path.GetDirectoryName(location), "compat");
+                bool loaded = ModCompatibilityCatalog.TryInitializeFromDirectory(compatDirectory);
+                UnityEngine.Debug.Log("[CSM-Forge] compatibility catalog " +
+                    (loaded ? "loaded from compat/." : "built-in (no external document loaded)."));
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.Log("[CSM-Forge] compatibility catalog init failed: " +
+                    error.GetType().Name + "; built-in set in force.");
+            }
+        }
         public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
 

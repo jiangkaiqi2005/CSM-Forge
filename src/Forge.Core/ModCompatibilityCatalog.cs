@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 
 namespace CsmForge.Core
 {
@@ -258,7 +259,45 @@ namespace CsmForge.Core
     /// </summary>
     public static class ModCompatibilityCatalog
     {
-        public static readonly ModCompatibilityDocument Default = ModCompatibilityDocument.BuiltIn();
+        private static readonly object Gate = new object();
+        private static ModCompatibilityDocument current = ModCompatibilityDocument.BuiltIn();
+        private static bool initialized;
+
+        public static ModCompatibilityDocument Default { get { lock (Gate) return current; } }
+
+        /// <summary>
+        /// WP-3.2: loads every compat/*.json in sorted order and lets the first document that
+        /// parses strictly replace the built-in set. Any failure (missing directory, malformed
+        /// file, unknown schema) leaves the built-in set in force - a bad file can never widen
+        /// what is accepted. Call once at mod load, before any consumer reads Default; later
+        /// calls are ignored so session state stays consistent.
+        /// </summary>
+        public static bool TryInitializeFromDirectory(string directory)
+        {
+            lock (Gate)
+            {
+                if (initialized) return false;
+                initialized = true;
+            }
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return false;
+            List<string> files = new List<string>();
+            foreach (string file in Directory.GetFiles(directory, "*.json"))
+                files.Add(file);
+            files.Sort(StringComparer.Ordinal);
+            foreach (string file in files)
+            {
+                string json;
+                try { json = File.ReadAllText(file); }
+                catch (Exception) { continue; }
+                ModCompatibilityDocument document;
+                if (TryParseDocument(json, out document))
+                {
+                    lock (Gate) current = document;
+                    return true;
+                }
+            }
+            return false;
+        }
 
         /// <summary>Parses a compat document; a smaller/older document never widens acceptance.</summary>
         public static bool TryParseDocument(string json, out ModCompatibilityDocument document)

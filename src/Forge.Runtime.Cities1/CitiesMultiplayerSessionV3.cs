@@ -59,6 +59,7 @@ namespace CsmForge.Runtime.Cities1
         private CompatibilityPolicy hostPolicy;
         private VerificationCadence districtVerifyCadence;
         private VerificationCadence zoneVerifyCadence;
+        private VerificationCadence netVerifyCadence;
         private const long GridVerifyIntervalMilliseconds = 5000;
         private LiteNetServerTransport server;
         private LiteNetClientTransport client;
@@ -203,7 +204,7 @@ namespace CsmForge.Runtime.Cities1
             try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; clientSnapshot = null; snapshotSave = null;
             authority = null; replica = null; joins = null;
-            districtVerifyCadence = null; zoneVerifyCadence = null;
+            districtVerifyCadence = null; zoneVerifyCadence = null; netVerifyCadence = null;
             ClearAllDomainReferences();
             hostPolicy = null; localManifest = null; publishedSnapshot = null;
             hostPeers.Clear(); memberGenerations.Clear(); clientManifestPages = null; clientOffer = null;

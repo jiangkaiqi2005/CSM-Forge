@@ -179,6 +179,18 @@ namespace CsmForge.Runtime.Cities1
             BroadcastBatch(batch);
         }
 
+        /// <summary>
+        /// WP-1.4c: cadence-driven full observe. The NetTool/bulldoze patches publish graph
+        /// changes as they happen; once per window this re-captures the live graph and publishes
+        /// any drift the patches missed, so the cached committed root cannot silently diverge.
+        /// </summary>
+        internal void PollObservedHostNetFull()
+        {
+            if (mode != MultiplayerSessionMode.Hosting || hostNet == null || authority == null || snapshotSave != null) return;
+            if (netVerifyCadence == null || !netVerifyCadence.ShouldVerify(MonotonicMilliseconds())) return;
+            PublishObservedHostNet(hostNet.CommittedRoot, 0, 0);
+        }
+
         internal bool TryInterceptClientZoneRefresh(ushort blockId, ulong requestedZone1, ulong requestedZone2,
             bool playerTool, out ulong restoreZone1, out ulong restoreZone2)
         {

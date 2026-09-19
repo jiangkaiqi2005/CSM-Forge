@@ -90,7 +90,7 @@ namespace CsmForge.Runtime.Cities1
 
         private static void ValidateNamespace(string value)
         {
-            if (string.IsNullOrEmpty(value) || value.Length > 80) throw new ArgumentException("Invalid extension identity namespace.", "namespaceId");
+            Check.Condition(string.IsNullOrEmpty(value) || value.Length > 80, "namespaceId", "Invalid extension identity namespace.");
             foreach (char c in value)
                 if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'))
                     throw new ArgumentException("Extension identity namespaces use canonical lowercase ASCII.", "namespaceId");

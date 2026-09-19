@@ -107,7 +107,7 @@ namespace CsmForge.Runtime.Cities1
 
         public DistrictCompositeAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             district = new DistrictAuthorityDomain(load);
             committedPolicies = CapturePolicies();
@@ -207,7 +207,7 @@ namespace CsmForge.Runtime.Cities1
 
         public DistrictCompositeReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             district = new DistrictReplicaDomain(load);
             committedPolicies = CapturePolicies();

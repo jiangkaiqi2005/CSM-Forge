@@ -15,7 +15,7 @@ namespace CsmForge.Core
         public DistrictPolicyStateV2(EntityIdentityV2 district, ulong services, ulong taxation,
             ulong cityPlanning, ulong special)
         {
-            if (!district.IsValid) throw new ArgumentException("Invalid district identity.", "district");
+            Check.Condition(!district.IsValid, "district", "Invalid district identity.");
             District = district;
             Services = services;
             Taxation = taxation;
@@ -38,7 +38,7 @@ namespace CsmForge.Core
             ulong citySpecial, DistrictPolicyStateV2[] values)
         {
             Check.NotNull(values, "values");
-            if (values.Length > 127) throw new ArgumentException("Too many district policy entries.", "values");
+            Check.Condition(values.Length > 127, "values", "Too many district policy entries.");
             CityServices = cityServices;
             CityTaxation = cityTaxation;
             CityPlanning = cityPlanning;
@@ -46,7 +46,7 @@ namespace CsmForge.Core
             districts = (DistrictPolicyStateV2[])values.Clone();
             Array.Sort(districts, delegate(DistrictPolicyStateV2 a, DistrictPolicyStateV2 b)
             {
-                if (a == null || b == null) throw new ArgumentException("Null district policy state.", "values");
+                Check.Condition(a == null || b == null, "values", "Null district policy state.");
                 return a.District.EntityId.CompareTo(b.District.EntityId);
             });
             ulong previous = 0;
@@ -103,7 +103,7 @@ namespace CsmForge.Core
     {
         public static Hash256 Combine(Hash256 districtRoot, Hash256 policyRoot)
         {
-            if (districtRoot == null || policyRoot == null) throw new ArgumentNullException("districtRoot");
+            Check.NotNull(districtRoot, "districtRoot"); Check.NotNull(policyRoot, "policyRoot"); // WP-2: per-argument reporting
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

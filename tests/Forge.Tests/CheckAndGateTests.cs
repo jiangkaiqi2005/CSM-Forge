@@ -29,9 +29,10 @@ namespace CsmForge.Tests
 
         [Case] public static void ConditionThrowsArgumentErrorWithMessage()
         {
+            // WP-2 contract: the argument is the VIOLATION condition (true = the guard trips).
             try
             {
-                Check.Condition(false, "port", "端口必须是 1–65535。");
+                Check.Condition(true, "port", "端口必须是 1–65535。");
                 throw new Exception("Expected ArgumentException.");
             }
             catch (ArgumentException thrown)
@@ -40,7 +41,7 @@ namespace CsmForge.Tests
                 Assert.True(thrown.Message.StartsWith("端口必须是 1–65535。", StringComparison.Ordinal));
                 Assert.Equal("port", thrown.ParamName);
             }
-            Check.Condition(true, "port", "unused");
+            Check.Condition(false, "port", "unused");
         }
 
         [Case] public static void CanonicalIdAcceptsLowercaseAsciiAndRejectsTheRest()
@@ -72,6 +73,28 @@ namespace CsmForge.Tests
             GateCounter.Record((GateCategory)99);
             GateCounter.Record((GateCategory)(-1));
             Assert.Equal(0L, GateCounter.Count((GateCategory)99));
+        }
+
+        [Case] public static void OutOfRangeThrowsWithParameterNameOnViolation()
+        {
+            // WP-2 contract: violation-style, same ArgumentOutOfRangeException(name) as inline.
+            try
+            {
+                Check.OutOfRange(true, "capacity");
+                throw new Exception("Expected ArgumentOutOfRangeException.");
+            }
+            catch (ArgumentOutOfRangeException thrown)
+            {
+                Assert.Equal("capacity", thrown.ParamName);
+            }
+            Check.OutOfRange(false, "capacity");
+        }
+
+        [Case] public static void InRangeThrowsOnlyOutsideBounds()
+        {
+            Check.InRange(5, 1, 8, "value");
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { Check.InRange(9, 1, 8, "value"); });
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { Check.InRange(0, 1, 8, "value"); });
         }
     }
 }

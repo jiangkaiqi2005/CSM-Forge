@@ -50,7 +50,7 @@ namespace CsmForge.Runtime.Cities1
 
         public SimulationClockAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
         }
 
@@ -74,7 +74,7 @@ namespace CsmForge.Runtime.Cities1
 
         public SimulationClockReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
         }
 

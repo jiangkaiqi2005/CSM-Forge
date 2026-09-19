@@ -12,22 +12,22 @@ namespace CsmForge.Runtime.Cities1
             InstanceID id = default(InstanceID);
             if (kind == StableNameTargetKindV2.Building)
             {
-                if (nativeId == 0 || nativeId > ushort.MaxValue) throw new ArgumentOutOfRangeException("nativeId");
+                Check.OutOfRange(nativeId == 0 || nativeId > ushort.MaxValue, "nativeId");
                 id.Building = (ushort)nativeId;
             }
             else if (kind == StableNameTargetKindV2.NetSegment)
             {
-                if (nativeId == 0 || nativeId > ushort.MaxValue) throw new ArgumentOutOfRangeException("nativeId");
+                Check.OutOfRange(nativeId == 0 || nativeId > ushort.MaxValue, "nativeId");
                 id.NetSegment = (ushort)nativeId;
             }
             else if (kind == StableNameTargetKindV2.District)
             {
-                if (nativeId == 0 || nativeId > byte.MaxValue) throw new ArgumentOutOfRangeException("nativeId");
+                Check.OutOfRange(nativeId == 0 || nativeId > byte.MaxValue, "nativeId");
                 id.District = (byte)nativeId;
             }
             else if (kind == StableNameTargetKindV2.TransportLine)
             {
-                if (nativeId == 0 || nativeId > ushort.MaxValue) throw new ArgumentOutOfRangeException("nativeId");
+                Check.OutOfRange(nativeId == 0 || nativeId > ushort.MaxValue, "nativeId");
                 id.TransportLine = (ushort)nativeId;
             }
             else throw new ArgumentOutOfRangeException("kind");
@@ -71,7 +71,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected StableNameDomainBase(LoadIdentity load, bool hostSide)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load; HostSide = hostSide; Seed();
         }
 

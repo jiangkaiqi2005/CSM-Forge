@@ -17,7 +17,7 @@ namespace CsmForge.Transport.LiteNet
         public bool Start(IPEndPoint endpoint, string key)
         {
             Check.NotNull(endpoint, "endpoint");
-            if (string.IsNullOrEmpty(key) || key.Length > 128) throw new ArgumentException("Invalid room key.", "key");
+            Check.Condition(string.IsNullOrEmpty(key) || key.Length > 128, "key", "Invalid room key.");
             EventBasedNetListener listener = new EventBasedNetListener();
             NetManager manager = new NetManager(listener) { AutoRecycle = true }; // WP-1.7: recycle pooled packets per receive
             listener.PeerConnectedEvent += OnConnected;

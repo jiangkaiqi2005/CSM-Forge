@@ -15,7 +15,7 @@ namespace CsmForge.Runtime.Cities1
 
         public KnownModBridgeDescriptor(string userModTypeName, Action register, Action<Harmony> install, Action resetState)
         {
-            if (string.IsNullOrEmpty(userModTypeName)) throw new ArgumentException("Known Mod type is missing.", "userModTypeName");
+            Check.Condition(string.IsNullOrEmpty(userModTypeName), "userModTypeName", "Known Mod type is missing.");
             UserModTypeName = userModTypeName;
             registerAdapters = register;
             installPatches = install;

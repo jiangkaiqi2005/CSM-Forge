@@ -314,7 +314,7 @@ namespace CsmForge.Runtime.Cities1
         internal static void ValidateShard(IForgeAdapterContextV1 context, int shardIndex)
         {
             Check.NotNull(context, "context");
-            if (shardIndex < 0 || shardIndex >= GridResolution) throw new ArgumentOutOfRangeException("shardIndex");
+            Check.OutOfRange(shardIndex < 0 || shardIndex >= GridResolution, "shardIndex");
         }
 
         private static bool ClientUtilityStepPrefix()

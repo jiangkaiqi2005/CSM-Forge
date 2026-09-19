@@ -10,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
         public int Budget { get; private set; }
         public WaterBudgetIntent(bool night, int budget)
         {
-            if (budget < 0 || budget > 255) throw new ArgumentOutOfRangeException("budget");
+            Check.OutOfRange(budget < 0 || budget > 255, "budget");
             Night = night; Budget = budget;
         }
     }
@@ -21,7 +21,7 @@ namespace CsmForge.Runtime.Cities1
         public int Night { get; private set; }
         public WaterBudgetState(int day, int night)
         {
-            if (day < 0 || day > 255 || night < 0 || night > 255) throw new ArgumentOutOfRangeException("day");
+            Check.OutOfRange(day < 0 || day > 255 || night < 0 || night > 255, "day");
             Day = day; Night = night;
         }
         public Hash256 Root { get { return Hash256.Compute(new byte[] { (byte)Day, (byte)Night }); } }
@@ -36,7 +36,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public static WaterBudgetIntent DecodeIntent(byte[] bytes)
         {
-            if (bytes == null || bytes.Length != 2 || bytes[0] > 1) throw new ArgumentException("Invalid water budget intent.", "bytes");
+            Check.Condition(bytes == null || bytes.Length != 2 || bytes[0] > 1, "bytes", "Invalid water budget intent.");
             return new WaterBudgetIntent(bytes[0] == 1, bytes[1]);
         }
         public static byte[] EncodeState(WaterBudgetState value)
@@ -46,7 +46,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public static WaterBudgetState DecodeState(byte[] bytes)
         {
-            if (bytes == null || bytes.Length != 2) throw new ArgumentException("Invalid water budget state.", "bytes");
+            Check.Condition(bytes == null || bytes.Length != 2, "bytes", "Invalid water budget state.");
             return new WaterBudgetState(bytes[0], bytes[1]);
         }
     }
@@ -87,7 +87,7 @@ namespace CsmForge.Runtime.Cities1
         public Hash256 StateRoot { get { return WaterBudgetGameAccess.Capture().Root; } }
         public WaterBudgetAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
         }
         public DomainExecutionV2 ExecutePlayer(byte[] payload)
@@ -110,7 +110,7 @@ namespace CsmForge.Runtime.Cities1
         public Hash256 StateRoot { get { return WaterBudgetGameAccess.Capture().Root; } }
         public WaterBudgetReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
         }
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)

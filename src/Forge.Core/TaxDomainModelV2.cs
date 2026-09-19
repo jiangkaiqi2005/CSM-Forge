@@ -35,7 +35,7 @@ namespace CsmForge.Core
         public int Rate { get; private set; }
         public TaxStateV2(TaxKeyV2 key, int rate)
         {
-            if (rate < 0 || rate > 29) throw new ArgumentOutOfRangeException("rate");
+            Check.OutOfRange(rate < 0 || rate > 29, "rate");
             Key = key; Rate = rate;
         }
     }

@@ -17,8 +17,8 @@ namespace CsmForge.Core
 
         public VerificationCadence(long nowMilliseconds, long intervalMilliseconds)
         {
-            if (nowMilliseconds < 0) throw new ArgumentOutOfRangeException("nowMilliseconds");
-            if (intervalMilliseconds < 1) throw new ArgumentOutOfRangeException("intervalMilliseconds");
+            Check.OutOfRange(nowMilliseconds < 0, "nowMilliseconds");
+            Check.OutOfRange(intervalMilliseconds < 1, "intervalMilliseconds");
             this.intervalMilliseconds = intervalMilliseconds;
             lastVerify = nowMilliseconds;
         }

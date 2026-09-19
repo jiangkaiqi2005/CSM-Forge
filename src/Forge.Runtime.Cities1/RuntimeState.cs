@@ -58,7 +58,7 @@ namespace CsmForge.Runtime.Cities1
         private int next, count;
         public RuntimeEventLog(int capacity)
         {
-            if (capacity < 16 || capacity > 2048) throw new ArgumentOutOfRangeException("capacity");
+            Check.OutOfRange(capacity < 16 || capacity > 2048, "capacity");
             events = new RuntimeEvent[capacity];
         }
         public void Record(RuntimeEventCode code, uint generation, string detail)

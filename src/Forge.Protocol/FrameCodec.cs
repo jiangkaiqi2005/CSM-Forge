@@ -19,8 +19,8 @@ namespace CsmForge.Protocol
 
         public Frame(MessageKind kind, SessionStamp stamp, ulong sequence, byte[] bytes)
         {
-            if (!Enum.IsDefined(typeof(MessageKind), kind)) throw new ArgumentOutOfRangeException("kind");
-            if (!stamp.IsValid) throw new ArgumentException("Invalid session stamp.", "stamp");
+            Check.OutOfRange(!Enum.IsDefined(typeof(MessageKind), kind), "kind");
+            Check.Condition(!stamp.IsValid, "stamp", "Invalid session stamp.");
             if (bytes == null || bytes.Length > Limits.FramePayloadBytes)
                 throw new ArgumentException("Invalid frame payload.", "bytes");
             Kind = kind;

@@ -120,7 +120,7 @@ namespace CsmForge.Runtime.Cities1
         {
             lock (gate)
             {
-                if (!identity.IsValid) throw new ArgumentException("Invalid load identity.", "identity");
+                Check.Condition(!identity.IsValid, "identity", "Invalid load identity.");
                 current = new ForgeSaveMetadata(identity.WorldId, identity.Epoch, revision, stateRoot != null, stateRoot);
             }
         }

@@ -10,7 +10,7 @@ namespace CsmForge.Core
 
         public SimulationClockStateV2(bool paused, int speed)
         {
-            if (speed < 0 || speed > 3) throw new ArgumentOutOfRangeException("speed");
+            Check.OutOfRange(speed < 0 || speed > 3, "speed");
             Paused = paused;
             Speed = speed;
         }

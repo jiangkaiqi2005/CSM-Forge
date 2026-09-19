@@ -71,7 +71,7 @@ namespace CsmForge.Runtime.Cities1
         public ExtensionStateEntryV2 CaptureOne(LoadIdentity load, int entryIndex)
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Extension capture belongs to a stale load.");
-            if (entryIndex < 0 || entryIndex >= entries.Length) throw new ArgumentOutOfRangeException("entryIndex");
+            Check.OutOfRange(entryIndex < 0 || entryIndex >= entries.Length, "entryIndex");
             EntryDescriptor descriptor = entries[entryIndex];
             ForgeStateAdapterRegistration registration = adapters[descriptor.AdapterIndex];
             byte[] state;
@@ -138,7 +138,7 @@ namespace CsmForge.Runtime.Cities1
 
         public int EntryAdapterIndex(int entryIndex)
         {
-            if (entryIndex < 0 || entryIndex >= entries.Length) throw new ArgumentOutOfRangeException("entryIndex");
+            Check.OutOfRange(entryIndex < 0 || entryIndex >= entries.Length, "entryIndex");
             return entries[entryIndex].AdapterIndex;
         }
 

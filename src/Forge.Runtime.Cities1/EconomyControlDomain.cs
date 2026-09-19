@@ -265,7 +265,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyControlAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committedRoot = EconomyControlGameAccess.Capture().Root;
         }
@@ -302,7 +302,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyControlReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committed = EconomyControlGameAccess.Capture();
         }

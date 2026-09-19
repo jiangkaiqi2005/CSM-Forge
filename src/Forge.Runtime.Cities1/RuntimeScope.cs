@@ -78,7 +78,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static void EndOfSimulationTick(CitiesLifecycleCoordinator lifecycle, RuntimeEventLog events)
         {
-            if (lifecycle == null || events == null) throw new ArgumentNullException("lifecycle");
+            Check.NotNull(lifecycle, "lifecycle"); Check.NotNull(events, "events"); // WP-2: per-argument reporting
             if (applyDepth == 0 && captureDepth == 0) return;
             uint generation = activeGeneration;
             applyDepth = 0;

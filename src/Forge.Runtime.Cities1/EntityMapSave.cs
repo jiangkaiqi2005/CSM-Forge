@@ -13,7 +13,7 @@ namespace CsmForge.Runtime.Cities1
 
         public SavedEntityDomainV2(ushort domainId, ulong highestIssuedId, EntityMapEntryV2[] entries)
         {
-            if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");
+            Check.OutOfRange(domainId == 0, "domainId");
             Check.NotNull(entries, "entries");
             DomainId = domainId;
             HighestIssuedId = highestIssuedId;

@@ -17,7 +17,7 @@ namespace CsmForge.Core
         {
             ValidateToken(adapterId, "adapterId", 96);
             ValidateToken(key, "key", 128);
-            if (bytes == null || bytes.Length > Limits.FramePayloadBytes) throw new ArgumentException("Invalid extension payload.", "bytes");
+            Check.Condition(bytes == null || bytes.Length > Limits.FramePayloadBytes, "bytes", "Invalid extension payload.");
             AdapterId = adapterId;
             Key = key;
             payload = (byte[])bytes.Clone();
@@ -145,7 +145,7 @@ namespace CsmForge.Core
                     writer.Write(payload);
                 }
                 writer.Flush();
-                if (stream.Length > Limits.FramePayloadBytes) throw new ArgumentException("Extension state frame exceeds one authority frame.", "entries");
+                Check.Condition(stream.Length > Limits.FramePayloadBytes, "entries", "Extension state frame exceeds one authority frame.");
                 return stream.ToArray();
             }
         }

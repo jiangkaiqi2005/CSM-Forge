@@ -59,8 +59,8 @@ namespace CsmForge.Core
         public static JsonNode Parse(string text, int maximumLength, int maximumDepth)
         {
             if (text == null) throw new ArgumentNullException("text");
-            if (maximumLength < 1) throw new ArgumentOutOfRangeException("maximumLength");
-            if (maximumDepth < 1) throw new ArgumentOutOfRangeException("maximumDepth");
+            Check.OutOfRange(maximumLength < 1, "maximumLength");
+            Check.OutOfRange(maximumDepth < 1, "maximumDepth");
             if (text.Length > maximumLength) throw new JsonParseException(0, "JSON text exceeds its length limit.");
             Parser parser = new Parser(text, maximumDepth);
             parser.SkipWhitespace();

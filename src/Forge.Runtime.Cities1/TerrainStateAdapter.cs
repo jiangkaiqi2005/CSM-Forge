@@ -83,7 +83,7 @@ namespace CsmForge.Runtime.Cities1
 
         private static void ValidateShard(int shardIndex)
         {
-            if (shardIndex < 0 || shardIndex >= Shards) throw new ArgumentOutOfRangeException("shardIndex");
+            Check.OutOfRange(shardIndex < 0 || shardIndex >= Shards, "shardIndex");
         }
     }
 }

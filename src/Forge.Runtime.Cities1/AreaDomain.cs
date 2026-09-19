@@ -59,7 +59,7 @@ namespace CsmForge.Runtime.Cities1
 
         public AreaAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committedRoot = StateRoot;
         }
 
@@ -90,7 +90,7 @@ namespace CsmForge.Runtime.Cities1
 
         public AreaReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committed = AreaGameAccess.Capture();
         }
 

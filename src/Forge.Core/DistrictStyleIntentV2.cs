@@ -9,7 +9,7 @@ namespace CsmForge.Core
         public ushort Style { get; private set; }
         public DistrictStyleIntentV2(EntityIdentityV2 district, ushort style)
         {
-            if (!district.IsValid) throw new ArgumentException("Invalid district identity.", "district");
+            Check.Condition(!district.IsValid, "district", "Invalid district identity.");
             District = district; Style = style;
         }
     }

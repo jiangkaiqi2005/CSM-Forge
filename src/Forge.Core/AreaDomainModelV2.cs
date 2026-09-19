@@ -11,7 +11,7 @@ namespace CsmForge.Core
 
         public AreaStateV2(uint unlockedMask)
         {
-            if ((unlockedMask & ~ValidMask) != 0) throw new ArgumentOutOfRangeException("unlockedMask");
+            Check.OutOfRange((unlockedMask & ~ValidMask) != 0, "unlockedMask");
             UnlockedMask = unlockedMask;
         }
 

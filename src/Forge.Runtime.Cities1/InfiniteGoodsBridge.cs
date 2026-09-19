@@ -274,9 +274,9 @@ namespace CsmForge.Runtime.Cities1
                     if (version == null || !version.IsLiteral || !StringComparer.Ordinal.Equals((string)version.GetRawConstantValue(), SupportedProductVersion)) continue;
                     RequiredIndexer(settings, settingId);
                     SortedIds(settingId);
-                    RequiredMethod(monitor, "OnAfterSimulationTick", Type.EmptyTypes);
+                    BridgeSurfaceValidator.RequiredMethod(monitor, "OnAfterSimulationTick", Type.EmptyTypes, true);
                     Type closedDefinition = definition.MakeGenericType(typeof(BuildingAI));
-                    RequiredMethod(closedDefinition, "TransferIfMatch", new[] { typeof(ushort), typeof(bool) });
+                    BridgeSurfaceValidator.RequiredMethod(closedDefinition, "TransferIfMatch", new[] { typeof(ushort), typeof(bool) }, true);
                 }
                 catch { continue; }
                 compatibleAssembly = assemblies[i];
@@ -285,12 +285,6 @@ namespace CsmForge.Runtime.Cities1
             return null;
         }
 
-        private static MethodInfo RequiredMethod(Type type, string name, Type[] parameters)
-        {
-            MethodInfo method = type.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null, parameters, null);
-            if (method == null || method.ReturnType != typeof(void)) throw new MissingMethodException(type.FullName, name);
-            return method;
-        }
+        // D2 dedup: void-returning surface methods validated through the shared validator.
     }
 }

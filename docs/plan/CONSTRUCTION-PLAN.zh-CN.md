@@ -50,8 +50,8 @@
 | 编号 | 内容 | 位置 | 备注 |
 | --- | --- | --- | --- |
 | S1 | `LocalIpv4` 盲取首个非回环 IPv4，抓到无网关虚拟网卡（实测返回 2.0.0.1），邀请码不可达 | `ForgeMultiplayerUi.cs:135-146` | 已在本机 ipconfig 实证；详见 01 WP-1.8 |
-| S2 | GA 违规选项聚合报错只存在于安装版构建；仓库 HEAD 抛到第一个就停；preflight catch 只显示异常类型名 | `GameAnarchyBridge.cs:136-150`、`ForgeRoomPreflight.cs:57` | 安装版行为更优，回移 |
-| S3 | `HelloV2`/`CompatibilityResultV2` 按 UTF-16 字符数校验、按 UTF-8 字节编码，22+ 汉字显示名无法加入 | `ProtocolV2Messages.cs` | 中文本地化用户直接踩中 |
+| S2 | GA 违规选项聚合报错只存在于安装版构建；仓库 HEAD 抛到第一个就停；preflight catch 只显示异常类型名 | `GameAnarchyBridge.cs:136-150`、`ForgeRoomPreflight.cs:57` | **已完成**（feat/s2-s3-error-and-text-bounds）：聚合报错回移（InfiniteGoodsBridge 同模式一并聚合），preflight 显示完整异常链 |
+| S3 | `HelloV2`/`CompatibilityResultV2` 按 UTF-16 字符数校验、按 UTF-8 字节编码，22+ 汉字显示名无法加入 | `ProtocolV2Messages.cs` | **已完成**（同分支）：模型构造同时校验字符数与 UTF-8 字节数，与线缆编码上限一致；`ProtocolTextBoundsTests` 5 项回归 |
 | S4 | `ClosePauseMenu` 反射调用 `new PauseMenu()` 临时实例，实际关不掉暂停菜单且泄漏组件 | `ForgeMultiplayerUi.cs:157-168` | |
 | S5 | `Kick(index)` 用渲染时快照的索引重读当前列表，可能踢错人 | `ForgePlayersPanel.cs:642-646` | |
 | S6 | Harmony 就绪回调不可取消、执行时不复查启用状态；mod 在等待期被禁用后补丁照常注入 | `PatchCoordinator.cs:28-79` | 子代理发现，未独立复核 |

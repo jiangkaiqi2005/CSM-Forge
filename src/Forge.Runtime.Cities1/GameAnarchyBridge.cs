@@ -137,16 +137,22 @@ namespace CsmForge.Runtime.Cities1
         {
             if (properties == null || values == null || properties.Length != values.Length)
                 throw new InvalidDataException("Invalid Game Anarchy shared setting values.");
+            // S2: aggregate every violation so one hosting attempt reports the complete list
+            // (matches the 1.0 candidate build) instead of one option per attempt.
+            List<string> violations = new List<string>();
             for (int i = 0; i < UnsupportedBooleanSettings.Length; i++)
                 if (RequiredValue(properties, values, UnsupportedBooleanSettings[i]) != 0L)
-                    throw new InvalidOperationException("Game Anarchy option is not supported in Forge multiplayer: " + UnsupportedBooleanSettings[i]);
+                    violations.Add(UnsupportedBooleanSettings[i]);
             if (RequiredValue(properties, values, "CurrentUnlockMode") != 0L || RequiredValue(properties, values, "CurrentMilestoneLevel") != 0L)
-                throw new InvalidOperationException("Game Anarchy milestone/unlock mutation is not supported in Forge multiplayer.");
+                violations.Add("CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)");
             if (RequiredValue(properties, values, "OilDepletionRate") != 100L || RequiredValue(properties, values, "OreDepletionRate") != 100L)
-                throw new InvalidOperationException("Game Anarchy oil/ore depletion overrides are not supported; both rates must be 100 for multiplayer.");
+                violations.Add("OilDepletionRate/OreDepletionRate (both rates must be 100)");
             if (RequiredValue(properties, values, "BuildingSpreadFireProbability") != 0L ||
                 RequiredValue(properties, values, "TreeSpreadFireProbability") != 0L)
-                throw new InvalidOperationException("Game Anarchy fire-spread overrides are not supported in Forge multiplayer.");
+                violations.Add("BuildingSpreadFireProbability/TreeSpreadFireProbability (fire-spread overrides)");
+            if (violations.Count != 0)
+                throw new InvalidOperationException("Game Anarchy options are not supported in Forge multiplayer: " +
+                    string.Join(", ", violations.ToArray()));
         }
 
         internal static uint SchemaFingerprint(PropertyInfo[] properties)

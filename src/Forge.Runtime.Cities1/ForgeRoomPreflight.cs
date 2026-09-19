@@ -54,13 +54,27 @@ namespace CsmForge.Runtime.Cities1
             }
             catch (Exception error)
             {
-                return Blocked("无法读取当前 DLC/Mod/资产清单：" + error.GetType().Name +
-                    "。请写入诊断日志后检查安装。");
+                // S2: surface the full cause chain (e.g. the aggregated Game Anarchy option list)
+                // instead of only the exception type name — the player must be able to act on it.
+                return Blocked("无法读取当前 DLC/Mod/资产清单：" + DescribeCause(error) +
+                    "。请按原因处理后重试；详细上下文见游戏日志。");
             }
         }
 
         private static ForgeRoomPreflightReport Blocked(string message)
         { return new ForgeRoomPreflightReport(false, "无法创建房间：" + message); }
+
+        /// <summary>Flattens the exception chain into one bounded, player-readable line.</summary>
+        private static string DescribeCause(Exception error)
+        {
+            StringBuilder value = new StringBuilder();
+            for (Exception current = error; current != null && value.Length < 600; current = current.InnerException)
+            {
+                if (value.Length != 0) value.Append(" < ");
+                value.Append(current.GetType().Name).Append(": ").Append(current.Message);
+            }
+            return value.ToString();
+        }
 
         private static string FriendlyIds(string[] ids)
         {

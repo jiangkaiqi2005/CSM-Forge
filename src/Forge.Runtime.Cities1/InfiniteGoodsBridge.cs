@@ -234,12 +234,17 @@ namespace CsmForge.Runtime.Cities1
 
         private static void ValidateSupportedConfiguration(Type enumType, object settings, PropertyInfo indexer)
         {
+            // S2: aggregate like GameAnarchyBridge — report every unsupported service point at once.
+            List<string> violations = new List<string>();
             for (int i = 0; i < UnsupportedServicePointSettings.Length; i++)
             {
                 object value = Enum.Parse(enumType, UnsupportedServicePointSettings[i], false);
                 if ((bool)indexer.GetValue(settings, new[] { value }))
-                    throw new InvalidOperationException("Infinite Goods service-point transfer is not supported in Forge multiplayer: " + UnsupportedServicePointSettings[i]);
+                    violations.Add(UnsupportedServicePointSettings[i]);
             }
+            if (violations.Count != 0)
+                throw new InvalidOperationException("Infinite Goods options are not supported in Forge multiplayer: " +
+                    string.Join(", ", violations.ToArray()));
         }
 
         private static bool IsUnsupportedServicePoint(string name)

@@ -74,7 +74,7 @@ namespace CsmForge.Core
         public void ApplyCell(uint index, DistrictCellStateV2 cell)
         {
             int shard = ShardOf(index); // validates the grid range
-            if (cell.Index != index) throw new ArgumentException("Cell index mismatch.", "cell");
+            Check.Condition(cell.Index != index, "cell", "Cell index mismatch.");
             if (cell.IsEmpty)
             {
                 if (shards[shard].Remove(index)) { cellCount--; shardRoots[shard] = null; aggregateDirty = true; }

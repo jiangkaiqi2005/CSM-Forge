@@ -42,14 +42,14 @@ namespace CsmForge.Core
 
         public CompatibilityPolicyV2(CompatibilityManifest hostManifest, IEnumerable<CompatibilityRuleV2> policyRules)
         {
-            if (hostManifest == null || policyRules == null) throw new ArgumentNullException("hostManifest");
+            Check.NotNull(hostManifest, "hostManifest"); Check.NotNull(policyRules, "policyRules"); // WP-2: per-argument reporting
             host = hostManifest;
             expected = host.Components; // D1-1: reuse the manifest's pre-validated dictionary; no per-Evaluate re-Collect
             List<CompatibilityRuleV2> collected = new List<CompatibilityRuleV2>();
             Dictionary<string, bool> seen = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (CompatibilityRuleV2 rule in policyRules)
             {
-                if (rule == null || seen.ContainsKey(rule.Prefix)) throw new ArgumentException("Invalid or duplicate compatibility rule.", "policyRules");
+                Check.Condition(rule == null || seen.ContainsKey(rule.Prefix), "policyRules", "Invalid or duplicate compatibility rule.");
                 seen.Add(rule.Prefix, true);
                 collected.Add(rule);
             }

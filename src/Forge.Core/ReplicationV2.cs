@@ -38,7 +38,7 @@ namespace CsmForge.Core
             if (revision == 0) throw new ArgumentOutOfRangeException("revision");
             if (!Enum.IsDefined(typeof(AuthorityOriginKind), originKind)) throw new ArgumentOutOfRangeException("originKind");
             if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");
-            if (beforeRoot == null || afterRoot == null) throw new ArgumentNullException("beforeRoot");
+            Check.NotNull(beforeRoot, "beforeRoot"); Check.NotNull(afterRoot, "afterRoot"); // WP-2: per-argument reporting
             if (originKind == AuthorityOriginKind.PlayerIntent)
             {
                 if (memberId == Guid.Empty || memberGeneration == 0 || operationCounter == 0)
@@ -95,7 +95,7 @@ namespace CsmForge.Core
         public AppliedAck(SessionStamp stamp, Guid connectionBinding, ulong revision, Hash256 root, int pendingBatches)
         {
             Check.Stamp(stamp);
-            if (connectionBinding == Guid.Empty) throw new ArgumentException("Missing connection binding.", "connectionBinding");
+            Check.Condition(connectionBinding == Guid.Empty, "connectionBinding", "Missing connection binding.");
             Check.NotNull(root, "root");
             if (pendingBatches < 0 || pendingBatches > 4096) throw new ArgumentOutOfRangeException("pendingBatches");
             Stamp = stamp;

@@ -60,7 +60,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyShard(IForgeAdapterContextV1 context, int shardIndex, byte[] state)
         {
-            if (context == null || state == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context"); Check.NotNull(state, "state"); // WP-2: per-argument reporting
             ValidateShard(shardIndex);
             State[] values = Decode(shardIndex, state);
             EnsureCache(false, false);

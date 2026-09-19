@@ -18,12 +18,12 @@ namespace CsmForge.Core
             int chunkBytes, Hash256 contentHash, Hash256 stateHash)
         {
             Check.Stamp(stamp);
-            if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer identity.", "transferId");
+            Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer identity.");
             if (totalBytes < 1 || totalBytes > Limits.SnapshotBytes) throw new ArgumentOutOfRangeException("totalBytes");
             if (chunkBytes < 1 || chunkBytes > 32768) throw new ArgumentOutOfRangeException("chunkBytes");
             long count = (totalBytes + chunkBytes - 1) / chunkBytes;
             if (count > 8192) throw new ArgumentException("Too many snapshot chunks.");
-            if (contentHash == null || stateHash == null) throw new ArgumentNullException("contentHash");
+            Check.NotNull(contentHash, "contentHash"); Check.NotNull(stateHash, "stateHash"); // WP-2: per-argument reporting
             Stamp = stamp; TransferId = transferId; Revision = revision;
             TotalBytes = totalBytes; ChunkBytes = chunkBytes; ChunkCount = (int)count;
             ContentHash = contentHash; StateHash = stateHash;

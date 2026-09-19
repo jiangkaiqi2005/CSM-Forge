@@ -12,7 +12,7 @@ namespace CsmForge.Core
         public ComponentFingerprint(string id, Hash256 binaryHash, Hash256 configurationHash)
         {
             Check.CanonicalId(id, 128, "id", "Invalid component identity."); // D2: shared canonical guard
-            if (binaryHash == null || configurationHash == null) throw new ArgumentNullException("binaryHash");
+            Check.NotNull(binaryHash, "binaryHash"); Check.NotNull(configurationHash, "configurationHash"); // WP-2: per-argument reporting
             Id = id; BinaryHash = binaryHash; ConfigurationHash = configurationHash;
         }
         public bool Matches(ComponentFingerprint other)
@@ -75,7 +75,7 @@ namespace CsmForge.Core
         public CompatibilityPolicy(Hash256 gameBuild, Hash256 schema,
             IEnumerable<ComponentFingerprint> required, IEnumerable<ComponentFingerprint> approvedLocalOnly)
         {
-            if (gameBuild == null || schema == null) throw new ArgumentNullException("gameBuild");
+            Check.NotNull(gameBuild, "gameBuild"); Check.NotNull(schema, "schema"); // WP-2: per-argument reporting
             this.gameBuild = gameBuild; this.schema = schema;
             this.required = CompatibilityManifest.Collect(required);
             optionalLocal = CompatibilityManifest.Collect(approvedLocalOnly);

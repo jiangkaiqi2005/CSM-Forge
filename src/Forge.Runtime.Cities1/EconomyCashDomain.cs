@@ -47,7 +47,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyCashAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             // Resolve the target-build private field at domain construction so unsupported
             // game builds fail before a multiplayer world can advertise a baseline.
             EconomyCashGameAccess.Capture();
@@ -71,7 +71,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyCashReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committed = EconomyCashGameAccess.Capture();
         }

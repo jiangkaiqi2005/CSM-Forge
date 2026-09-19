@@ -124,8 +124,8 @@ namespace CsmForge.Runtime.Cities1
                 }
             }
             Type fire = ResolveType("GameAnarchy.Managers.FireControlManager");
-            MethodInfo fireProbability = RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() });
-            MethodInfo putOut = RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes);
+            MethodInfo fireProbability = BridgeSurfaceValidator.RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() }, false);
+            MethodInfo putOut = BridgeSurfaceValidator.RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes, false);
             harmony.Patch(fireProbability, new HarmonyMethod(typeof(GameAnarchyBridge).GetMethod("FireProbabilityPrefix", BindingFlags.Static | BindingFlags.NonPublic)));
             harmony.Patch(putOut, new HarmonyMethod(typeof(GameAnarchyBridge).GetMethod("UnsupportedManualFirePrefix", BindingFlags.Static | BindingFlags.NonPublic)));
             patched = true;
@@ -202,15 +202,15 @@ namespace CsmForge.Runtime.Cities1
                 {
                     PropertyInfo[] properties = SharedProperties(settings);
                     string[] blocked = ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings;
-                    for (int p = 0; p < blocked.Length; p++) RequiredProperty(properties, blocked[p]);
-                    RequiredProperty(properties, "CurrentUnlockMode"); RequiredProperty(properties, "CurrentMilestoneLevel");
-                    RequiredProperty(properties, "OilDepletionRate"); RequiredProperty(properties, "OreDepletionRate");
-                    RequiredProperty(properties, "BuildingSpreadFireProbability"); RequiredProperty(properties, "TreeSpreadFireProbability");
-                    RequiredMethod(city, "OnPostSimulationFrame", Type.EmptyTypes);
-                    RequiredMethod(resources, "OnAfterResourcesModified", new[] { typeof(int), typeof(int), RequiredType("ICities.NaturalResource"), typeof(int) });
-                    RequiredMethod(milestones, "OnRefreshMilestones", Type.EmptyTypes);
-                    RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() });
-                    RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes);
+                    for (int p = 0; p < blocked.Length; p++) BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, blocked[p]);
+                    BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "CurrentUnlockMode"); BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "CurrentMilestoneLevel");
+                    BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "OilDepletionRate"); BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "OreDepletionRate");
+                    BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "BuildingSpreadFireProbability"); BridgeSurfaceValidator.RequiredProperty(properties, SettingsTypeName, "TreeSpreadFireProbability");
+                    BridgeSurfaceValidator.RequiredMethod(city, "OnPostSimulationFrame", Type.EmptyTypes, false);
+                    BridgeSurfaceValidator.RequiredMethod(resources, "OnAfterResourcesModified", new[] { typeof(int), typeof(int), BridgeSurfaceValidator.RequiredType("ICities.NaturalResource"), typeof(int) }, false);
+                    BridgeSurfaceValidator.RequiredMethod(milestones, "OnRefreshMilestones", Type.EmptyTypes, false);
+                    BridgeSurfaceValidator.RequiredMethod(fire, "GetFireProbability", new[] { typeof(uint), typeof(uint).MakeByRefType(), typeof(uint).MakeByRefType() }, false);
+                    BridgeSurfaceValidator.RequiredMethod(fire, "PutOutBurningBuildings", Type.EmptyTypes, false);
                 }
                 catch { continue; }
                 compatibleAssembly = assemblies[i];
@@ -219,36 +219,7 @@ namespace CsmForge.Runtime.Cities1
             return null;
         }
 
-        private static Type RequiredType(string fullName)
-        {
-            Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            for (int i = 0; i < assemblies.Length; i++)
-            {
-                Type type = assemblies[i].GetType(fullName, false);
-                if (type != null) return type;
-            }
-            throw new TypeLoadException(fullName);
-        }
-
-        private static PropertyInfo RequiredProperty(PropertyInfo[] properties, string name)
-        {
-            for (int i = 0; i < properties.Length; i++) if (properties[i].Name == name) return properties[i];
-            throw new MissingMemberException(SettingsTypeName, name);
-        }
-
-        private static long RequiredValue(PropertyInfo[] properties, long[] values, string name)
-        {
-            for (int i = 0; i < properties.Length; i++) if (properties[i].Name == name) return values[i];
-            throw new MissingMemberException(SettingsTypeName, name);
-        }
-
-        private static MethodInfo RequiredMethod(Type type, string name, Type[] parameters)
-        {
-            if (type == null) throw new TypeLoadException(name);
-            MethodInfo method = type.GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                null, parameters, null);
-            if (method == null) throw new MissingMethodException(type.FullName, name);
-            return method;
-        }
+        // D2 dedup: RequiredType/RequiredProperty/RequiredValue/RequiredMethod moved to
+        // BridgeSurfaceValidator (owner name "GameAnarchy.ModSettings.ModSetting" preserved).
     }
 }

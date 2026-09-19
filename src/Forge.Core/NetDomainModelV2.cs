@@ -118,19 +118,19 @@ namespace CsmForge.Core
 
         public static NetIntentV2 DeleteSegment(EntityIdentityV2 segment, bool keepNodes)
         {
-            if (!segment.IsValid) throw new ArgumentException("Invalid segment identity.", "segment");
+            Check.Condition(!segment.IsValid, "segment", "Invalid segment identity.");
             return new NetIntentV2 { Kind = NetIntentKindV2.DeleteSegment, Target = segment, KeepNodes = keepNodes };
         }
 
         public static NetIntentV2 DeleteNode(EntityIdentityV2 node)
         {
-            if (!node.IsValid) throw new ArgumentException("Invalid node identity.", "node");
+            Check.Condition(!node.IsValid, "node", "Invalid node identity.");
             return new NetIntentV2 { Kind = NetIntentKindV2.DeleteNode, Target = node };
         }
 
         public static NetIntentV2 UpgradeSegment(EntityIdentityV2 segment, string prefabKey, byte mode, bool side)
         {
-            if (!segment.IsValid) throw new ArgumentException("Invalid segment identity.", "segment");
+            Check.Condition(!segment.IsValid, "segment", "Invalid segment identity.");
             ValidatePrefab(prefabKey);
             return new NetIntentV2 { Kind = NetIntentKindV2.UpgradeSegment, Target = segment,
                 PrefabKey = prefabKey, UpgradeMode = mode, UpgradeSide = side };
@@ -195,7 +195,7 @@ namespace CsmForge.Core
                 throw new ArgumentException("Invalid Multitool semantic point count.", "points");
             NetMultitoolPointV2[] result = (NetMultitoolPointV2[])points.Clone();
             for (int i = 0; i < result.Length; i++)
-                if (result[i] == null) throw new ArgumentException("Null Multitool semantic point.", "points");
+                Check.Condition(result[i] == null, "points", "Null Multitool semantic point.");
             return result;
         }
 
@@ -241,7 +241,7 @@ namespace CsmForge.Core
 
         public NetNodeStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, uint flags)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid node identity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid node identity.");
             NetIntentV2.ValidatePrefab(prefabKey);
             NetControlPointV2.CheckFinite(x); NetControlPointV2.CheckFinite(y); NetControlPointV2.CheckFinite(z);
             Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Flags = flags;

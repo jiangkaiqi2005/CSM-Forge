@@ -65,7 +65,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state)
         {
-            if (context == null || state == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context"); Check.NotNull(state, "state"); // WP-2: per-argument reporting
             EventManager manager = EventManager.instance;
             if (manager == null) throw new InvalidOperationException("EventManager is unavailable.");
             CoreEntityReferenceSnapshot core = CoreEntityReferenceSnapshot.Capture();

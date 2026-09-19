@@ -20,7 +20,7 @@ namespace CsmForge.Core
             ulong permissionVersion, ushort domainId, Hash256 expectedDomainRoot, byte[] bytes)
         {
             Check.Stamp(stamp);
-            if (!member.IsValid) throw new ArgumentException("Invalid member identity.", "member");
+            Check.Condition(!member.IsValid, "member", "Invalid member identity.");
             if (operationCounter == 0) throw new ArgumentOutOfRangeException("operationCounter");
             if (permissionVersion == 0) throw new ArgumentOutOfRangeException("permissionVersion");
             if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");

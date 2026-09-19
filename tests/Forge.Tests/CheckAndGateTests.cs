@@ -29,9 +29,10 @@ namespace CsmForge.Tests
 
         [Case] public static void ConditionThrowsArgumentErrorWithMessage()
         {
+            // WP-2 contract: the argument is the VIOLATION condition (true = the guard trips).
             try
             {
-                Check.Condition(false, "port", "端口必须是 1–65535。");
+                Check.Condition(true, "port", "端口必须是 1–65535。");
                 throw new Exception("Expected ArgumentException.");
             }
             catch (ArgumentException thrown)
@@ -40,7 +41,7 @@ namespace CsmForge.Tests
                 Assert.True(thrown.Message.StartsWith("端口必须是 1–65535。", StringComparison.Ordinal));
                 Assert.Equal("port", thrown.ParamName);
             }
-            Check.Condition(true, "port", "unused");
+            Check.Condition(false, "port", "unused");
         }
 
         [Case] public static void CanonicalIdAcceptsLowercaseAsciiAndRejectsTheRest()

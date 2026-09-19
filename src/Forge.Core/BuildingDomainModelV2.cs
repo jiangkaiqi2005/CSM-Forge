@@ -31,12 +31,12 @@ namespace CsmForge.Core
         }
         public static BuildingIntentV2 Delete(EntityIdentityV2 entity)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             return new BuildingIntentV2 { Kind = BuildingIntentKindV2.Delete, Entity = entity };
         }
         internal static void ValidatePrefab(string value)
         {
-            if (string.IsNullOrEmpty(value) || Encoding.UTF8.GetByteCount(value) > 192) throw new ArgumentException("Invalid building prefab identity.", "value");
+            Check.Condition(string.IsNullOrEmpty(value) || Encoding.UTF8.GetByteCount(value) > 192, "value", "Invalid building prefab identity.");
         }
         internal static void ValidateFloat(float value)
         {
@@ -59,7 +59,7 @@ namespace CsmForge.Core
             : this(entity, prefabKey, x, y, z, angle, length, buildIndex, 0) { }
         public BuildingStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, float angle, byte length, uint buildIndex, int constructionCost)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             BuildingIntentV2.ValidatePrefab(prefabKey); BuildingIntentV2.ValidateFloat(x); BuildingIntentV2.ValidateFloat(y);
             BuildingIntentV2.ValidateFloat(z); BuildingIntentV2.ValidateFloat(angle);
             if (length == 0) throw new ArgumentOutOfRangeException("length");
@@ -89,7 +89,7 @@ namespace CsmForge.Core
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity) { return Deleted(entity, 0); }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity, int refundAmount)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             if (refundAmount < 0 || refundAmount > 1000000000) throw new ArgumentOutOfRangeException("refundAmount");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Deleted, Entity = entity, RefundAmount = refundAmount };
         }

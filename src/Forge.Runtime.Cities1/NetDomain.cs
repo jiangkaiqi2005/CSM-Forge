@@ -161,7 +161,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected NetDomainBase(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load;
             RuntimeServices.EntityMaps.AttachDomain(NodeMapSaveId, NodeIds);
             RuntimeServices.EntityMaps.AttachDomain(SegmentMapSaveId, SegmentIds);

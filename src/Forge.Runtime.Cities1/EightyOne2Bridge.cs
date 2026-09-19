@@ -90,7 +90,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal static void Apply(bool[] values)
         {
-            if (values == null || values.Length != PropertyNames.Length) throw new ArgumentException("Invalid 81 Tiles 2 setting vector.", "values");
+            Check.Condition(values == null || values.Length != PropertyNames.Length, "values", "Invalid 81 Tiles 2 setting vector.");
             Type type = ResolveType(SettingsTypeName);
             if (type == null) throw new InvalidOperationException("81 Tiles 2 settings are unavailable.");
             object settings = Activator.CreateInstance(type);

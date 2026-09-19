@@ -72,7 +72,7 @@ namespace CsmForge.Runtime.Cities1
 
         public ForgeAdapterContextV1(string adapterId, bool authoritative)
         {
-            if (string.IsNullOrEmpty(adapterId)) throw new ArgumentException("Adapter id is missing.", "adapterId");
+            Check.Condition(string.IsNullOrEmpty(adapterId), "adapterId", "Adapter id is missing.");
             IsAuthoritative = authoritative;
             ids = ExtensionIdentityServices.Maps.GetOrAttach(adapterId);
         }
@@ -251,7 +251,7 @@ namespace CsmForge.Runtime.Cities1
 
         private static void ValidateId(string value)
         {
-            if (string.IsNullOrEmpty(value) || value.Length > 80) throw new ArgumentException("Invalid Forge adapter id.", "AdapterId");
+            Check.Condition(string.IsNullOrEmpty(value) || value.Length > 80, "AdapterId", "Invalid Forge adapter id.");
             foreach (char c in value)
                 if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '-' || c == '_'))
                     throw new ArgumentException("Forge adapter ids use canonical lowercase ASCII.", "AdapterId");

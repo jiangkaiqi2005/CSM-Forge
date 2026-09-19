@@ -57,8 +57,8 @@ namespace CsmForge.Protocol
         {
             if (!Enum.IsDefined(typeof(SessionLane), lane)) throw new ArgumentOutOfRangeException("lane");
             if (!Enum.IsDefined(typeof(MessageKindV2), kind)) throw new ArgumentOutOfRangeException("kind");
-            if (!stamp.IsValid) throw new ArgumentException("Invalid session stamp.", "stamp");
-            if (connectionBinding == Guid.Empty) throw new ArgumentException("Missing connection binding.", "connectionBinding");
+            Check.Condition(!stamp.IsValid, "stamp", "Invalid session stamp.");
+            Check.Condition(connectionBinding == Guid.Empty, "connectionBinding", "Missing connection binding.");
             if (sequence == 0) throw new ArgumentOutOfRangeException("sequence");
             if (payloadSchemaVersion == 0) throw new ArgumentOutOfRangeException("payloadSchemaVersion");
             if (bytes == null || bytes.Length > Limits.FramePayloadBytes)

@@ -28,7 +28,7 @@ namespace CsmForge.Runtime.Cities1
             Check.NotNull(assembly, "assembly");
             if (!Enum.IsDefined(typeof(ForgeModCompatibilityKind), kind)) throw new ArgumentOutOfRangeException("kind");
             string key = assembly.FullName;
-            if (string.IsNullOrEmpty(key)) throw new ArgumentException("Assembly identity is unavailable.", "assembly");
+            Check.Condition(string.IsNullOrEmpty(key), "assembly", "Assembly identity is unavailable.");
             lock (Gate)
             {
                 if (RuntimeServices.Multiplayer.Status.Mode != MultiplayerSessionMode.Offline)

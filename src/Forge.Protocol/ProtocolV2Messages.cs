@@ -90,7 +90,7 @@ namespace CsmForge.Protocol
             Check.NotNull(manifest, "manifest");
             ComponentFingerprint[] entries = manifest.Entries;
             int count = Math.Max(1, (entries.Length + ManifestEntriesPerPage - 1) / ManifestEntriesPerPage);
-            if (count > 256) throw new ArgumentException("Manifest needs too many pages.", "manifest");
+            Check.Condition(count > 256, "manifest", "Manifest needs too many pages.");
             ManifestPageV2[] result = new ManifestPageV2[count];
             for (int page = 0; page < count; page++)
             {

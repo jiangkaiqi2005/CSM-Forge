@@ -41,7 +41,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CityNameAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; CityNameGameAccess.Capture();
         }
 
@@ -68,7 +68,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CityNameReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committed = CityNameGameAccess.Capture();
         }
 

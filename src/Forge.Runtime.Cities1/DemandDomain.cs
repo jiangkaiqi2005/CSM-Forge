@@ -36,7 +36,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static DemandStateV2 Decode(byte[] bytes)
         {
-            if (bytes == null || bytes.Length != 3) throw new ArgumentException("Invalid demand payload.", "bytes");
+            Check.Condition(bytes == null || bytes.Length != 3, "bytes", "Invalid demand payload.");
             return new DemandStateV2(bytes[0], bytes[1], bytes[2]);
         }
     }
@@ -78,7 +78,7 @@ namespace CsmForge.Runtime.Cities1
         public Hash256 StateRoot { get { return DemandGameAccess.Capture().Root; } }
         public DemandAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
         }
         public DomainExecutionV2 ExecutePlayer(byte[] payload) { return DomainExecutionV2.Rejected(); }
     }

@@ -46,7 +46,7 @@ namespace CsmForge.Core
         public ushort Style { get; private set; }
         public DistrictEntityStateV2(EntityIdentityV2 entity, ulong randomSeed, ushort style)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid district identity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid district identity.");
             Entity = entity; RandomSeed = randomSeed; Style = style;
         }
     }

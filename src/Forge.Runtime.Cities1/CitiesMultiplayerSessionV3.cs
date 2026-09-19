@@ -104,7 +104,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CitiesMultiplayerSessionV3(CitiesLifecycleCoordinator lifecycle, RuntimeEventLog events)
         {
-            if (lifecycle == null || events == null) throw new ArgumentNullException("lifecycle");
+            Check.NotNull(lifecycle, "lifecycle"); Check.NotNull(events, "events"); // WP-2: per-argument reporting
             this.lifecycle = lifecycle;
             this.events = events;
         }

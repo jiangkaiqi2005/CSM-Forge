@@ -71,7 +71,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(IForgeAdapterContextV1 context, byte[] state)
         {
-            if (context == null || state == null) throw new ArgumentNullException("context");
+            Check.NotNull(context, "context"); Check.NotNull(state, "state"); // WP-2: per-argument reporting
             ParkState[] desired = Decode(state);
             Dictionary<ulong, ParkState> wanted = new Dictionary<ulong, ParkState>();
             for (int i = 0; i < desired.Length; i++) wanted.Add(desired[i].Identity.EntityId, desired[i]);

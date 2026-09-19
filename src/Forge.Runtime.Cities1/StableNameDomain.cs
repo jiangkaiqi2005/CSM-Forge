@@ -71,7 +71,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected StableNameDomainBase(LoadIdentity load, bool hostSide)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load; HostSide = hostSide; Seed();
         }
 

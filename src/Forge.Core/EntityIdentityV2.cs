@@ -33,7 +33,7 @@ namespace CsmForge.Core
 
         public EntityMapEntryV2(EntityIdentityV2 identity, uint nativeId)
         {
-            if (!identity.IsValid) throw new ArgumentException("Invalid entity identity.", "identity");
+            Check.Condition(!identity.IsValid, "identity", "Invalid entity identity.");
             if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
             Identity = identity;
             NativeId = nativeId;
@@ -75,7 +75,7 @@ namespace CsmForge.Core
 
         public void BindKnown(EntityIdentityV2 identity, uint nativeId)
         {
-            if (!identity.IsValid) throw new ArgumentException("Invalid entity identity.", "identity");
+            Check.Condition(!identity.IsValid, "identity", "Invalid entity identity.");
             if (nativeId == 0) throw new ArgumentOutOfRangeException("nativeId");
             if (retired.Contains(identity.EntityId)) throw new InvalidOperationException("Retired entity identity cannot be rebound.");
             Entry current;
@@ -146,7 +146,7 @@ namespace CsmForge.Core
             nextEntityId = 0;
             foreach (EntityMapEntryV2 value in entries)
             {
-                if (value == null) throw new ArgumentException("Snapshot contains a null entity mapping.", "entries");
+                Check.Condition(value == null, "entries", "Snapshot contains a null entity mapping.");
                 BindKnown(value.Identity, value.NativeId);
             }
             if (highestIssuedId < nextEntityId)

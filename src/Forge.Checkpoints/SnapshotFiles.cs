@@ -43,7 +43,7 @@ namespace CsmForge.Checkpoints
         public SnapshotReadCursor(SnapshotFileDescriptor descriptor, Guid transferId)
         {
             Check.NotNull(descriptor, "descriptor");
-            if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer id.", "transferId");
+            Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer id.");
             this.descriptor = descriptor; this.transferId = transferId;
             stream = new FileStream(descriptor.Path, FileMode.Open, FileAccess.Read, FileShare.Read);
             if (stream.Length != descriptor.Length) throw new IOException("Snapshot changed after publication.");
@@ -88,10 +88,10 @@ namespace CsmForge.Checkpoints
 
         public SnapshotReceiveFile(SnapshotOfferV2 offer, string path)
         {
-            if (offer == null || !offer.RequiresTransfer) throw new ArgumentException("A transfer-backed snapshot offer is required.", "offer");
+            Check.Condition(offer == null || !offer.RequiresTransfer, "offer", "A transfer-backed snapshot offer is required.");
             if (offer.ContentBytes == 0 || offer.ContentBytes > (ulong)SnapshotFileDescriptor.MaximumBytes)
                 throw new ArgumentOutOfRangeException("offer");
-            if (string.IsNullOrEmpty(path)) throw new ArgumentException("Temporary path is required.", "path");
+            Check.Condition(string.IsNullOrEmpty(path), "path", "Temporary path is required.");
             this.offer = offer; this.path = path;
             string directory = System.IO.Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);

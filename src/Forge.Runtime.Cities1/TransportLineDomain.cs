@@ -111,7 +111,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static ushort CreateAuthority(LoadIdentity load, TransportLineIntentV2 intent)
         {
-            if (intent == null || intent.Kind != TransportLineIntentKindV2.Create) throw new ArgumentException("Expected transport create intent.", "intent");
+            Check.Condition(intent == null || intent.Kind != TransportLineIntentKindV2.Create, "intent", "Expected transport create intent.");
             TransportManager manager = TransportManager.instance; SimulationManager simulation = SimulationManager.instance;
             if (manager == null || simulation == null) throw new InvalidOperationException("Transport services are unavailable.");
             TransportInfo info = ResolvePrefab(intent.PrefabKey); ushort lineId;
@@ -219,7 +219,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected TransportLineDomainBase(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load; RuntimeServices.EntityMaps.AttachDomain(TransportLineAuthorityDomain.Id, Ids);
             if (Ids.Count == 0) SeedExisting(); else ValidateRestored();
             RefreshCommitted();

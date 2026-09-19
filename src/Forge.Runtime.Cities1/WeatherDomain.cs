@@ -66,7 +66,7 @@ namespace CsmForge.Runtime.Cities1
 
         public WeatherAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; WeatherGameAccess.Capture();
         }
 
@@ -85,7 +85,7 @@ namespace CsmForge.Runtime.Cities1
 
         public WeatherReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committed = WeatherGameAccess.Capture();
         }
 

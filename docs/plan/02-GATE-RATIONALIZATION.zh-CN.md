@@ -14,10 +14,18 @@
 > - D2 首轮已完成：`Check` 升为 public 并新增 `NotNull/Condition/InRange/CanonicalId`；
 >   单行 `X == null` 模式 177 处全部转换（ANE throw 224→48，-79%）；
 >   两处 canonical 字符集循环合并为 `Check.CanonicalId`。
->   **剩余**：48 处复合/多行 ANE、AE 216、AOORE 84 的继续转换；
->   桥反射面校验（GA/InfiniteGoods 各自的 RequiredMethod/RequiredProperty）合并待做。
+> - **D2 第二轮已完成（WP-2b）**：双 null 复合 ANE 单行 23 处、单行 AE 88 处
+>   （`Check.Condition(cond, name, msg)`，违规语义）转换完成——**转换过程中
+>   Check.Condition 的断言式/违规式语义反了，被测试套件当场抓住并修正**
+>   （这正是"先写确定性回归再动结构"纪律的价值案例）；ANE 总数 224→25（-89%），
+>   AE 总数 216→130（剩余为多行/复合条件与 message-only 变体，继续按批转换）。
+>   **剩余**：AE 130 的多行变体、AOORE 84（`Check.InRange` 需逐处提取边界）；
+>   桥反射面校验已合并（见下）。
 > - D3 已在 WP-1.2 部分落地（广播容错驱逐 + UI 停止走调度），`FenceSession` 前的
 >   "踢可疑 peer 观察一轮"中间档仍待做。
+> - **D2 桥反射面校验已合并**：`BridgeSurfaceValidator`（Runtime.Cities1）统一
+>   GA/InfiniteGoods 的 RequiredType/RequiredProperty/RequiredValue/RequiredMethod
+>   （requireVoid 参数保留 IG 的 void 返回校验语义），异常类型与参数逐字一致。
 > - D4 打点原语已落地：`Forge.Core/GateCounter`（GateCategory 五类，
 >   Wire/Invariant/Lifecycle/Thread/Contract）+ `CheckAndGateTests` 6 项回归；
 >   已接线 4 处高价值站点（V3.FenceSession、EvictDeadHostPeers、

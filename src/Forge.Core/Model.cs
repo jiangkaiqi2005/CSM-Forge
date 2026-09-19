@@ -49,7 +49,7 @@ namespace CsmForge.Core
 
         public static void Stamp(SessionStamp stamp)
         {
-            if (!stamp.IsValid) throw new ArgumentException("Uninitialized session stamp.", "stamp");
+            Check.Condition(!stamp.IsValid, "stamp", "Uninitialized session stamp.");
         }
 
         public static void NotNull(object value, string name)
@@ -57,9 +57,10 @@ namespace CsmForge.Core
             if (value == null) throw new ArgumentNullException(name);
         }
 
-        public static void Condition(bool valid, string name, string message)
+        /// <summary>WP-2: pass the VIOLATION condition - the guard throws when it is true.</summary>
+        public static void Condition(bool violation, string name, string message)
         {
-            if (!valid) throw new ArgumentException(message, name);
+            if (violation) throw new ArgumentException(message, name);
         }
 
         public static void InRange(long value, long minimum, long maximum, string name)
@@ -128,7 +129,7 @@ namespace CsmForge.Core
             Check.Stamp(stamp);
             if (revision == 0 || requestId == 0 || origin == Guid.Empty)
                 throw new ArgumentException("Commit identity is incomplete.");
-            if (beforeHash == null || afterHash == null) throw new ArgumentNullException("beforeHash");
+            Check.NotNull(beforeHash, "beforeHash"); Check.NotNull(afterHash, "afterHash"); // WP-2: per-argument reporting
             Stamp = stamp;
             Revision = revision;
             Origin = origin;
@@ -164,7 +165,7 @@ namespace CsmForge.Core
 
         public WorldImage(byte[] data, Hash256 contentHash, Hash256 stateHash)
         {
-            if (contentHash == null || stateHash == null) throw new ArgumentNullException("contentHash");
+            Check.NotNull(contentHash, "contentHash"); Check.NotNull(stateHash, "stateHash"); // WP-2: per-argument reporting
             bytes = Check.Copy(data, Limits.SnapshotBytes, false);
             ContentHash = contentHash;
             StateHash = stateHash;
@@ -183,7 +184,7 @@ namespace CsmForge.Core
         public WorldSnapshot(SessionStamp stamp, ulong revision, Guid transferId, WorldImage image)
         {
             Check.Stamp(stamp);
-            if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer identity.", "transferId");
+            Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer identity.");
             Check.NotNull(image, "image");
             Stamp = stamp;
             Revision = revision;

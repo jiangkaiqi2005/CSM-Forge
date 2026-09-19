@@ -48,6 +48,18 @@ namespace CsmForge.Core
 
         public bool IsSourceDirty(int shard) { return sourceDirty[shard]; }
 
+        public bool HasSourceDirtyShards()
+        {
+            for (int shard = 0; shard < ShardCount; shard++)
+                if (sourceDirty[shard]) return true;
+            return false;
+        }
+
+        public void MarkAllSourceDirty()
+        {
+            for (int shard = 0; shard < ShardCount; shard++) sourceDirty[shard] = true;
+        }
+
         public void MarkSourceDirty(int shard)
         {
             if (shard < 0 || shard >= ShardCount) throw new ArgumentOutOfRangeException("shard");
@@ -137,25 +149,25 @@ namespace CsmForge.Core
             return changed.ToArray();
         }
 
-        /// <summary>Cheap path: reconciles only shards flagged source-dirty. Returns changed cell count.</summary>
-        public int ReconcileSourceDirty(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        /// <summary>Cheap path: reconciles only shards flagged source-dirty. Returns the changed cells.</summary>
+        public List<DistrictCellStateV2> ReconcileSourceDirty(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
         {
             if (source == null) throw new ArgumentNullException("source");
-            int changed = 0;
+            List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
             for (int shard = 0; shard < ShardCount; shard++)
             {
                 if (!sourceDirty[shard]) continue;
-                changed += ReconcileShard(shard, source(shard)).Length;
+                changed.AddRange(ReconcileShard(shard, source(shard)));
             }
             return changed;
         }
 
         /// <summary>Full verification path: reconciles every shard, catching bypassed writes.</summary>
-        public int ReconcileAll(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        public List<DistrictCellStateV2> ReconcileAll(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
         {
             if (source == null) throw new ArgumentNullException("source");
-            int changed = 0;
-            for (int shard = 0; shard < ShardCount; shard++) changed += ReconcileShard(shard, source(shard)).Length;
+            List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
+            for (int shard = 0; shard < ShardCount; shard++) changed.AddRange(ReconcileShard(shard, source(shard)));
             return changed;
         }
 

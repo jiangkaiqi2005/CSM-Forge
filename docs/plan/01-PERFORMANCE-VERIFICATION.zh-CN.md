@@ -109,10 +109,29 @@
   现在只重算 hash-dirty 分片；`ReconcileCellsSourceDirty`/`ReconcileCellsFull`
   供运行时两级校验使用，与 WP-1.1 的 VerificationCadence 窗口衔接
   （窗口触发 = 全量校验；Harmony 钩子置位 = 廉价路径）。
-- **剩余（下一片）**：Harmony 在 DistrictManager 变更点置 source-dirty（运行时廉价路径）；
-  `NetDomain.CaptureWorld` 的同构分片化；根公式升级 FGD3 需要宿主/副本同版本
-  （混跑由 schema 检查按设计拒绝）。
-- **验收**：单测 213/213（+4）；net35 构建 0 警告 0 错误；真机 PERF 对比待 E3/E4。
+- **剩余（下一片）**：`NetDomain.CaptureWorld` 的同构分片化；根公式升级 FGD3 需要宿主/副本
+  同版本（混跑由 schema 检查按设计拒绝）。
+
+### WP-1.4b Harmony 脏钩子 + 廉价路径（第二片）—— 已实现，待真机验收
+
+- **确定性回归先行**（`DistrictShardedCellIndexTests`）：`HookSequenceIsCaughtByCheapPathAndConfirmedByFullWindow`
+  钉死运行时契约——钩子置位 → 廉价路径恰好捕获 1 处变更 → 全量窗口确认 0 漂移 →
+  未触分片保持原样；`StateIndexCheapPathCarriesCellsAndKeepsRootCoherent` 覆盖
+  DistrictStateIndexV2 集成（聚合根 = 全量重算、Root 读取稳定）。
+- **钩子**（`DistrictPatches.cs`）：ilspy 查证 `DistrictManager` 的网格写入点为
+  `ModifyCell(int x, int z, Cell)`（brush/mods/ReleaseDistrictImplementation 都落到它）——
+  postfix 按 `z*512+x` 置 source-dirty；`ReleaseDistrict` postfix 置全部分片 dirty
+  （释放可能跨全图清格）。两钩子仅 HostLive 生效、`IsApplying` 跳过。
+- **廉价路径**（`DistrictPolicyPolling.PollObservedHostDistricts`）：
+  1. 有 source-dirty 分片 → `ObserveHostSourceDirty()` 只重读那些分片
+     （每分片 512 次 CaptureCell）→ 变更发布为权威批次；
+  2. 无 → WP-1.1 节拍窗口到点才全量 reconcile（兜底）。
+  实体捕获仍随廉价路径运行（≤255 个区划，很便宜）——宿主新建区的实体随其首批格子一起发布。
+- **接线链**：patch → `CitiesMultiplayerSessionV3.MarkDistrictCellSourceDirty` →
+  `DistrictCompositeAuthorityDomain` → `DistrictAuthorityDomain` → `Committed.MarkCellSourceDirty`。
+- **验收**：单测 215/215（+2）；net35 构建 0 警告 0 错误；真机验收项：画区/改区后
+  一个 tick 内同步（钩子路径）、无操作时区划 reconcile 零成本（节拍窗口）、
+  人工绕过（未钩写入口）在窗口内被全量校验纠正。
 
 ### WP-1.5 哈希移出主线程（依赖 WP-1.4）
 

@@ -216,13 +216,15 @@ namespace CsmForge.Core
 
         /// <summary>WP-1.4: mark a grid shard as possibly drifted from the game (Harmony hooks).</summary>
         public void MarkCellSourceDirty(uint cellIndex) { cells.MarkSourceDirtyForCell(cellIndex); }
+        public void MarkAllCellsSourceDirty() { cells.MarkAllSourceDirty(); }
+        public bool HasSourceDirtyShards() { return cells.HasSourceDirtyShards(); }
 
-        /// <summary>WP-1.4: cheap reconcile of source-dirty shards; returns changed cell count.</summary>
-        public int ReconcileCellsSourceDirty(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        /// <summary>WP-1.4: cheap reconcile of source-dirty shards; returns the changed cells.</summary>
+        public List<DistrictCellStateV2> ReconcileCellsSourceDirty(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
         { return cells.ReconcileSourceDirty(source); }
 
         /// <summary>WP-1.4: full verification reconcile over all 512 shards; catches bypassed writes.</summary>
-        public int ReconcileCellsFull(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
+        public List<DistrictCellStateV2> ReconcileCellsFull(Func<int, IDictionary<uint, DistrictCellStateV2>> source)
         { return cells.ReconcileAll(source); }
 
         /// <summary>WP-1.4: cached shard aggregate must always equal a full recompute.</summary>

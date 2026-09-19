@@ -161,6 +161,21 @@ namespace CsmForge.Runtime.Cities1
                 district.StateRoot, committedPolicies);
         }
 
+        internal bool HasSourceDirtyShards() { return district.HasSourceDirtyShards(); }
+
+        /// <summary>WP-1.4b cheap path: reconciles only the shards the game hooks marked.</summary>
+        internal DistrictAuthorityEnvelopeV2 ObserveHostSourceDirty()
+        {
+            DistrictMutationV2 mutation = district.ObserveHostSourceDirty();
+            if (mutation == null) return null;
+            committedPolicies = CapturePolicies();
+            return new DistrictAuthorityEnvelopeV2(mutation, district.StateRoot, committedPolicies);
+        }
+
+        internal void MarkCellSourceDirty(uint cellIndex) { district.MarkCellSourceDirty(cellIndex); }
+
+        internal void MarkAllCellsSourceDirty() { district.MarkAllCellsSourceDirty(); }
+
         private DistrictPolicySnapshotV2 CapturePolicies()
         {
             return DistrictPolicyGameAccess.Capture(delegate(uint native)

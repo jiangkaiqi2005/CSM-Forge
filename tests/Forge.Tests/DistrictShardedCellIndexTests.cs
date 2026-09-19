@@ -40,17 +40,17 @@ namespace CsmForge.Tests
             DistrictShardedCellIndex index = new DistrictShardedCellIndex();
             var source = new Dictionary<uint, DistrictCellStateV2>();
             source[100] = Cell(100, 255, a);
-            Assert.Equal(1, index.ReconcileAll(SourceOf(source))); // initial sync
+            Assert.Equal(1, index.ReconcileAll(SourceOf(source)).Count); // initial sync
             Hash256 inSync = index.AggregateRoot;
 
             // Bypassed write: the game grid changed but no source-dirty mark was set.
             source[100] = Cell(100, 255, b);
             Assert.True(!index.IsSourceDirty(0));
-            Assert.Equal(0, index.ReconcileSourceDirty(SourceOf(source))); // cheap path sees nothing
+            Assert.Equal(0, index.ReconcileSourceDirty(SourceOf(source)).Count); // cheap path sees nothing
             Assert.Equal(inSync, index.AggregateRoot);           // stale by design
 
             // Full verification (WP-1.1 cadence) catches the bypassed write.
-            Assert.Equal(1, index.ReconcileAll(SourceOf(source)));
+            Assert.Equal(1, index.ReconcileAll(SourceOf(source)).Count);
             Assert.True(!index.AggregateRoot.Equals(inSync));
 
             // And it converges to the same state as an honest direct application.
@@ -66,13 +66,13 @@ namespace CsmForge.Tests
             var source = new Dictionary<uint, DistrictCellStateV2>();
             source[511] = Cell(511, 255, id); // shard 0
             source[512] = Cell(512, 255, id); // shard 1
-            Assert.Equal(2, index.ReconcileAll(SourceOf(source)));
+            Assert.Equal(2, index.ReconcileAll(SourceOf(source)).Count);
             Hash256 inSync = index.AggregateRoot;
 
             source[513] = Cell(513, 255, id);
             index.MarkSourceDirtyForCell(513); // Harmony hook marks exactly the touched shard
             Assert.True(index.IsSourceDirty(1));
-            Assert.Equal(1, index.ReconcileSourceDirty(SourceOf(source)));
+            Assert.Equal(1, index.ReconcileSourceDirty(SourceOf(source)).Count);
             Assert.True(!index.IsSourceDirty(1));
             Assert.True(!index.AggregateRoot.Equals(inSync));
         }
@@ -112,6 +112,56 @@ namespace CsmForge.Tests
             Assert.Equal(511, index.ShardOf(262143));
             Assert.Throws<ArgumentOutOfRangeException>(delegate { index.ShardOf(262144); });
             Assert.Throws<ArgumentOutOfRangeException>(delegate { index.ApplyCell(262144, Cell(0, 0, default(EntityIdentityV2))); });
+        }
+
+        [Case] public static void HookSequenceIsCaughtByCheapPathAndConfirmedByFullWindow()
+        {
+            // Runtime contract model (WP-1.4b): the ModifyCell/ReleaseDistrict postfixes mark the
+            // touched shard, the cheap reconcile catches the change, and the cadence full window
+            // finds zero drift afterwards.
+            EntityIdentityV2 id = new EntityIdentityV2(7, 1);
+            DistrictShardedCellIndex index = new DistrictShardedCellIndex();
+            var source = new Dictionary<uint, DistrictCellStateV2>();
+            source[300] = Cell(300, 255, id);
+            source[900] = Cell(900, 255, id);
+            Assert.Equal(2, index.ReconcileAll(SourceOf(source)).Count);
+            Hash256 inSync = index.AggregateRoot;
+
+            source[300] = Cell(300, 200, id);   // player repaints cell 300
+            index.MarkSourceDirtyForCell(300);  // ModifyCell postfix
+            Assert.Equal(1, index.ReconcileSourceDirty(SourceOf(source)).Count);
+            Hash256 afterCheap = index.AggregateRoot;
+            Assert.True(!afterCheap.Equals(inSync));
+
+            // cadence full window: zero changes - the cheap path already converged
+            Assert.Equal(0, index.ReconcileAll(SourceOf(source)).Count);
+            Assert.True(index.AggregateRoot.Equals(afterCheap));
+            Assert.True(index.AggregateRoot.Equals(index.RecomputeFullAggregateRoot()));
+
+            // an untouched shard stays exactly as synced
+            DistrictCellStateV2 cell900;
+            Assert.True(index.TryGetCell(900, out cell900));
+            Assert.True(cell900.Equals(Cell(900, 255, id)));
+        }
+
+        [Case] public static void StateIndexCheapPathCarriesCellsAndKeepsRootCoherent()
+        {
+            DistrictStateIndexV2 index = new DistrictStateIndexV2();
+            EntityIdentityV2 id = new EntityIdentityV2(9, 1);
+            index.Apply(new DistrictMutationV2(new[] { new DistrictEntityStateV2(id, 5, 1) },
+                new EntityIdentityV2[0], new DistrictCellStateV2[0]));
+
+            index.MarkCellSourceDirty(600); // hook marked shard 1
+            var sourceCells = new Dictionary<uint, DistrictCellStateV2>();
+            sourceCells[600] = Cell(600, 255, id);
+            var empty = new Dictionary<uint, DistrictCellStateV2>();
+            List<DistrictCellStateV2> changed = index.ReconcileCellsSourceDirty(shard => shard == 1 ? sourceCells : empty);
+            Assert.Equal(1, changed.Count);
+
+            Hash256 root = index.Root;
+            Assert.True(index.CellAggregateRoot.Equals(index.RecomputedCellAggregateRoot));
+            Assert.True(root.Equals(index.Root));
+            Assert.Equal(1, index.CellCount);
         }
     }
 }

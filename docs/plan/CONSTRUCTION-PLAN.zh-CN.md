@@ -66,12 +66,13 @@
 
 ## 3. 施工顺序与依赖
 
-**集成记录（2026-09-20）**：①-④ 与 ⑤ 第一轮、⑥ 的全部工作已通过 `--no-ff` 合并
-`feat/wp-1.4b-district-dirty-hooks` 回 `feat/ultimate-dlc-mod-framework`（合并提交 `fc17958`，
-已推送）；`build-runtime.ps1` 已从该提交打包 `dist/runtime/CSM-Forge-runtime.zip`，
-BUILD_INFO 溯源恢复（source_commit 可达）。E3/E4 真机记录待执行：安装包后按
-docs/TESTING 场景跑 1 Host + 1/2 Client、画区/修路/聊天、客户端 kill -9、
-节拍窗口前后 PERF 对比，并把结果写回 E3-E4-TEST-RECORD。
+**集成记录（2026-09-20，更新）**：①-⑧ 全部已完成工作已合入
+`feat/ultimate-dlc-mod-framework` @ `71b677f`（三次 `--no-ff` 合并：`fc17958` 波次一、
+`8d170cb` 目录加载+通用编解码器、`71b677f` 门禁第三轮+多 mod manifest，均已推送）；
+`build-runtime.ps1` 已从 `71b677f` 重新打包，BUILD_INFO 溯源指向可达提交。
+**E3/E4 真机验收为当前唯一待办（需人工执行）**：安装 `dist/runtime/CSM-Forge-runtime.zip`
+（71b677f 构建）后按 docs/TESTING 场景跑 1 Host + 1/2 Client、画区/修路/聊天、
+客户端 kill -9、节拍窗口 PERF 对比，并把结果写回 E3-E4-TEST-RECORD。
 
 ```
 ① WP-1.1 低频安全点验证      （独立可做，体感质变，一个 PR 量级）✅

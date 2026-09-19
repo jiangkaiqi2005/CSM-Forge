@@ -76,7 +76,6 @@ namespace CsmForge.Core
 
         private static void ValidateSlot(EntityIdentityV2 district, byte alpha)
         {
-            if (alpha != 0 && !district.IsValid) throw new ArgumentException("Non-empty district cell slot requires an identity.");
             if (alpha == 0 && district.IsValid) throw new ArgumentException("Empty district cell slot must not carry an identity.");
         }
 
@@ -183,6 +182,7 @@ namespace CsmForge.Core
             {
                 if (cell.AlphaAt(slot) == 0) continue;
                 EntityIdentityV2 id = cell.IdentityAt(slot); DistrictEntityStateV2 target;
+                if (!id.IsValid) continue; // Token zero is CS1's unassigned/background district.
                 if (!entities.TryGetValue(id.EntityId, out target) || !target.Entity.Equals(id))
                     throw new InvalidOperationException("District grid references an unknown entity.");
             }
@@ -275,7 +275,8 @@ namespace CsmForge.Core
                     for (int slot = 0; slot < 4; slot++)
                     {
                         byte alpha = cell.AlphaAt(slot); writer.Write(alpha);
-                        writer.Write(alpha == 0 ? (byte)0 : Token(tokens, cell.IdentityAt(slot)));
+                        EntityIdentityV2 identity = cell.IdentityAt(slot);
+                        writer.Write(alpha == 0 || !identity.IsValid ? (byte)0 : Token(tokens, identity));
                     }
                 }
                 writer.Flush(); byte[] result = stream.ToArray();
@@ -322,7 +323,7 @@ namespace CsmForge.Core
                         {
                             if (token != 0) throw new InvalidDataException("Empty district slot has a token.");
                         }
-                        else ids[slot] = ResolveToken(token, identities);
+                        else if (token != 0) ids[slot] = ResolveToken(token, identities);
                     }
                     cells[i] = new DistrictCellStateV2(index, ids[0], alphas[0], ids[1], alphas[1], ids[2], alphas[2], ids[3], alphas[3]);
                 }

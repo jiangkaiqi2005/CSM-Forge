@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
         private static EntityIdentityV2 ResolveCellDistrict(byte nativeId, byte alpha, EntityIdMapV2 ids)
         {
             if (alpha == 0) return default(EntityIdentityV2);
-            if (nativeId == 0) throw new InvalidOperationException("Non-empty district cell references district zero.");
+            if (nativeId == 0) return default(EntityIdentityV2); // CS1 unassigned/background district.
             EntityIdentityV2 identity;
             if (!ids.TryGetIdentity(nativeId, out identity))
                 throw new InvalidOperationException("District grid references an unmapped native district.");
@@ -95,10 +95,10 @@ namespace CsmForge.Runtime.Cities1
             if (!RuntimeServices.Lifecycle.IsCurrent(load) || manager == null || state == null || state.Index >= manager.m_districtGrid.Length)
                 throw new InvalidOperationException("District cell apply is invalid.");
             DistrictManager.Cell cell = manager.m_districtGrid[state.Index];
-            cell.m_district1 = state.Alpha1 == 0 ? (byte)0 : Native(state.District1, ids); cell.m_alpha1 = state.Alpha1;
-            cell.m_district2 = state.Alpha2 == 0 ? (byte)0 : Native(state.District2, ids); cell.m_alpha2 = state.Alpha2;
-            cell.m_district3 = state.Alpha3 == 0 ? (byte)0 : Native(state.District3, ids); cell.m_alpha3 = state.Alpha3;
-            cell.m_district4 = state.Alpha4 == 0 ? (byte)0 : Native(state.District4, ids); cell.m_alpha4 = state.Alpha4;
+            cell.m_district1 = state.Alpha1 == 0 || !state.District1.IsValid ? (byte)0 : Native(state.District1, ids); cell.m_alpha1 = state.Alpha1;
+            cell.m_district2 = state.Alpha2 == 0 || !state.District2.IsValid ? (byte)0 : Native(state.District2, ids); cell.m_alpha2 = state.Alpha2;
+            cell.m_district3 = state.Alpha3 == 0 || !state.District3.IsValid ? (byte)0 : Native(state.District3, ids); cell.m_alpha3 = state.Alpha3;
+            cell.m_district4 = state.Alpha4 == 0 || !state.District4.IsValid ? (byte)0 : Native(state.District4, ids); cell.m_alpha4 = state.Alpha4;
             using (RuntimeScopeGuard.EnterApply(load, DistrictAuthorityDomain.Id)) manager.m_districtGrid[state.Index] = cell;
         }
 

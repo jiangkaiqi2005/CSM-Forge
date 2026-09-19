@@ -258,7 +258,8 @@ namespace CsmForge.Runtime.Cities1
             SortedDictionary<ulong, ParkDescriptor> dictionary)
         {
             if (alpha == 0) return;
-            if (native == 0 || !ParkLive(native)) throw new InvalidOperationException("Non-empty park-grid cell references an unavailable park.");
+            if (native == 0) return; // CS1 unassigned/background park area.
+            if (!ParkLive(native)) throw new InvalidOperationException("Non-empty park-grid cell references an unavailable park.");
             EntityIdentityV2 identity;
             if (!parkIds.TryGetIdentity(native, out identity))
             {
@@ -279,6 +280,7 @@ namespace CsmForge.Runtime.Cities1
             Dictionary<ulong, byte> codeByEntity)
         {
             if (alpha == 0) { writer.Write((byte)0); writer.Write((byte)0); return; }
+            if (native == 0) { writer.Write((byte)0); writer.Write(alpha); return; }
             EntityIdentityV2 identity;
             byte code;
             if (!parkIds.TryGetIdentity(native, out identity) || !codeByEntity.TryGetValue(identity.EntityId, out code))
@@ -294,7 +296,8 @@ namespace CsmForge.Runtime.Cities1
                 if (code != 0) throw new InvalidDataException("Empty park-grid slot has a non-zero dictionary code.");
                 native = 0; return;
             }
-            if (code == 0 || code >= nativeByCode.Length || nativeByCode[code] == 0)
+            if (code == 0) { native = 0; return; }
+            if (code >= nativeByCode.Length || nativeByCode[code] == 0)
                 throw new InvalidDataException("Park-grid slot references an invalid dictionary code.");
             native = nativeByCode[code];
         }

@@ -45,6 +45,25 @@ namespace CsmForge.Tests
         }
 
         [Case]
+        public static void DistrictMutationRoundTripsUnassignedBackgroundWeight()
+        {
+            DistrictCellStateV2 background = new DistrictCellStateV2(27,
+                default(EntityIdentityV2), 255, default(EntityIdentityV2), 0,
+                default(EntityIdentityV2), 0, default(EntityIdentityV2), 0);
+            DistrictMutationV2 mutation = new DistrictMutationV2(new DistrictEntityStateV2[0],
+                new EntityIdentityV2[0], new DistrictCellStateV2[] { background });
+
+            DistrictMutationV2 copy = DistrictDomainCodecV2.DecodeMutation(DistrictDomainCodecV2.EncodeMutation(mutation));
+            Assert.Equal(1, copy.Cells.Length);
+            Assert.Equal((byte)255, copy.Cells[0].Alpha1);
+            Assert.Equal(default(EntityIdentityV2), copy.Cells[0].District1);
+
+            DistrictStateIndexV2 state = new DistrictStateIndexV2();
+            state.Apply(copy);
+            Assert.Equal(1, state.CellCount);
+        }
+
+        [Case]
         public static void DistrictRootIsCanonicalAndDeletionRequiresNoReferences()
         {
             EntityIdentityV2 a = new EntityIdentityV2(2, 1);

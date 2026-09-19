@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.IO;
 using System.Threading;
 using CsmForge.Core;
 using ICities;
@@ -9,10 +10,49 @@ namespace CsmForge.Runtime.Cities1
     public sealed class ForgeMod : IUserMod
     {
         public static readonly ForgeSettings Settings = new ForgeSettings();
-        public string Name { get { return "CSM-Forge V3"; } }
-        public string Description { get { return "Host-authoritative Cities: Skylines multiplayer runtime under staged integration."; } }
-        public void OnEnabled() { RuntimeServices.Enable(); UnityEngine.Debug.Log("[CSM-Forge] runtime enabled."); }
-        public void OnDisabled() { RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+        public string Name { get { return "CSM-Forge 1.0 Candidate"; } }
+        public string Description { get { return "主菜单加入房间；进入城市后从暂停菜单创建和管理房间。真实多机玩法仍待验证。"; } }
+        public void OnEnabled()
+        {
+            InitializeCompatibilityCatalog();
+            BuiltInDlcAdapters.RegisterAll();
+            ForgeExtensionApi.Register(new DistrictParkControlsAdapter());
+            ForgeExtensionApi.Register(new DistrictParkDeepScalarAdapter());
+            ForgeExtensionApi.Register(new CampusDeepStateAdapter());
+            ForgeExtensionApi.Register(new EventStateAdapter());
+            ForgeExtensionApi.Register(new DisasterStateAdapter());
+            ForgeExtensionApi.Register(new ParkGridStateAdapter());
+            ForgeExtensionApi.Register(new BuildingSimulationStateAdapter());
+            ForgeExtensionApi.Register(new PathUnitStateAdapter());
+            ForgeExtensionApi.Register(new VehiclePresentationStateAdapter());
+            ForgeExtensionApi.Register(new CitizenInstancePresentationStateAdapter());
+            ForgeExtensionApi.Register(new TerrainStateAdapter());
+            KnownModBridgeRegistry.RegisterAvailable();
+            RuntimeServices.Enable();
+            ForgeMultiplayerUi.Initialize();
+            UnityEngine.Debug.Log("[CSM-Forge] runtime enabled; builtInAdapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length + ".");
+        }
+        public void OnDisabled() { ForgeMultiplayerUi.Shutdown(); RuntimeServices.Disable(); UnityEngine.Debug.Log("[CSM-Forge] runtime disabled."); }
+
+        /// <summary>WP-3.2: external compat documents replace the built-in set wholesale; any
+        /// failure leaves the test-pinned built-in set in force (fail closed).</summary>
+        private static void InitializeCompatibilityCatalog()
+        {
+            try
+            {
+                string location = typeof(ForgeMod).Assembly.Location;
+                string compatDirectory = string.IsNullOrEmpty(location)
+                    ? null : Path.Combine(Path.GetDirectoryName(location), "compat");
+                bool loaded = ModCompatibilityCatalog.TryInitializeFromDirectory(compatDirectory);
+                UnityEngine.Debug.Log("[CSM-Forge] compatibility catalog " +
+                    (loaded ? "loaded from compat/." : "built-in (no external document loaded)."));
+            }
+            catch (Exception error)
+            {
+                UnityEngine.Debug.Log("[CSM-Forge] compatibility catalog init failed: " +
+                    error.GetType().Name + "; built-in set in force.");
+            }
+        }
         public void OnSettingsUI(UIHelperBase helper) { ForgeSettingsPanel.Build(helper, Settings); }
     }
 
@@ -32,10 +72,14 @@ namespace CsmForge.Runtime.Cities1
                 LoadIdentity identity = RuntimeServices.Lifecycle.LevelLoaded(mode,
                     RuntimeServices.Metadata.PendingWorldId, RuntimeServices.Metadata.PendingEpoch);
                 RuntimeServices.Metadata.Attach(identity);
+                KnownModBridgeRegistry.RegisterAvailable();
+                RuntimeServices.Patches.RefreshOptionalBridges();
+                ForgeMultiplayerUi.EnsurePauseMenuEntry();
                 CompatibilityManifest manifest = CitiesCompatibilityCollector.Collect();
                 UnityEngine.Debug.Log("[CSM-Forge] level loaded; world=" + identity.WorldId +
                     "; epoch=" + identity.Epoch + "; generation=" + identity.Generation +
                     "; load=" + mode + "; compatibilityEntries=" + manifest.Entries.Length +
+                    "; adapters=" + ForgeExtensionApi.RegisteredAdapterIds.Length +
                     "; gameBuild=" + BuildConfig.applicationVersion +
                     "; managedRuntime=" + Environment.Version +
                     "; unity=" + UnityEngine.Application.unityVersion +
@@ -86,7 +130,7 @@ namespace CsmForge.Runtime.Cities1
             }
             UnityEngine.Debug.Log("[CSM-Forge] runtime evidence generation=" + identity.Generation +
                 "; SimulationManager=" + (simulation != null) + "; FixedUpdate-surface=" + fixedUpdate +
-                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER.");
+                "; simulation-isolation=PARTIAL; authority-projection=WATER-DEMAND-TAX-BUDGET-CASH-LOAN-AREA-BUILDING-ROAD-ZONE-DISTRICT-POLICY-CLOCK-TRANSPORT-NAME-CITYNAME-WEATHER-EXTENSION-DISTRICTPARK-PARKGRID-DISTRICTPARKCONTROLS-DISTRICTPARKDEEP-CAMPUSDEEP-EVENTS-DISASTERS-KNOWNMODBRIDGES.");
         }
     }
 
@@ -115,6 +159,10 @@ namespace CsmForge.Runtime.Cities1
                 RuntimeServices.Multiplayer.PollObservedHostCash();
                 RuntimeServices.Multiplayer.PollObservedHostAreas();
                 RuntimeServices.Multiplayer.PollObservedHostWeather();
+                RuntimeServices.Multiplayer.PollObservedHostBuildings();
+                RuntimeServices.Multiplayer.PollObservedHostExtensions();
+                RuntimeServices.Multiplayer.PollObservedHostNetFull();
+                EightyOne2UtilityAuthority.RestoreClientProjection();
                 RuntimeServices.Multiplayer.RestoreClientWeatherTargets();
                 RuntimeServices.Multiplayer.AuditClientProjection();
                 RuntimeServices.Multiplayer.AfterSimulationTick();

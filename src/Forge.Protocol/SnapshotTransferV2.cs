@@ -18,9 +18,9 @@ namespace CsmForge.Protocol
         public SnapshotChunkV2(Guid snapshotId, Guid transferId, uint index, ulong offset, byte[] bytes, Hash256 chunkHash)
         {
             if (snapshotId == Guid.Empty || transferId == Guid.Empty) throw new ArgumentException("Snapshot chunk identity is incomplete.");
-            if (bytes == null || bytes.Length == 0 || bytes.Length > MaxChunkBytes) throw new ArgumentException("Snapshot chunk size is invalid.", "bytes");
+            Check.Condition(bytes == null || bytes.Length == 0 || bytes.Length > MaxChunkBytes, "bytes", "Snapshot chunk size is invalid.");
             Hash256 actual = Hash256.Compute(bytes);
-            if (chunkHash == null || !actual.Equals(chunkHash)) throw new ArgumentException("Snapshot chunk hash does not match its bytes.", "chunkHash");
+            Check.Condition(chunkHash == null || !actual.Equals(chunkHash), "chunkHash", "Snapshot chunk hash does not match its bytes.");
             SnapshotId = snapshotId; TransferId = transferId; Index = index; Offset = offset;
             data = (byte[])bytes.Clone(); ChunkHash = chunkHash;
         }
@@ -44,7 +44,7 @@ namespace CsmForge.Protocol
     {
         public static byte[] EncodeChunk(SnapshotChunkV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] data = value.Data;
             using (MemoryStream stream = new MemoryStream())
             {
@@ -73,7 +73,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeProgress(SnapshotProgressV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] result = new byte[44];
             Buffer.BlockCopy(value.SnapshotId.ToByteArray(), 0, result, 0, 16);
             Buffer.BlockCopy(value.TransferId.ToByteArray(), 0, result, 16, 16);

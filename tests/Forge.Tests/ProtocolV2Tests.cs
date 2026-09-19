@@ -85,5 +85,47 @@ namespace CsmForge.Tests
                     Guid.NewGuid(), 0, Guid.Empty, 1, new byte[0]);
             });
         }
+
+        [Case]
+        public static void SocialMessagesUseStableMemberIdentityAndBoundedText()
+        {
+            MemberIdentity host = new MemberIdentity(Guid.NewGuid(), 1);
+            MemberIdentity client = new MemberIdentity(Guid.NewGuid(), 3);
+            RosterSnapshotV2 roster = SocialMessagesV2.DecodeRoster(SocialMessagesV2.EncodeRoster(
+                new RosterSnapshotV2(new[]
+                {
+                    new SessionPlayerV2(host, "Host", SessionPlayerRoleV2.Host, SessionPlayerPhaseV2.Live),
+                    new SessionPlayerV2(client, "Friend", SessionPlayerRoleV2.Client, SessionPlayerPhaseV2.Joining)
+                })));
+            Assert.Equal(2, roster.Players.Length);
+            Assert.Equal(client, roster.Players[1].Member);
+            Assert.Equal("Friend", roster.Players[1].DisplayName);
+
+            ChatEventV2 chat = SocialMessagesV2.DecodeChatEvent(SocialMessagesV2.EncodeChatEvent(
+                new ChatEventV2(client, "Friend", "hello")));
+            Assert.Equal(client, chat.Member);
+            Assert.Equal("hello", chat.Text);
+            Assert.Throws<ArgumentException>(delegate { new ChatSubmitV2(new string('x', 257)); });
+            Assert.Throws<ArgumentException>(delegate { new ChatSubmitV2(new string('界', 171)); });
+            Assert.Throws<ArgumentException>(delegate
+            { new SessionPlayerV2(client, new string('界', 32), SessionPlayerRoleV2.Client, SessionPlayerPhaseV2.Live); });
+        }
+
+        [Case]
+        public static void PlayerPresentationHasItsOwnLaneAndRoundTrips()
+        {
+            MemberIdentity member = new MemberIdentity(Guid.NewGuid(), 2);
+            PlayerPresentationV2 source = new PlayerPresentationV2(member, "Builder", "RoadTool", 1.5f, 2.5f, 3.5f, true);
+            PlayerPresentationV2 decoded = SocialMessagesV2.DecodePresentation(SocialMessagesV2.EncodePresentation(source));
+            Assert.Equal(member, decoded.Member);
+            Assert.Equal("RoadTool", decoded.ToolName);
+            Assert.Equal(2.5f, decoded.WorldY);
+            Assert.Equal(SessionLane.Presentation, SessionFrameV2.ExpectedLane(MessageKindV2.PlayerPresentation));
+            Assert.Throws<ArgumentException>(delegate
+            {
+                new SessionFrameV2(SessionLane.Control, MessageKindV2.PlayerPresentation,
+                    new SessionStamp(Guid.NewGuid(), 1), Guid.NewGuid(), 1, Guid.Empty, 1, new byte[0]);
+            });
+        }
     }
 }

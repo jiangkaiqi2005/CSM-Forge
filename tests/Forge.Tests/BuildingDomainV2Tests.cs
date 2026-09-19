@@ -30,9 +30,29 @@ namespace CsmForge.Tests
             Assert.Equal(entity, decodedDeleted.Entity);
             Assert.Equal(777, decodedDeleted.RefundAmount);
 
+            BuildingStateV2 upgradedState = new BuildingStateV2(entity, "building:vanilla:large-clinic", create.X, create.Y, create.Z, create.Angle, create.Length, 322, 0);
+            BuildingResultV2 decodedUpdated = BuildingDomainCodecV2.DecodeResult(BuildingDomainCodecV2.EncodeResult(BuildingResultV2.Updated(upgradedState)));
+            Assert.Equal(BuildingResultKindV2.Updated, decodedUpdated.Kind);
+            Assert.Equal(upgradedState.PrefabKey, decodedUpdated.State.PrefabKey);
+
             BuildingIntentV2 delete = BuildingIntentV2.Delete(entity);
             BuildingIntentV2 decodedDelete = BuildingDomainCodecV2.DecodeIntent(BuildingDomainCodecV2.EncodeIntent(delete));
             Assert.Equal(entity, decodedDelete.Entity);
+        }
+
+        [Case]
+        public static void NaturalUpdateReplacesExistingAbsoluteState()
+        {
+            EntityIdentityV2 id = new EntityIdentityV2(9, 1);
+            BuildingStateIndexV2 index = new BuildingStateIndexV2();
+            index.Seed(new BuildingStateV2(id, "small", 1, 2, 3, 0, 2, 1));
+            Hash256 before = index.Root;
+            BuildingStateV2 upgraded = new BuildingStateV2(id, "large", 1, 2, 3, 0, 4, 2);
+            index.Apply(BuildingResultV2.Updated(upgraded));
+            BuildingStateV2 actual;
+            Assert.True(index.TryGet(id, out actual));
+            Assert.Equal("large", actual.PrefabKey);
+            Assert.True(!before.Equals(index.Root));
         }
 
         [Case]

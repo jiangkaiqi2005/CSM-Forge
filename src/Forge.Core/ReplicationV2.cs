@@ -35,10 +35,10 @@ namespace CsmForge.Core
             Hash256 beforeRoot, Hash256 afterRoot, byte[] bytes)
         {
             Check.Stamp(stamp);
-            if (revision == 0) throw new ArgumentOutOfRangeException("revision");
-            if (!Enum.IsDefined(typeof(AuthorityOriginKind), originKind)) throw new ArgumentOutOfRangeException("originKind");
-            if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");
-            if (beforeRoot == null || afterRoot == null) throw new ArgumentNullException("beforeRoot");
+            Check.OutOfRange(revision == 0, "revision");
+            Check.OutOfRange(!Enum.IsDefined(typeof(AuthorityOriginKind), originKind), "originKind");
+            Check.OutOfRange(domainId == 0, "domainId");
+            Check.NotNull(beforeRoot, "beforeRoot"); Check.NotNull(afterRoot, "afterRoot"); // WP-2: per-argument reporting
             if (originKind == AuthorityOriginKind.PlayerIntent)
             {
                 if (memberId == Guid.Empty || memberGeneration == 0 || operationCounter == 0)
@@ -95,9 +95,9 @@ namespace CsmForge.Core
         public AppliedAck(SessionStamp stamp, Guid connectionBinding, ulong revision, Hash256 root, int pendingBatches)
         {
             Check.Stamp(stamp);
-            if (connectionBinding == Guid.Empty) throw new ArgumentException("Missing connection binding.", "connectionBinding");
-            if (root == null) throw new ArgumentNullException("root");
-            if (pendingBatches < 0 || pendingBatches > 4096) throw new ArgumentOutOfRangeException("pendingBatches");
+            Check.Condition(connectionBinding == Guid.Empty, "connectionBinding", "Missing connection binding.");
+            Check.NotNull(root, "root");
+            Check.OutOfRange(pendingBatches < 0 || pendingBatches > 4096, "pendingBatches");
             Stamp = stamp;
             ConnectionBinding = connectionBinding;
             Revision = revision;

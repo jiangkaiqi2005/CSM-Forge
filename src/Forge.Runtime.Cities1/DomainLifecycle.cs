@@ -23,6 +23,7 @@ namespace CsmForge.Runtime.Cities1
             clientNames = null;
             clientCityName = null;
             clientWeather = null;
+            clientExtensions = null;
         }
 
         private void ClearAllDomainReferences()
@@ -44,6 +45,7 @@ namespace CsmForge.Runtime.Cities1
             hostNames = null;
             hostCityName = null;
             hostWeather = null;
+            hostExtensions = null;
             committedDemandRoot = null;
             committedCashRoot = null;
             committedEconomyControlRoot = null;

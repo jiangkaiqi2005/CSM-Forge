@@ -6,7 +6,7 @@ using System.Text;
 namespace CsmForge.Core
 {
     public enum BuildingIntentKindV2 : byte { Create = 1, Delete = 2 }
-    public enum BuildingResultKindV2 : byte { Created = 1, Deleted = 2 }
+    public enum BuildingResultKindV2 : byte { Created = 1, Deleted = 2, Updated = 3 }
 
     public sealed class BuildingIntentV2
     {
@@ -24,19 +24,19 @@ namespace CsmForge.Core
         public static BuildingIntentV2 Create(string prefabKey, float x, float y, float z, float angle, byte length, int constructionCost)
         {
             ValidatePrefab(prefabKey); ValidateFloat(x); ValidateFloat(y); ValidateFloat(z); ValidateFloat(angle);
-            if (length == 0) throw new ArgumentOutOfRangeException("length");
-            if (constructionCost < 0 || constructionCost > 1000000000) throw new ArgumentOutOfRangeException("constructionCost");
+            Check.OutOfRange(length == 0, "length");
+            Check.OutOfRange(constructionCost < 0 || constructionCost > 1000000000, "constructionCost");
             return new BuildingIntentV2 { Kind = BuildingIntentKindV2.Create, PrefabKey = prefabKey, X = x, Y = y, Z = z,
                 Angle = angle, Length = length, ConstructionCost = constructionCost };
         }
         public static BuildingIntentV2 Delete(EntityIdentityV2 entity)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             return new BuildingIntentV2 { Kind = BuildingIntentKindV2.Delete, Entity = entity };
         }
         internal static void ValidatePrefab(string value)
         {
-            if (string.IsNullOrEmpty(value) || Encoding.UTF8.GetByteCount(value) > 192) throw new ArgumentException("Invalid building prefab identity.", "value");
+            Check.Condition(string.IsNullOrEmpty(value) || Encoding.UTF8.GetByteCount(value) > 192, "value", "Invalid building prefab identity.");
         }
         internal static void ValidateFloat(float value)
         {
@@ -59,11 +59,11 @@ namespace CsmForge.Core
             : this(entity, prefabKey, x, y, z, angle, length, buildIndex, 0) { }
         public BuildingStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, float angle, byte length, uint buildIndex, int constructionCost)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
             BuildingIntentV2.ValidatePrefab(prefabKey); BuildingIntentV2.ValidateFloat(x); BuildingIntentV2.ValidateFloat(y);
             BuildingIntentV2.ValidateFloat(z); BuildingIntentV2.ValidateFloat(angle);
-            if (length == 0) throw new ArgumentOutOfRangeException("length");
-            if (constructionCost < 0 || constructionCost > 1000000000) throw new ArgumentOutOfRangeException("constructionCost");
+            Check.OutOfRange(length == 0, "length");
+            Check.OutOfRange(constructionCost < 0 || constructionCost > 1000000000, "constructionCost");
             Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Angle = angle; Length = length;
             BuildIndex = buildIndex; ConstructionCost = constructionCost;
         }
@@ -78,14 +78,19 @@ namespace CsmForge.Core
         private BuildingResultV2() { }
         public static BuildingResultV2 Created(BuildingStateV2 state)
         {
-            if (state == null) throw new ArgumentNullException("state");
+            Check.NotNull(state, "state");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Created, Entity = state.Entity, State = state };
+        }
+        public static BuildingResultV2 Updated(BuildingStateV2 state)
+        {
+            Check.NotNull(state, "state");
+            return new BuildingResultV2 { Kind = BuildingResultKindV2.Updated, Entity = state.Entity, State = state };
         }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity) { return Deleted(entity, 0); }
         public static BuildingResultV2 Deleted(EntityIdentityV2 entity, int refundAmount)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid building entity.", "entity");
-            if (refundAmount < 0 || refundAmount > 1000000000) throw new ArgumentOutOfRangeException("refundAmount");
+            Check.Condition(!entity.IsValid, "entity", "Invalid building entity.");
+            Check.OutOfRange(refundAmount < 0 || refundAmount > 1000000000, "refundAmount");
             return new BuildingResultV2 { Kind = BuildingResultKindV2.Deleted, Entity = entity, RefundAmount = refundAmount };
         }
     }
@@ -106,7 +111,9 @@ namespace CsmForge.Core
         {
             if (result == null) throw new ArgumentNullException("result"); if (result.Kind == BuildingResultKindV2.Created) { Seed(result.State); return; }
             BuildingStateV2 current; if (!states.TryGetValue(result.Entity.EntityId, out current) || !current.Entity.Equals(result.Entity))
-                throw new InvalidOperationException("Cannot delete an unknown or stale building entity."); states.Remove(result.Entity.EntityId);
+                throw new InvalidOperationException("Cannot update or delete an unknown or stale building entity.");
+            if (result.Kind == BuildingResultKindV2.Updated) { states[result.Entity.EntityId] = result.State; return; }
+            if (result.Kind != BuildingResultKindV2.Deleted) throw new InvalidOperationException("Unknown building result kind."); states.Remove(result.Entity.EntityId);
         }
         public bool TryGet(EntityIdentityV2 entity, out BuildingStateV2 state)
         {
@@ -156,7 +163,7 @@ namespace CsmForge.Core
             if (value == null) throw new ArgumentNullException("value"); using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind); writer.Write(value.Entity.EntityId); writer.Write(value.Entity.Generation);
-                if (value.Kind == BuildingResultKindV2.Created)
+                if (value.Kind == BuildingResultKindV2.Created || value.Kind == BuildingResultKindV2.Updated)
                 { WriteString(writer, value.State.PrefabKey); writer.Write(value.State.X); writer.Write(value.State.Y); writer.Write(value.State.Z); writer.Write(value.State.Angle); writer.Write(value.State.Length); writer.Write(value.State.BuildIndex); writer.Write(value.State.ConstructionCost); }
                 else writer.Write(value.RefundAmount);
                 writer.Flush(); return stream.ToArray();
@@ -168,8 +175,8 @@ namespace CsmForge.Core
             using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes, false)))
             {
                 BuildingResultKindV2 kind = (BuildingResultKindV2)reader.ReadByte(); EntityIdentityV2 entity = new EntityIdentityV2(reader.ReadUInt64(), reader.ReadUInt32()); BuildingResultV2 result;
-                if (kind == BuildingResultKindV2.Created)
-                { string prefab = ReadString(reader); result = BuildingResultV2.Created(new BuildingStateV2(entity, prefab, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadInt32())); }
+                if (kind == BuildingResultKindV2.Created || kind == BuildingResultKindV2.Updated)
+                { string prefab = ReadString(reader); BuildingStateV2 state = new BuildingStateV2(entity, prefab, reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadInt32()); result = kind == BuildingResultKindV2.Created ? BuildingResultV2.Created(state) : BuildingResultV2.Updated(state); }
                 else if (kind == BuildingResultKindV2.Deleted) result = BuildingResultV2.Deleted(entity, reader.ReadInt32());
                 else throw new InvalidDataException("Unknown building result kind."); EnsureEnd(reader); return result;
             }

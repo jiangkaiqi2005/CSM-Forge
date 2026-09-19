@@ -35,7 +35,7 @@ namespace CsmForge.Core
         private int count;
         public DiagnosticRing(int capacity)
         {
-            if (capacity < 1 || capacity > 4096) throw new ArgumentOutOfRangeException("capacity");
+            Check.OutOfRange(capacity < 1 || capacity > 4096, "capacity");
             records = new DiagnosticRecord[capacity];
         }
         public void Record(DiagnosticCode code, SessionStamp stamp, Guid peer, ulong revision, ulong request)
@@ -77,13 +77,13 @@ namespace CsmForge.Core
         private readonly int capacity;
         public BoundedInbox(int capacity)
         {
-            if (capacity < 1 || capacity > 4096) throw new ArgumentOutOfRangeException("capacity");
+            Check.OutOfRange(capacity < 1 || capacity > 4096, "capacity");
             this.capacity = capacity;
             queue = new Queue<T>(capacity);
         }
         public bool TryPost(T item)
         {
-            if (item == null) throw new ArgumentNullException("item");
+            Check.NotNull(item, "item");
             lock (gate)
             {
                 if (queue.Count == capacity) return false;

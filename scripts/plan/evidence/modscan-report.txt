@@ -1,0 +1,35 @@
+# WP-3.1 client-only heuristic diff report
+# format: workshopId | dll | hardcoded-client? | heuristic | simulation-surface sample
+1637663252 | CSUtil.CameraControl.dll | ? | client | 
+1637663252 | CSUtil.Commons.dll | ? | client | 
+1637663252 | CitiesHarmony.API.dll | ? | client | 
+1637663252 | MoveItIntegration.dll | ? | client | 
+1637663252 | TMPE.API.dll | ? | sim | IAdvancedParkingManager,ICustomSegmentLightsManager,IExtBuildingManager
+1637663252 | TrafficManager.dll | ? | unscannable | FileNotFoundException
+1637663252 | UnifiedUILib.dll | exact | sim | DefaultTool,NetManager,NetTool
+2040656402 | 0Harmony_2.0.0.8_impostor.dll | ? | client | 
+2040656402 | 0Harmony_2.0.0.9_impostor.dll | ? | client | 
+2040656402 | 0Harmony_2.0.1.0_impostor.dll | ? | client | 
+2040656402 | CitiesHarmony.Harmony.dll | ? | client | 
+2040656402 | CitiesHarmony.dll | exact | client | 
+2560782729 | CitiesHarmony.API.dll | ? | client | 
+2560782729 | NetworkMultitool.dll | ? | unscannable | FileNotFoundException
+2560782729 | System.Xml.Linq.dll | ? | sim | ResourceManager,XmlNamespaceManager
+2560782729 | UnifiedUILib.dll | exact | sim | DefaultTool,NetManager,NetTool
+2778750497 | ACME.dll | ? | unscannable | FileNotFoundException
+2778750497 | CitiesHarmony.API.dll | ? | client | 
+2778750497 | UnifiedUILib.dll | exact | sim | DefaultTool,NetManager,NetTool
+2781804786 | CitiesHarmony.API.dll | ? | client | 
+2781804786 | GameAnarchy.dll | ? | unscannable | FileNotFoundException
+2781804786 | Newtonsoft.Json.dll | ? | client | 
+2781804786 | System.Runtime.Serialization.dll | ? | client | 
+2781804786 | UnifiedUILib.dll | exact | sim | DefaultTool,NetManager,NetTool
+2862121823 | CitiesHarmony.API.dll | ? | client | 
+2862121823 | EightyOne2.dll | ? | unscannable | FileNotFoundException
+2916710759 | DemandController.dll | exact | client | 
+3680103097 | CitiesHarmony.API.dll | ? | client | 
+3680103097 | PrecisionEngineering.dll | client | sim | IRenderableManager,ISimulationManager
+3781187198 | CSLModernMap.dll | ? | unscannable | FileNotFoundException
+3781187198 | Newtonsoft.Json.dll | ? | unscannable | FileNotFoundException
+725555912 | InfiniteGoodsMod.dll | exact | sim | BuildingManager,PowerPlantAI,ServicePointAI
+# scanned=32 unscannable=7 clientByHeuristic=17 diffAgainstHardcoded=18

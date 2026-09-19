@@ -11,7 +11,7 @@ namespace CsmForge.Core
 
         public AreaStateV2(uint unlockedMask)
         {
-            if ((unlockedMask & ~ValidMask) != 0) throw new ArgumentOutOfRangeException("unlockedMask");
+            Check.OutOfRange((unlockedMask & ~ValidMask) != 0, "unlockedMask");
             UnlockedMask = unlockedMask;
         }
 
@@ -42,7 +42,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeState(AreaStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(StateMagic); writer.Write(value.UnlockedMask);
@@ -62,7 +62,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(AreaUnlockIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(IntentMagic); writer.Write((byte)value.X); writer.Write((byte)value.Z);

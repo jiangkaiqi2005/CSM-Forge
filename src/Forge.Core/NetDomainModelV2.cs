@@ -10,7 +10,14 @@ namespace CsmForge.Core
         Create = 1,
         DeleteSegment = 2,
         DeleteNode = 3,
-        UpgradeSegment = 4
+        UpgradeSegment = 4,
+        MultitoolAddNode = 16,
+        MultitoolRemoveNode = 17,
+        MultitoolUnionNodes = 18,
+        MultitoolSplitNode = 19,
+        MultitoolIntersectSegments = 20,
+        MultitoolCreateParallel = 21,
+        MultitoolCreateConnection = 22
     }
 
     public sealed class NetControlPointV2
@@ -42,6 +49,29 @@ namespace CsmForge.Core
         }
     }
 
+    public sealed class NetMultitoolPointV2
+    {
+        public float X { get; private set; }
+        public float Y { get; private set; }
+        public float Z { get; private set; }
+        public float ForwardX { get; private set; }
+        public float ForwardY { get; private set; }
+        public float ForwardZ { get; private set; }
+        public float BackwardX { get; private set; }
+        public float BackwardY { get; private set; }
+        public float BackwardZ { get; private set; }
+
+        public NetMultitoolPointV2(float x, float y, float z, float forwardX, float forwardY, float forwardZ,
+            float backwardX, float backwardY, float backwardZ)
+        {
+            NetControlPointV2.CheckFinite(x); NetControlPointV2.CheckFinite(y); NetControlPointV2.CheckFinite(z);
+            NetControlPointV2.CheckFinite(forwardX); NetControlPointV2.CheckFinite(forwardY); NetControlPointV2.CheckFinite(forwardZ);
+            NetControlPointV2.CheckFinite(backwardX); NetControlPointV2.CheckFinite(backwardY); NetControlPointV2.CheckFinite(backwardZ);
+            X = x; Y = y; Z = z; ForwardX = forwardX; ForwardY = forwardY; ForwardZ = forwardZ;
+            BackwardX = backwardX; BackwardY = backwardY; BackwardZ = backwardZ;
+        }
+    }
+
     public sealed class NetIntentV2
     {
         public NetIntentKindV2 Kind { get; private set; }
@@ -59,6 +89,15 @@ namespace CsmForge.Core
         public bool KeepNodes { get; private set; }
         public byte UpgradeMode { get; private set; }
         public bool UpgradeSide { get; private set; }
+        public EntityIdentityV2 SecondaryTarget { get; private set; }
+        public EntityIdentityV2[] RelatedTargets { get; private set; }
+        public float X { get; private set; }
+        public float Y { get; private set; }
+        public float Z { get; private set; }
+        public NetMultitoolPointV2[] SemanticPoints { get; private set; }
+        public bool FirstStart { get; private set; }
+        public bool SecondStart { get; private set; }
+        public bool FollowTerrain { get; private set; }
 
         private NetIntentV2() { }
 
@@ -68,7 +107,7 @@ namespace CsmForge.Core
         {
             ValidatePrefab(prefabKey);
             if (start == null || middle == null || end == null) throw new ArgumentNullException("controlPoint");
-            if (maxSegments <= 0 || maxSegments > 1024) throw new ArgumentOutOfRangeException("maxSegments");
+            Check.OutOfRange(maxSegments <= 0 || maxSegments > 1024, "maxSegments");
             return new NetIntentV2
             {
                 Kind = NetIntentKindV2.Create, PrefabKey = prefabKey, Start = start, Middle = middle, End = end,
@@ -79,22 +118,109 @@ namespace CsmForge.Core
 
         public static NetIntentV2 DeleteSegment(EntityIdentityV2 segment, bool keepNodes)
         {
-            if (!segment.IsValid) throw new ArgumentException("Invalid segment identity.", "segment");
+            Check.Condition(!segment.IsValid, "segment", "Invalid segment identity.");
             return new NetIntentV2 { Kind = NetIntentKindV2.DeleteSegment, Target = segment, KeepNodes = keepNodes };
         }
 
         public static NetIntentV2 DeleteNode(EntityIdentityV2 node)
         {
-            if (!node.IsValid) throw new ArgumentException("Invalid node identity.", "node");
+            Check.Condition(!node.IsValid, "node", "Invalid node identity.");
             return new NetIntentV2 { Kind = NetIntentKindV2.DeleteNode, Target = node };
         }
 
         public static NetIntentV2 UpgradeSegment(EntityIdentityV2 segment, string prefabKey, byte mode, bool side)
         {
-            if (!segment.IsValid) throw new ArgumentException("Invalid segment identity.", "segment");
+            Check.Condition(!segment.IsValid, "segment", "Invalid segment identity.");
             ValidatePrefab(prefabKey);
             return new NetIntentV2 { Kind = NetIntentKindV2.UpgradeSegment, Target = segment,
                 PrefabKey = prefabKey, UpgradeMode = mode, UpgradeSide = side };
+        }
+
+        public static NetIntentV2 MultitoolAddNode(EntityIdentityV2 segment, float x, float y, float z)
+        {
+            ValidateIdentity(segment, "segment"); ValidatePosition(x, y, z);
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolAddNode, Target = segment, X = x, Y = y, Z = z };
+        }
+
+        public static NetIntentV2 MultitoolRemoveNode(EntityIdentityV2 node)
+        {
+            ValidateIdentity(node, "node");
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolRemoveNode, Target = node };
+        }
+
+        public static NetIntentV2 MultitoolUnionNodes(EntityIdentityV2 source, EntityIdentityV2 target)
+        {
+            ValidateIdentity(source, "source"); ValidateIdentity(target, "target");
+            if (source.Equals(target)) throw new ArgumentException("Multitool union endpoints must be distinct.");
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolUnionNodes, Target = source, SecondaryTarget = target };
+        }
+
+        public static NetIntentV2 MultitoolSplitNode(EntityIdentityV2 source, float x, float y, float z,
+            EntityIdentityV2[] segments)
+        {
+            ValidateIdentity(source, "source"); ValidatePosition(x, y, z);
+            EntityIdentityV2[] normalized = NormalizeTargets(segments, 1, 7, "segments");
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolSplitNode, Target = source,
+                X = x, Y = y, Z = z, RelatedTargets = normalized };
+        }
+
+        public static NetIntentV2 MultitoolIntersectSegments(EntityIdentityV2 first, EntityIdentityV2 second)
+        {
+            ValidateIdentity(first, "first"); ValidateIdentity(second, "second");
+            if (first.Equals(second)) throw new ArgumentException("Multitool intersect segments must be distinct.");
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolIntersectSegments, Target = first, SecondaryTarget = second };
+        }
+
+        public static NetIntentV2 MultitoolCreateParallel(string prefabKey, bool invert, NetMultitoolPointV2[] points)
+        {
+            ValidatePrefab(prefabKey);
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolCreateParallel, PrefabKey = prefabKey,
+                Invert = invert, SemanticPoints = CopyPoints(points) };
+        }
+
+        public static NetIntentV2 MultitoolCreateConnection(EntityIdentityV2 firstSegment, EntityIdentityV2 secondSegment,
+            bool firstStart, bool secondStart, string prefabKey, bool invert, bool followTerrain, NetMultitoolPointV2[] points)
+        {
+            ValidateIdentity(firstSegment, "firstSegment"); ValidateIdentity(secondSegment, "secondSegment");
+            if (firstSegment.Equals(secondSegment)) throw new ArgumentException("Multitool connection segments must be distinct.");
+            ValidatePrefab(prefabKey);
+            return new NetIntentV2 { Kind = NetIntentKindV2.MultitoolCreateConnection, Target = firstSegment,
+                SecondaryTarget = secondSegment, FirstStart = firstStart, SecondStart = secondStart,
+                PrefabKey = prefabKey, Invert = invert, FollowTerrain = followTerrain, SemanticPoints = CopyPoints(points) };
+        }
+
+        private static NetMultitoolPointV2[] CopyPoints(NetMultitoolPointV2[] points)
+        {
+            if (points == null || points.Length < 2 || points.Length > 512)
+                throw new ArgumentException("Invalid Multitool semantic point count.", "points");
+            NetMultitoolPointV2[] result = (NetMultitoolPointV2[])points.Clone();
+            for (int i = 0; i < result.Length; i++)
+                Check.Condition(result[i] == null, "points", "Null Multitool semantic point.");
+            return result;
+        }
+
+        private static void ValidateIdentity(EntityIdentityV2 value, string name)
+        {
+            if (!value.IsValid) throw new ArgumentException("Invalid net entity identity.", name);
+        }
+
+        private static void ValidatePosition(float x, float y, float z)
+        {
+            NetControlPointV2.CheckFinite(x); NetControlPointV2.CheckFinite(y); NetControlPointV2.CheckFinite(z);
+        }
+
+        private static EntityIdentityV2[] NormalizeTargets(EntityIdentityV2[] values, int min, int max, string name)
+        {
+            if (values == null || values.Length < min || values.Length > max) throw new ArgumentException("Invalid net entity set.", name);
+            EntityIdentityV2[] result = (EntityIdentityV2[])values.Clone();
+            for (int i = 0; i < result.Length; i++) ValidateIdentity(result[i], name);
+            Array.Sort(result, delegate(EntityIdentityV2 a, EntityIdentityV2 b)
+            {
+                int id = a.EntityId.CompareTo(b.EntityId); return id != 0 ? id : a.Generation.CompareTo(b.Generation);
+            });
+            for (int i = 1; i < result.Length; i++)
+                if (result[i - 1].Equals(result[i])) throw new ArgumentException("Duplicate net entity identity.", name);
+            return result;
         }
 
         internal static void ValidatePrefab(string value)
@@ -115,7 +241,7 @@ namespace CsmForge.Core
 
         public NetNodeStateV2(EntityIdentityV2 entity, string prefabKey, float x, float y, float z, uint flags)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid node identity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid node identity.");
             NetIntentV2.ValidatePrefab(prefabKey);
             NetControlPointV2.CheckFinite(x); NetControlPointV2.CheckFinite(y); NetControlPointV2.CheckFinite(z);
             Entity = entity; PrefabKey = prefabKey; X = x; Y = y; Z = z; Flags = flags;
@@ -172,7 +298,7 @@ namespace CsmForge.Core
             UpsertSegments = Copy(upsertSegments, "upsertSegments");
             DeleteSegments = Copy(deleteSegments, "deleteSegments");
             if (ConstructionCount > 4096) throw new ArgumentException("Net mutation is too large.");
-            if (constructionCost < 0 || refund < 0) throw new ArgumentOutOfRangeException("cost");
+            Check.OutOfRange(constructionCost < 0 || refund < 0, "cost");
             ConstructionCost = constructionCost; Refund = refund;
         }
 
@@ -205,16 +331,31 @@ namespace CsmForge.Core
     {
         private readonly SortedDictionary<ulong, NetNodeStateV2> nodes = new SortedDictionary<ulong, NetNodeStateV2>();
         private readonly SortedDictionary<ulong, NetSegmentStateV2> segments = new SortedDictionary<ulong, NetSegmentStateV2>();
+        private Hash256 cachedRoot;
         public int NodeCount { get { return nodes.Count; } }
         public int SegmentCount { get { return segments.Count; } }
-        public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
+
+        /// <summary>
+        /// WP-1.4c: the canonical encoding is memoized and every mutating path clears it —
+        /// repeated Root reads on a surviving index stay cheap, and a missed invalidation is a
+        /// stale-root bug caught by NetStateIndexCachedRootTests.
+        /// </summary>
+        public Hash256 Root
+        {
+            get
+            {
+                if (cachedRoot == null) cachedRoot = Hash256.Compute(EncodeCanonical());
+                return cachedRoot;
+            }
+        }
 
         public void SeedNode(NetNodeStateV2 value) { UpsertNode(value, false); }
         public void SeedSegment(NetSegmentStateV2 value) { UpsertSegment(value, false); }
 
         public void Apply(NetMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
+            cachedRoot = null; // WP-1.4c: mutation invalidates the memoized root even if it rejects later
             HashSet<ulong> deletedSegments = new HashSet<ulong>();
             for (int i = 0; i < mutation.DeleteSegments.Length; i++)
             {
@@ -255,20 +396,20 @@ namespace CsmForge.Core
 
         private void UpsertNode(NetNodeStateV2 value, bool allowReplace)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             NetNodeStateV2 current;
             if (nodes.TryGetValue(value.Entity.EntityId, out current))
             {
                 if (!current.Entity.Equals(value.Entity)) throw new InvalidOperationException("Net node generation conflict.");
                 if (!allowReplace) throw new InvalidOperationException("Net node already exists.");
-                nodes[value.Entity.EntityId] = value; return;
+                nodes[value.Entity.EntityId] = value; cachedRoot = null; return;
             }
-            nodes.Add(value.Entity.EntityId, value);
+            nodes.Add(value.Entity.EntityId, value); cachedRoot = null;
         }
 
         private void UpsertSegment(NetSegmentStateV2 value, bool allowReplace)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             NetNodeStateV2 start, end;
             if (!nodes.TryGetValue(value.StartNode.EntityId, out start) || !start.Entity.Equals(value.StartNode) ||
                 !nodes.TryGetValue(value.EndNode.EntityId, out end) || !end.Entity.Equals(value.EndNode))
@@ -278,9 +419,9 @@ namespace CsmForge.Core
             {
                 if (!current.Entity.Equals(value.Entity)) throw new InvalidOperationException("Net segment generation conflict.");
                 if (!allowReplace) throw new InvalidOperationException("Net segment already exists.");
-                segments[value.Entity.EntityId] = value; return;
+                segments[value.Entity.EntityId] = value; cachedRoot = null; return;
             }
-            segments.Add(value.Entity.EntityId, value);
+            segments.Add(value.Entity.EntityId, value); cachedRoot = null;
         }
 
         private byte[] EncodeCanonical()
@@ -331,7 +472,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(NetIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind);
@@ -342,6 +483,11 @@ namespace CsmForge.Core
                     writer.Write(value.MaxSegments); writer.Write(value.TestEnds); writer.Write(value.AutoFix);
                     writer.Write(value.Invert); writer.Write(value.SwitchDirection); writer.Write(value.ZoneGridFlags);
                 }
+                else if (value.Kind == NetIntentKindV2.MultitoolCreateParallel)
+                {
+                    NetStateIndexV2.WriteString(writer, value.PrefabKey); writer.Write(value.Invert);
+                    WriteSemanticPoints(writer, value.SemanticPoints);
+                }
                 else
                 {
                     NetStateIndexV2.WriteIdentity(writer, value.Target);
@@ -350,6 +496,27 @@ namespace CsmForge.Core
                     {
                         NetStateIndexV2.WriteString(writer, value.PrefabKey); writer.Write(value.UpgradeMode); writer.Write(value.UpgradeSide);
                     }
+                    else if (value.Kind == NetIntentKindV2.MultitoolAddNode)
+                        WritePosition(writer, value.X, value.Y, value.Z);
+                    else if (value.Kind == NetIntentKindV2.MultitoolUnionNodes ||
+                        value.Kind == NetIntentKindV2.MultitoolIntersectSegments)
+                        NetStateIndexV2.WriteIdentity(writer, value.SecondaryTarget);
+                    else if (value.Kind == NetIntentKindV2.MultitoolSplitNode)
+                    {
+                        WritePosition(writer, value.X, value.Y, value.Z);
+                        writer.Write((byte)value.RelatedTargets.Length);
+                        for (int i = 0; i < value.RelatedTargets.Length; i++) NetStateIndexV2.WriteIdentity(writer, value.RelatedTargets[i]);
+                    }
+                    else if (value.Kind == NetIntentKindV2.MultitoolCreateConnection)
+                    {
+                        NetStateIndexV2.WriteIdentity(writer, value.SecondaryTarget);
+                        writer.Write(value.FirstStart); writer.Write(value.SecondStart);
+                        NetStateIndexV2.WriteString(writer, value.PrefabKey);
+                        writer.Write(value.Invert); writer.Write(value.FollowTerrain);
+                        WriteSemanticPoints(writer, value.SemanticPoints);
+                    }
+                    else if (value.Kind != NetIntentKindV2.DeleteNode && value.Kind != NetIntentKindV2.MultitoolRemoveNode)
+                        throw new InvalidDataException("Unknown net intent kind.");
                 }
                 writer.Flush(); return Checked(stream);
             }
@@ -370,6 +537,35 @@ namespace CsmForge.Core
                     result = NetIntentV2.DeleteNode(ReadIdentity(reader));
                 else if (kind == NetIntentKindV2.UpgradeSegment)
                     result = NetIntentV2.UpgradeSegment(ReadIdentity(reader), ReadString(reader), reader.ReadByte(), reader.ReadBoolean());
+                else if (kind == NetIntentKindV2.MultitoolAddNode)
+                {
+                    EntityIdentityV2 segment = ReadIdentity(reader); float x, y, z; ReadPosition(reader, out x, out y, out z);
+                    result = NetIntentV2.MultitoolAddNode(segment, x, y, z);
+                }
+                else if (kind == NetIntentKindV2.MultitoolRemoveNode)
+                    result = NetIntentV2.MultitoolRemoveNode(ReadIdentity(reader));
+                else if (kind == NetIntentKindV2.MultitoolUnionNodes)
+                    result = NetIntentV2.MultitoolUnionNodes(ReadIdentity(reader), ReadIdentity(reader));
+                else if (kind == NetIntentKindV2.MultitoolSplitNode)
+                {
+                    EntityIdentityV2 source = ReadIdentity(reader); float x, y, z; ReadPosition(reader, out x, out y, out z);
+                    int count = reader.ReadByte(); if (count < 1 || count > 7) throw new InvalidDataException("Invalid Multitool split segment count.");
+                    EntityIdentityV2[] segments = new EntityIdentityV2[count];
+                    for (int i = 0; i < count; i++) segments[i] = ReadIdentity(reader);
+                    result = NetIntentV2.MultitoolSplitNode(source, x, y, z, segments);
+                }
+                else if (kind == NetIntentKindV2.MultitoolIntersectSegments)
+                    result = NetIntentV2.MultitoolIntersectSegments(ReadIdentity(reader), ReadIdentity(reader));
+                else if (kind == NetIntentKindV2.MultitoolCreateParallel)
+                    result = NetIntentV2.MultitoolCreateParallel(ReadString(reader), reader.ReadBoolean(), ReadSemanticPoints(reader));
+                else if (kind == NetIntentKindV2.MultitoolCreateConnection)
+                {
+                    EntityIdentityV2 first = ReadIdentity(reader), second = ReadIdentity(reader);
+                    bool firstStart = reader.ReadBoolean(), secondStart = reader.ReadBoolean();
+                    string prefab = ReadString(reader); bool invert = reader.ReadBoolean(), follow = reader.ReadBoolean();
+                    result = NetIntentV2.MultitoolCreateConnection(first, second, firstStart, secondStart,
+                        prefab, invert, follow, ReadSemanticPoints(reader));
+                }
                 else throw new InvalidDataException("Unknown net intent kind.");
                 EnsureEnd(reader); return result;
             }
@@ -377,7 +573,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(NetMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -407,6 +603,41 @@ namespace CsmForge.Core
                 EnsureEnd(reader);
                 return new NetMutationV2(upsertNodes, deleteNodes, upsertSegments, deleteSegments, cost, refund);
             }
+        }
+
+        private static void WriteSemanticPoints(BinaryWriter writer, NetMultitoolPointV2[] points)
+        {
+            if (points == null || points.Length < 2 || points.Length > 512) throw new InvalidDataException("Invalid Multitool point count.");
+            writer.Write((ushort)points.Length);
+            for (int i = 0; i < points.Length; i++)
+            {
+                NetMultitoolPointV2 p = points[i];
+                writer.Write(p.X); writer.Write(p.Y); writer.Write(p.Z);
+                writer.Write(p.ForwardX); writer.Write(p.ForwardY); writer.Write(p.ForwardZ);
+                writer.Write(p.BackwardX); writer.Write(p.BackwardY); writer.Write(p.BackwardZ);
+            }
+        }
+
+        private static NetMultitoolPointV2[] ReadSemanticPoints(BinaryReader reader)
+        {
+            int count = reader.ReadUInt16();
+            if (count < 2 || count > 512) throw new InvalidDataException("Invalid Multitool point count.");
+            NetMultitoolPointV2[] result = new NetMultitoolPointV2[count];
+            for (int i = 0; i < count; i++)
+                result[i] = new NetMultitoolPointV2(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
+                    reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
+                    reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+            return result;
+        }
+
+        private static void WritePosition(BinaryWriter writer, float x, float y, float z)
+        {
+            writer.Write(x); writer.Write(y); writer.Write(z);
+        }
+
+        private static void ReadPosition(BinaryReader reader, out float x, out float y, out float z)
+        {
+            x = reader.ReadSingle(); y = reader.ReadSingle(); z = reader.ReadSingle();
         }
 
         private static void WritePoint(BinaryWriter writer, NetControlPointV2 value)

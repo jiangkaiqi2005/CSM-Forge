@@ -2,9 +2,9 @@
 
 面向 **Cities: Skylines 1** 的 Host-authoritative 多人共同经营系统。Forge 是新的生产主线：吸收 CSM-CQU 已验证的异常安全、热加入、兼容采集、世界传输和真实 CS1 接入经验，但不把旧的 Command Relay/Replay 当作最终同步模型。
 
-当前 `fix/forge-cqu-integration-docs` 已推进到 **V3 minimum-playable Alpha 候选**。它不是玩家正式发行版，但已经具备真实 CS1 Runtime、自动可安装 ZIP、Host/Join/热加入/恢复链，以及一组可共同建设城市的 Host-authoritative 领域。
+当前 `feat/ultimate-dlc-mod-framework` 正推进到 **CSM-Forge 1.0 code-complete candidate**。它还不是玩家正式发行版，但已经具备真实 CS1 Runtime、自动可安装 ZIP、Host/Join/热加入/恢复链，以及持续扩展中的 Host-authoritative 领域。
 
-## 当前最小可玩 Alpha 范围
+## 1.0 Candidate 代码覆盖范围
 
 已接入并进入 Forge Authority / Replica 主链：
 
@@ -25,25 +25,22 @@
 - Stable Name：Building / Road Segment / District / TransportLine 自定义名称；
 - City Name；
 - Weather：Host 权威天气 target，Client 保留本地视觉插值；
+- Tree / Prop：Stable ID + sharded absolute state；Client create/move/delete 转 semantic intent，Host 执行后再做 absolute projection；Building/Net 引发的 collateral clear 明确放行并使装饰物 shard 失效重捕获；
 - Client projection audit：低频检查真实游戏投影与最后 Host committed root；当前严格 **diagnostic-only**，发现漂移只记录日志，不自动踢人或重同步。
 
-### Alpha 安全边界
+### 当前安全边界
 
-Tree / Prop / Terrain 还没有完成 V3 Authority 闭包。为了避免玩家误操作后出现静默不同步，Forge 在多人阶段对以下持久写操作 **fail-closed**：
+Tree / Prop 已进入 Forge Authority 闭包，不再由旧 Alpha safety patch 拦截。它们使用 Stable ID、分 shard absolute state 与 semantic intent；但在真实双机/多机完成 E3/E4 前，只能称为**代码覆盖完成、真机未验证**。
 
-- Tree Create / Move / Release；
-- Prop Create / Move / Release；
-- Terrain brush。
+Terrain 已进入 Host-owned absolute height shard Authority：Host 可执行 brush/undo，Client 只投影最终 raw height rows，并通过原版 terrain update 管线重建 Net/Building 等派生结果。Client 本地 Terrain 工具继续阻断；真实双机/多机尚未验证。
 
-单机状态不受这些限制；Forge `ApplyScope` 内由已支持权威操作触发的底层调用仍可通过。
-
-Event、Campus 和其他 DLC 专用系统尚未声明完整支持。Citizen / Vehicle / Pathfinding 仍主要作为本地动态表现层运行；它们不能直接绕过现有 Building / Net / Zone / Economy 配置写屏障。是否存在长期动态漂移，需要 E4 真机长跑和 projection audit 日志继续验证。
+Citizen / Vehicle / Path 已进入 Host-owned simulation/result Authority：Client 不运行对应 manager simulation，Path route 使用 Stable Path 与 Stable Segment identity，Vehicle/CitizenInstance 只投影 lifecycle 与 coarse presentation。DLC 与固定 Mod 的代码覆盖状态见各审查文档；所有这些路径仍需 E3/E4 真机矩阵和 projection audit 长跑，CI green 不代表 gameplay validated。
 
 ## 重要限制
 
 - 当前 Transport 是 **LiteNetLib + 临时 room key** 的开发/LAN 适配器，不是最终公网认证方案；
 - 真实游戏多机长跑、弱网、复杂 Mod/DLC 组合仍未完成 E4 验收；
-- 当前 Alpha 只应用于备份城市；
+- 当前 Candidate 只应用于备份城市；
 - CI 能证明 Core/Protocol/Runtime 对参考 CS1 程序集可编译并能生成安装包，不能替代真实两台/多台 CS1 的游戏运行证据。
 
 ## V3 设计文档
@@ -60,6 +57,7 @@ Event、Campus 和其他 DLC 专用系统尚未声明完整支持。Citizen / Ve
 | 运行时复制 | [运行时复制](docs/spec/RUNTIME-REPLICATION.zh-CN.md) |
 | 故障与恢复 | [鲁棒性规范](docs/spec/ROBUSTNESS.zh-CN.md) |
 | 实机/长跑验收 | [验收规范](docs/spec/ACCEPTANCE.zh-CN.md) |
+| Candidate E3/E4 证据记录 | [测试记录模板](docs/E3-E4-TEST-RECORD-TEMPLATE.zh-CN.md) |
 
 旧 M0/v1 文档仅用于历史和兼容测试，不代表当前 V3 主线。
 
@@ -76,7 +74,7 @@ Event、Campus 和其他 DLC 专用系统尚未声明完整支持。Citizen / Ve
 - Host / Client Domain registry 集合和顺序对称；
 - Client rebaseline 与完整 Stop 的 Domain cleanup 完整；
 - projection audit 保持 diagnostic-only；
-- minimum-playable Alpha 的 unsupported-write safety barrier 保持存在。
+- 尚未进入 Authority 的 unsupported write 必须继续 fail closed。
 
 纯内核本地测试：
 
@@ -116,29 +114,28 @@ Windows Mod 目录：
 
 把 ZIP 中 `CSM-Forge` 文件夹的内容放入上述目录，使 `CSM.Forge.Runtime.Cities1.dll` 直接位于该目录。另行安装并启用 **CitiesHarmony**，然后重启游戏。
 
-## 第一次双机 Alpha 测试
+## 第一次双机 Candidate 测试
 
 1. Host 和 Client 都备份测试城市；
-2. 两台机器安装**同一个 commit SHA** 的 Forge Alpha Artifact，并启用 CitiesHarmony；
-3. 两边都先进入一个城市，打开 Mod 设置页，确认 `patches=ready`；
-4. Host 设置 UDP 端口与临时 room key，点击 **Host 当前存档**；
-5. Client 填 Host IPv4、同一端口与 room key，点击 **Join Host 快照**；
-6. 等 Client 状态明确进入 `ClientLive` 后再操作；
-7. 依次测试：暂停/速度 → 一条道路 → 一个建筑 → zoning → district brush/policy → tax/budget → area unlock → 一条 transport line；
-8. 当前 Alpha 不使用 Tree / Prop / Terrain 工具；这些写操作会被故意阻断；
-9. 再让第二名 Client 加入或让第一名 Client 重连，确认 Host 与其他玩家不被阻塞；
-10. 如果日志出现 `[CSM-Forge] diagnostic-only projection drift`，保留游戏日志并记录出现前的最后一个玩家操作。
+2. 两台机器安装**同一个 commit SHA** 的 Forge Candidate Artifact，并启用 CitiesHarmony；
+3. 两边在游戏启动前运行安装目录中的 `VERIFY-INSTALL.ps1`，确认 `source_commit` 与 `manifest_sha256` 完全一致；
+4. Host 进入要共享的城市，按 Esc，点击 **FORGE 多人联机**，通过预检后创建房间；
+5. Host 在会话页点击 **复制直连邀请并打开 Steam**。Forge 会复制 LAN 直连邀请并打开好友列表，由房主粘贴发送；当前不发布 Steam `connect` Rich Presence，好友不能直接点击“加入游戏”，也不提供 NAT 穿透或中继；
+6. Client 保持在主菜单，点击 **FORGE 联机**、粘贴邀请并加入；Client 不需要预先加载占位城市；
+7. 等 Client 状态明确进入 `ClientLive` 后再操作；
+8. 按安装包中的 `E3-E4-TEST-RECORD.md` 执行矩阵；
+9. 如果出现失败或 `[CSM-Forge] diagnostic-only projection drift`，先在游戏内点击“写入诊断日志”，再在每台机器运行 `COLLECT-DIAGNOSTICS.ps1`。
 
-## 达到“稳定替代”前仍需完成
+## 从 code-complete candidate 到正式发行仍需完成
 
 - 至少 2–4 台真实 CS1 的长时间联机；
 - 重叠热加入、慢 Client、取消、掉线重连；
 - 大城市 Snapshot 与 Journal 压力；
 - 弱网与长时间 projection audit；
-- Tree / Prop / Terrain Authority；
+- Terrain Authority 的真实双机/多机、hot-join 与 collateral 验证；
 - Event / Campus / DLC 专用状态；
 - 更完整的 Citizen / Vehicle / Path 自然模拟 closure；
 - Host-only Mod 能力的真实分类与实测；
 - 最终公网认证 Transport。
 
-因此当前目标是 **minimum-playable Alpha**，不是 Release。Alpha 的价值是开始获得真实多人证据，并据此继续关闭剩余模拟漂移和功能缺口。
+因此当前状态是 **1.0 code-complete candidate / gameplay unverified**，不是 Release 或 RC。代码与安装体验已经形成候选闭环；下一道硬门禁是把安装包内 E3/E4 矩阵绑定到真实 Host/Client 证据，并据此修复实际游戏问题。

@@ -1,4 +1,5 @@
 using System;
+using CsmForge.Core;
 using System.Reflection;
 using ColossalFramework;
 using ColossalFramework.Packaging;
@@ -25,8 +26,8 @@ namespace CsmForge.Runtime.Cities1
 
         public void Start(byte[] world, Action<LoadIdentity> completed, Action<Exception> failed)
         {
-            if (world == null || world.Length == 0) throw new ArgumentException("Received snapshot is empty.", "world");
-            if (completed == null || failed == null) throw new ArgumentNullException("completed");
+            Check.Condition(world == null || world.Length == 0, "world", "Received snapshot is empty.");
+            Check.NotNull(completed, "completed"); Check.NotNull(failed, "failed"); // WP-2: per-argument reporting
             PreparedWorld prepared = Prepare(world);
             int token;
             lock (gate)

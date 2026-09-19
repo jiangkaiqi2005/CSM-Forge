@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static EconomyCashStateV2 ApplyReplica(LoadIdentity load, EconomyCashStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (!RuntimeServices.Lifecycle.IsCurrent(load))
                 throw new InvalidOperationException("Economy cash apply belongs to a stale load.");
             EconomyManager manager = EconomyManager.instance;
@@ -47,7 +47,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyCashAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             // Resolve the target-build private field at domain construction so unsupported
             // game builds fail before a multiplayer world can advertise a baseline.
             EconomyCashGameAccess.Capture();
@@ -71,14 +71,14 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyCashReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committed = EconomyCashGameAccess.Capture();
         }
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering &&

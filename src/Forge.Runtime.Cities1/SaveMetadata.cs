@@ -33,7 +33,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static byte[] Encode(ForgeSaveMetadata metadata)
         {
-            if (metadata == null) throw new ArgumentNullException("metadata");
+            Check.NotNull(metadata, "metadata");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -80,7 +80,7 @@ namespace CsmForge.Runtime.Cities1
 
         public ForgeSaveMetadataStore(RuntimeEventLog events)
         {
-            if (events == null) throw new ArgumentNullException("events");
+            Check.NotNull(events, "events");
             this.events = events;
         }
 
@@ -120,7 +120,7 @@ namespace CsmForge.Runtime.Cities1
         {
             lock (gate)
             {
-                if (!identity.IsValid) throw new ArgumentException("Invalid load identity.", "identity");
+                Check.Condition(!identity.IsValid, "identity", "Invalid load identity.");
                 current = new ForgeSaveMetadata(identity.WorldId, identity.Epoch, revision, stateRoot != null, stateRoot);
             }
         }
@@ -146,6 +146,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private const string MetadataDataId = "CSM-Forge.V3.Metadata";
         private const string EntityMapDataId = "CSM-Forge.V3.EntityMaps";
+        private const string ExtensionEntityMapDataId = "CSM-Forge.V3.ExtensionEntityMaps";
         private const string ClockDataId = "CSM-Forge.V3.SimulationClock";
         private ISerializableData serializableData;
 
@@ -162,9 +163,11 @@ namespace CsmForge.Runtime.Cities1
             {
                 byte[] metadata = serializableData == null ? null : serializableData.LoadData(MetadataDataId);
                 byte[] entityMaps = serializableData == null ? null : serializableData.LoadData(EntityMapDataId);
+                byte[] extensionEntityMaps = serializableData == null ? null : serializableData.LoadData(ExtensionEntityMapDataId);
                 byte[] clock = serializableData == null ? null : serializableData.LoadData(ClockDataId);
                 RuntimeServices.Metadata.LoadPending(metadata);
                 RuntimeServices.EntityMaps.LoadPending(entityMaps);
+                ExtensionIdentityServices.Maps.LoadPending(extensionEntityMaps);
                 SimulationClockSave.Store.LoadPending(clock);
             }
             catch (Exception error)
@@ -173,6 +176,7 @@ namespace CsmForge.Runtime.Cities1
                     "forge-save-load: " + error.GetType().Name);
                 RuntimeServices.Metadata.Clear();
                 RuntimeServices.EntityMaps.Clear();
+                ExtensionIdentityServices.Maps.Clear();
                 SimulationClockSave.Store.Clear();
             }
         }
@@ -186,14 +190,16 @@ namespace CsmForge.Runtime.Cities1
             {
                 serializableData.SaveData(MetadataDataId, RuntimeServices.Metadata.EncodeCurrent(identity));
                 serializableData.SaveData(EntityMapDataId, RuntimeServices.EntityMaps.EncodeCurrent());
+                serializableData.SaveData(ExtensionEntityMapDataId, ExtensionIdentityServices.Maps.EncodeCurrent());
                 serializableData.SaveData(ClockDataId, SimulationClockSave.Store.EncodeCurrent());
-                RuntimeServices.Events.Record(RuntimeEventCode.SaveMetadataSaved, identity.Generation, null);
+                RuntimeServices.Events.Record(RuntimeEventCode.SaveMetadataSaved, identity.Generation,
+                    "extension-identity-namespaces=" + ExtensionIdentityServices.Maps.ActiveNamespaces().Length);
             }
             catch (Exception error)
             {
                 RuntimeServices.Events.Record(RuntimeEventCode.Error, identity.Generation,
                     "forge-save: " + error.GetType().Name);
-                RuntimeServices.Lifecycle.Fence("Forge save metadata, entity-map, or clock save failed");
+                RuntimeServices.Lifecycle.Fence("Forge save metadata, entity-map, extension identity, or clock save failed");
             }
         }
 

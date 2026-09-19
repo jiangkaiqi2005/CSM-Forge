@@ -37,7 +37,9 @@ namespace CsmForge.Runtime.Cities1
             hostCityName = new CityNameAuthorityDomain(identity);
             hostWeather = new WeatherAuthorityDomain(identity);
             committedWeatherRoot = hostWeather.StateRoot;
-            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames, hostCityName, hostWeather };
+            hostExtensions = new ExtensionStateAuthorityDomain(identity,
+                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations(), true));
+            return new IAuthorityDomainV2[] { hostWater, hostDemand, hostTaxes, hostBudgets, hostCash, hostEconomyControl, hostAreas, hostBuildings, hostNet, hostZones, hostDistricts, hostClock, hostTransport, hostNames, hostCityName, hostWeather, hostExtensions };
         }
 
         private IReplicaDomainV2[] CreateClientDomains(LoadIdentity identity)
@@ -61,7 +63,9 @@ namespace CsmForge.Runtime.Cities1
             clientNames = new StableNameReplicaDomain(identity);
             clientCityName = new CityNameReplicaDomain(identity);
             clientWeather = new WeatherReplicaDomain(identity);
-            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames, clientCityName, clientWeather };
+            clientExtensions = new ExtensionStateReplicaDomain(identity,
+                new CitiesExtensionStateRegistry(ForgeExtensionApi.SnapshotRegistrations(), false));
+            return new IReplicaDomainV2[] { clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl, clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock, clientTransport, clientNames, clientCityName, clientWeather, clientExtensions };
         }
 
         internal bool IsHostNetAuthorityActive
@@ -101,6 +105,30 @@ namespace CsmForge.Runtime.Cities1
         {
             entity = default(EntityIdentityV2);
             return IsHostNetAuthorityActive && hostNet.TryResolveSegment(nativeId, out entity);
+        }
+
+        internal bool TryResolveClientNetNodeNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsClientNetReplicaActive && clientNet.TryResolveNodeNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveClientNetSegmentNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsClientNetReplicaActive && clientNet.TryResolveSegmentNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveHostNetNodeNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsHostNetAuthorityActive && hostNet.TryResolveNodeNative(entity, out nativeId);
+        }
+
+        internal bool TryResolveHostNetSegmentNative(EntityIdentityV2 entity, out uint nativeId)
+        {
+            nativeId = 0;
+            return IsHostNetAuthorityActive && hostNet.TryResolveSegmentNative(entity, out nativeId);
         }
 
         internal bool TrySubmitNetIntent(NetIntentV2 value)
@@ -151,6 +179,18 @@ namespace CsmForge.Runtime.Cities1
             BroadcastBatch(batch);
         }
 
+        /// <summary>
+        /// WP-1.4c: cadence-driven full observe. The NetTool/bulldoze patches publish graph
+        /// changes as they happen; once per window this re-captures the live graph and publishes
+        /// any drift the patches missed, so the cached committed root cannot silently diverge.
+        /// </summary>
+        internal void PollObservedHostNetFull()
+        {
+            if (mode != MultiplayerSessionMode.Hosting || hostNet == null || authority == null || snapshotSave != null) return;
+            if (netVerifyCadence == null || !netVerifyCadence.ShouldVerify(MonotonicMilliseconds())) return;
+            PublishObservedHostNet(hostNet.CommittedRoot, 0, 0);
+        }
+
         internal bool TryInterceptClientZoneRefresh(ushort blockId, ulong requestedZone1, ulong requestedZone2,
             bool playerTool, out ulong restoreZone1, out ulong restoreZone2)
         {
@@ -181,6 +221,9 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostZones()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostZones == null || authority == null || snapshotSave != null) return;
+            // WP-1.1: the 32k-block sparse capture no longer runs every tick. Net/zone commits
+            // force the next poll immediately (BroadcastBatch); this cadence poll is the safety net.
+            if (!ZoneVerificationDue()) return;
             Hash256 before = hostZones.StateRoot;
             ZoneMutationV2 mutation = hostZones.ReconcileWorld();
             PublishObservedZoneMutation(before, mutation);

@@ -19,8 +19,8 @@ namespace CsmForge.Protocol
 
         public Frame(MessageKind kind, SessionStamp stamp, ulong sequence, byte[] bytes)
         {
-            if (!Enum.IsDefined(typeof(MessageKind), kind)) throw new ArgumentOutOfRangeException("kind");
-            if (!stamp.IsValid) throw new ArgumentException("Invalid session stamp.", "stamp");
+            Check.OutOfRange(!Enum.IsDefined(typeof(MessageKind), kind), "kind");
+            Check.Condition(!stamp.IsValid, "stamp", "Invalid session stamp.");
             if (bytes == null || bytes.Length > Limits.FramePayloadBytes)
                 throw new ArgumentException("Invalid frame payload.", "bytes");
             Kind = kind;
@@ -43,7 +43,7 @@ namespace CsmForge.Protocol
 
         public static byte[] Encode(Frame frame)
         {
-            if (frame == null) throw new ArgumentNullException("frame");
+            Check.NotNull(frame, "frame");
             byte[] body;
             byte[] payload = frame.Payload;
             using (MemoryStream stream = new MemoryStream())
@@ -101,7 +101,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeIntent(Intent intent)
         {
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -125,7 +125,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeCommit(Commit commit)
         {
-            if (commit == null) throw new ArgumentNullException("commit");
+            Check.NotNull(commit, "commit");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

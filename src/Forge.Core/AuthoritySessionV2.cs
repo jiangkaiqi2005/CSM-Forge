@@ -20,11 +20,11 @@ namespace CsmForge.Core
             ulong permissionVersion, ushort domainId, Hash256 expectedDomainRoot, byte[] bytes)
         {
             Check.Stamp(stamp);
-            if (!member.IsValid) throw new ArgumentException("Invalid member identity.", "member");
-            if (operationCounter == 0) throw new ArgumentOutOfRangeException("operationCounter");
-            if (permissionVersion == 0) throw new ArgumentOutOfRangeException("permissionVersion");
-            if (domainId == 0) throw new ArgumentOutOfRangeException("domainId");
-            if (expectedDomainRoot == null) throw new ArgumentNullException("expectedDomainRoot");
+            Check.Condition(!member.IsValid, "member", "Invalid member identity.");
+            Check.OutOfRange(operationCounter == 0, "operationCounter");
+            Check.OutOfRange(permissionVersion == 0, "permissionVersion");
+            Check.OutOfRange(domainId == 0, "domainId");
+            Check.NotNull(expectedDomainRoot, "expectedDomainRoot");
             Stamp = stamp;
             Member = member;
             OperationCounter = operationCounter;
@@ -77,7 +77,7 @@ namespace CsmForge.Core
 
         public static DomainExecutionV2 Success(byte[] absoluteDelta, Hash256 afterRoot)
         {
-            if (afterRoot == null) throw new ArgumentNullException("afterRoot");
+            Check.NotNull(afterRoot, "afterRoot");
             return new DomainExecutionV2(true, Check.Copy(absoluteDelta, Limits.FramePayloadBytes, false), afterRoot);
         }
     }
@@ -182,7 +182,7 @@ namespace CsmForge.Core
         public AuthorityCoordinatorV2(SessionStamp stamp, IEnumerable<IAuthorityDomainV2> domainAdapters)
         {
             Check.Stamp(stamp);
-            if (domainAdapters == null) throw new ArgumentNullException("domainAdapters");
+            Check.NotNull(domainAdapters, "domainAdapters");
             Stamp = stamp;
             foreach (IAuthorityDomainV2 domain in domainAdapters)
             {
@@ -246,7 +246,7 @@ namespace CsmForge.Core
         public AuthoritySubmitResultV2 Submit(Guid binding, PlayerIntentV2 intent)
         {
             Enter();
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             busy = true;
             try { return SubmitCore(binding, intent); }
             finally { busy = false; }
@@ -423,7 +423,7 @@ namespace CsmForge.Core
                 throw new InvalidOperationException("Authority domain changed outside the committed path.");
         }
 
-        private void Fence() { IsFenced = true; }
+        private void Fence() { IsFenced = true; GateCounter.Record(GateCategory.Invariant); }
 
         internal static Hash256 AggregateRoot(Dictionary<ushort, Hash256> source)
         {
@@ -462,7 +462,7 @@ namespace CsmForge.Core
             ulong baselineRevision)
         {
             Check.Stamp(stamp);
-            if (domainAdapters == null) throw new ArgumentNullException("domainAdapters");
+            Check.NotNull(domainAdapters, "domainAdapters");
             Stamp = stamp;
             foreach (IReplicaDomainV2 domain in domainAdapters)
             {
@@ -487,7 +487,7 @@ namespace CsmForge.Core
         public ReplicaDecisionV2 Receive(AuthorityBatch batch)
         {
             Enter();
-            if (batch == null) throw new ArgumentNullException("batch");
+            Check.NotNull(batch, "batch");
             if (Phase == ReplicaPhase.Disconnected) return ReplicaDecisionV2.Disconnected;
             if (Phase == ReplicaPhase.NeedsSnapshot) return ReplicaDecisionV2.NeedsSnapshot;
             if (!batch.Stamp.Equals(Stamp)) return ReplicaDecisionV2.WrongSession;

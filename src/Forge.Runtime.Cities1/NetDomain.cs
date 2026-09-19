@@ -161,7 +161,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected NetDomainBase(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load;
             RuntimeServices.EntityMaps.AttachDomain(NodeMapSaveId, NodeIds);
             RuntimeServices.EntityMaps.AttachDomain(SegmentMapSaveId, SegmentIds);
@@ -169,10 +169,19 @@ namespace CsmForge.Runtime.Cities1
             Committed = CaptureWorld();
         }
 
-        public Hash256 CurrentRoot { get { return CaptureWorld().Root; } }
+        /// <summary>
+        /// WP-1.4c: the committed root is cached - reading it no longer walks the whole graph.
+        /// Live captures happen only at explicit diff points (ExecutePlayer, ObserveHostChanges,
+        /// Reconcile). A live write that bypasses the NetTool/bulldoze patches stays invisible
+        /// here and is caught by the cadence-driven full observe (PollObservedHostNetFull).
+        /// </summary>
+        public Hash256 CurrentRoot { get { return Committed.Root; } }
+        public Hash256 CommittedRoot { get { return Committed.Root; } }
 
         public bool TryResolveNode(uint nativeId, out EntityIdentityV2 entity) { return NodeIds.TryGetIdentity(nativeId, out entity); }
         public bool TryResolveSegment(uint nativeId, out EntityIdentityV2 entity) { return SegmentIds.TryGetIdentity(nativeId, out entity); }
+        public bool TryResolveNodeNative(EntityIdentityV2 entity, out uint nativeId) { return NodeIds.TryGetNative(entity, out nativeId); }
+        public bool TryResolveSegmentNative(EntityIdentityV2 entity, out uint nativeId) { return SegmentIds.TryGetNative(entity, out nativeId); }
 
         private void SeedOrValidate()
         {
@@ -216,7 +225,7 @@ namespace CsmForge.Runtime.Cities1
 
         protected NetMutationV2 Reconcile(NetWorldSnapshotV2 before, int constructionCost, int refund)
         {
-            if (before == null) throw new ArgumentNullException("before");
+            Check.NotNull(before, "before");
             List<NetNodeStateV2> upsertNodes = new List<NetNodeStateV2>();
             List<EntityIdentityV2> deleteNodes = new List<EntityIdentityV2>();
             List<NetSegmentStateV2> upsertSegments = new List<NetSegmentStateV2>();
@@ -374,6 +383,13 @@ namespace CsmForge.Runtime.Cities1
                     if (NetManager.instance.m_nodes.m_buffer[node].CountSegments() != 0) return DomainExecutionV2.Rejected();
                     using (RuntimeScopeGuard.EnterApply(Load, Id)) NetManager.instance.ReleaseNode(node);
                 }
+                else if (NetworkMultitoolBridge.IsSemanticIntent(intent.Kind))
+                {
+                    bool executed;
+                    using (RuntimeScopeGuard.EnterApply(Load, Id))
+                        executed = NetworkMultitoolBridge.TryExecuteHost(intent, NodeIds, SegmentIds);
+                    if (!executed) return DomainExecutionV2.Rejected();
+                }
                 else return DomainExecutionV2.Rejected();
 
                 NetMutationV2 mutation = Reconcile(before, economy.ConstructionFetched, economy.RefundAdded);
@@ -400,7 +416,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             NetMutationV2 mutation = NetDomainCodecV2.DecodeMutation(absoluteDelta);
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(Load) ||

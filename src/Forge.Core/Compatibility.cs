@@ -11,11 +11,8 @@ namespace CsmForge.Core
         public Hash256 ConfigurationHash { get; private set; }
         public ComponentFingerprint(string id, Hash256 binaryHash, Hash256 configurationHash)
         {
-            if (string.IsNullOrEmpty(id) || id.Length > 128) throw new ArgumentException("Invalid component identity.", "id");
-            foreach (char value in id)
-                if (!((value >= 'a' && value <= 'z') || (value >= '0' && value <= '9') || value == '.' || value == ':' || value == '-' || value == '_'))
-                    throw new ArgumentException("Component IDs use canonical lowercase ASCII.", "id");
-            if (binaryHash == null || configurationHash == null) throw new ArgumentNullException("binaryHash");
+            Check.CanonicalId(id, 128, "id", "Invalid component identity."); // D2: shared canonical guard
+            Check.NotNull(binaryHash, "binaryHash"); Check.NotNull(configurationHash, "configurationHash"); // WP-2: per-argument reporting
             Id = id; BinaryHash = binaryHash; ConfigurationHash = configurationHash;
         }
         public bool Matches(ComponentFingerprint other)
@@ -35,9 +32,13 @@ namespace CsmForge.Core
             GameBuildHash = gameBuildHash; SchemaHash = schemaHash;
             components = Collect(entries);
         }
+
+        /// <summary>Canonical, pre-validated component view; callers must not mutate (D1-1).</summary>
+        internal Dictionary<string, ComponentFingerprint> Components { get { return components; } }
+
         internal static Dictionary<string, ComponentFingerprint> Collect(IEnumerable<ComponentFingerprint> entries)
         {
-            if (entries == null) throw new ArgumentNullException("entries");
+            Check.NotNull(entries, "entries");
             Dictionary<string, ComponentFingerprint> result = new Dictionary<string, ComponentFingerprint>(StringComparer.Ordinal);
             foreach (ComponentFingerprint entry in entries)
             {
@@ -60,8 +61,9 @@ namespace CsmForge.Core
 
     /// <summary>
     /// Approved required components and optional local-only components are a trusted room
-    /// policy built from audited adapter support, NOT an automatic copy of the host mod list.
-    /// Unknown extras fail closed even when both peers happen to have them installed.
+    /// policy built from audited adapter support. Unknown mods fail closed. The v3 ultimate
+    /// manifest also uses audited component categories: extra client DLC/assets are harmless,
+    /// known client-only mods may differ, and blocked mods fence room creation.
     /// </summary>
     public sealed class CompatibilityPolicy
     {
@@ -73,37 +75,55 @@ namespace CsmForge.Core
         public CompatibilityPolicy(Hash256 gameBuild, Hash256 schema,
             IEnumerable<ComponentFingerprint> required, IEnumerable<ComponentFingerprint> approvedLocalOnly)
         {
-            if (gameBuild == null || schema == null) throw new ArgumentNullException("gameBuild");
+            Check.NotNull(gameBuild, "gameBuild"); Check.NotNull(schema, "schema"); // WP-2: per-argument reporting
             this.gameBuild = gameBuild; this.schema = schema;
             this.required = CompatibilityManifest.Collect(required);
             optionalLocal = CompatibilityManifest.Collect(approvedLocalOnly);
             foreach (string id in this.required.Keys)
+            {
                 if (optionalLocal.ContainsKey(id)) throw new ArgumentException("Required components cannot be downgraded to optional.");
+                if (IsPrefix(id, "blocked-mod:"))
+                    throw new InvalidOperationException("Host contains an unsupported shared-simulation mod without a Forge adapter: " + id);
+            }
         }
 
-        // Validate host AND every client before registering a transport connection in HostSession.
+        // Validate every client before registering a transport connection in HostSession.
         public string[] Evaluate(CompatibilityManifest manifest)
         {
-            if (manifest == null) throw new ArgumentNullException("manifest");
+            Check.NotNull(manifest, "manifest");
             List<string> errors = new List<string>();
             if (!gameBuild.Equals(manifest.GameBuildHash)) errors.Add("game-build-mismatch");
             if (!schema.Equals(manifest.SchemaHash)) errors.Add("schema-mismatch");
             Dictionary<string, ComponentFingerprint> actual = CompatibilityManifest.Collect(manifest.Entries);
             foreach (KeyValuePair<string, ComponentFingerprint> pair in required)
             {
+                if (IsPrefix(pair.Key, "client-mod:")) continue;
                 ComponentFingerprint value;
                 if (!actual.TryGetValue(pair.Key, out value)) errors.Add("missing:" + pair.Key);
                 else if (!pair.Value.Matches(value)) errors.Add("fingerprint-mismatch:" + pair.Key);
             }
             foreach (KeyValuePair<string, ComponentFingerprint> pair in actual)
             {
-                if (required.ContainsKey(pair.Key)) continue;
+                ComponentFingerprint expected;
+                if (required.TryGetValue(pair.Key, out expected)) continue;
+                if (AllowsClientExtra(pair.Key)) continue;
+
                 ComponentFingerprint approved;
                 if (!optionalLocal.TryGetValue(pair.Key, out approved)) errors.Add("unsupported:" + pair.Key);
                 else if (!approved.Matches(pair.Value)) errors.Add("local-fingerprint-mismatch:" + pair.Key);
             }
             errors.Sort(StringComparer.Ordinal);
             return errors.ToArray();
+        }
+
+        private static bool AllowsClientExtra(string id)
+        {
+            return IsPrefix(id, "dlc:") || IsPrefix(id, "asset:") || IsPrefix(id, "client-mod:");
+        }
+
+        private static bool IsPrefix(string value, string prefix)
+        {
+            return value != null && value.StartsWith(prefix, StringComparison.Ordinal);
         }
     }
 }

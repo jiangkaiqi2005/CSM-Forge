@@ -11,3 +11,7 @@ artifacts/
 *.pdb
 *.log
 .env
+
+__pycache__/
+*.pyc
+dist/

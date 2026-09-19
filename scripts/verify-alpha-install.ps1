@@ -8,6 +8,12 @@ if (-not (Test-Path -LiteralPath $rootPath -PathType Container)) {
     throw "CSM-Forge install directory does not exist: $rootPath"
 }
 
+$modsRoot = Split-Path -Parent $rootPath
+$originalCsmDll = Join-Path $modsRoot 'CSM\CSM.dll'
+if (Test-Path -LiteralPath $originalCsmDll -PathType Leaf) {
+    throw "The original CSM and CSM-Forge cannot coexist. Move or uninstall the original CSM directory first: $originalCsmDll"
+}
+
 $required = @(
     'CSM.Forge.Runtime.Cities1.dll',
     'CSM.Forge.Core.dll',
@@ -21,7 +27,7 @@ $required = @(
 foreach ($name in $required) {
     $path = Join-Path $rootPath $name
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Required Alpha file is missing: $path"
+        throw "Required candidate file is missing: $path"
     }
 }
 
@@ -72,7 +78,7 @@ if (Test-Path -LiteralPath $buildInfoPath -PathType Leaf) {
     if ($info.source_ref) { $sourceRef = [string]$info.source_ref }
 }
 
-Write-Host 'CSM-Forge Alpha install verification: PASS'
+Write-Host 'CSM-Forge candidate install verification: PASS'
 Write-Host "root=$rootPath"
 Write-Host "checked_files=$checked"
 Write-Host "manifest_sha256=$manifestHash"

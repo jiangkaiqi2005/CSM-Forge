@@ -13,7 +13,7 @@ namespace CsmForge.Core
 
         public ZoneBlockKeyV2(EntityIdentityV2 segment, int positionX16, int positionZ16, int angle4096)
         {
-            if (!segment.IsValid) throw new ArgumentException("Invalid zoning segment identity.", "segment");
+            Check.Condition(!segment.IsValid, "segment", "Invalid zoning segment identity.");
             Segment = segment;
             PositionX16 = positionX16;
             PositionZ16 = positionZ16;
@@ -54,7 +54,7 @@ namespace CsmForge.Core
 
         public ZoneStateV2(ZoneBlockKeyV2 key, ulong zone1, ulong zone2)
         {
-            if (!key.IsValid) throw new ArgumentException("Invalid zoning key.", "key");
+            Check.Condition(!key.IsValid, "key", "Invalid zoning key.");
             Key = key; Zone1 = zone1; Zone2 = zone2;
         }
     }
@@ -64,7 +64,7 @@ namespace CsmForge.Core
         public ZoneStateV2 Requested { get; private set; }
         public ZoneIntentV2(ZoneStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             Requested = requested;
         }
     }
@@ -98,14 +98,14 @@ namespace CsmForge.Core
 
         public void Seed(ZoneStateV2 value)
         {
-            if (value == null || value.IsEmpty) throw new ArgumentException("Only non-empty zoning belongs in the overlay.", "value");
+            Check.Condition(value == null || value.IsEmpty, "value", "Only non-empty zoning belongs in the overlay.");
             if (states.ContainsKey(value.Key)) throw new InvalidOperationException("Duplicate zoning key.");
             states.Add(value.Key, value);
         }
 
         public void Apply(ZoneMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
             for (int i = 0; i < mutation.Deletes.Length; i++) states.Remove(mutation.Deletes[i]);
             for (int i = 0; i < mutation.Upserts.Length; i++) states[mutation.Upserts[i].Key] = mutation.Upserts[i];
         }
@@ -147,7 +147,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(ZoneIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -166,7 +166,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(ZoneMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

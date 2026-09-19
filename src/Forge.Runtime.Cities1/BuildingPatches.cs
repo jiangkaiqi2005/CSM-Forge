@@ -184,4 +184,13 @@ namespace CsmForge.Runtime.Cities1
             RuntimeServices.Multiplayer.ObserveHostBuildingDeleted(__state);
         }
     }
+
+    [HarmonyPatch(typeof(BuildingManager), "SimulationStepImpl")]
+    internal static class BuildingManagerClientSimulationBarrierPatch
+    {
+        public static bool Prefix()
+        {
+            return RuntimeScopeGuard.IsApplying || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.ClientReplicaLive;
+        }
+    }
 }

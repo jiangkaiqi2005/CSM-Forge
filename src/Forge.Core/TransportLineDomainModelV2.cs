@@ -53,7 +53,7 @@ namespace CsmForge.Core
             byte red, byte green, byte blue, byte alpha, ushort budget, ushort ticketPrice, bool day, bool night,
             bool complete, TransportStopV2[] stops)
         {
-            if (!entity.IsValid) throw new ArgumentException("Invalid transport line identity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid transport line identity.");
             ValidateDraft(prefabKey, stops);
             Entity = entity; PrefabKey = prefabKey;
             Red = red; Green = green; Blue = blue; Alpha = alpha;
@@ -63,8 +63,8 @@ namespace CsmForge.Core
 
         internal static void ValidateDraft(string prefabKey, TransportStopV2[] stops)
         {
-            if (string.IsNullOrEmpty(prefabKey) || prefabKey.Length > 160) throw new ArgumentException("Invalid transport prefab key.", "prefabKey");
-            if (stops == null || stops.Length > 512) throw new ArgumentException("Transport stop list exceeds supported bounds.", "stops");
+            Check.Condition(string.IsNullOrEmpty(prefabKey) || prefabKey.Length > 160, "prefabKey", "Invalid transport prefab key.");
+            Check.Condition(stops == null || stops.Length > 512, "stops", "Transport stop list exceeds supported bounds.");
             for (int i = 0; i < stops.Length; i++) if (stops[i] == null) throw new ArgumentException("Null transport stop.", "stops");
         }
     }
@@ -114,12 +114,12 @@ namespace CsmForge.Core
                 throw new ArgumentOutOfRangeException("kind");
             if (kind == TransportLineIntentKindV2.Create)
             {
-                if (target.IsValid) throw new ArgumentException("Create intent must not carry a target identity.", "target");
+                Check.Condition(target.IsValid, "target", "Create intent must not carry a target identity.");
                 TransportLineStateV2.ValidateDraft(prefabKey, stops);
             }
             else if (!target.IsValid) throw new ArgumentException("Invalid transport line target.", "target");
             bool route = kind == TransportLineIntentKindV2.AddStop || kind == TransportLineIntentKindV2.RemoveStop || kind == TransportLineIntentKindV2.MoveStop;
-            if (route && stopIndex < -1) throw new ArgumentOutOfRangeException("stopIndex");
+            Check.OutOfRange(route && stopIndex < -1, "stopIndex");
             if ((kind == TransportLineIntentKindV2.AddStop || kind == TransportLineIntentKindV2.MoveStop) && stop == null)
                 throw new ArgumentNullException("stop");
             Kind = kind; Target = target; PrefabKey = prefabKey;
@@ -153,14 +153,14 @@ namespace CsmForge.Core
 
         public void Seed(TransportLineStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (values.ContainsKey(value.Entity.EntityId)) throw new InvalidOperationException("Duplicate transport line identity.");
             values.Add(value.Entity.EntityId, value);
         }
 
         public void Apply(TransportLineMutationV2 mutation)
         {
-            if (mutation == null) throw new ArgumentNullException("mutation");
+            Check.NotNull(mutation, "mutation");
             for (int i = 0; i < mutation.Upserts.Length; i++)
             {
                 TransportLineStateV2 value = mutation.Upserts[i]; TransportLineStateV2 current;
@@ -248,7 +248,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(TransportLineIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write((byte)value.Kind);
@@ -317,7 +317,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeMutation(TransportLineMutationV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(MutationMagic);

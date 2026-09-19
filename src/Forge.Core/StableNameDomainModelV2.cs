@@ -21,7 +21,7 @@ namespace CsmForge.Core
         {
             if (kind < StableNameTargetKindV2.Building || kind > StableNameTargetKindV2.TransportLine)
                 throw new ArgumentOutOfRangeException("kind");
-            if (!entity.IsValid) throw new ArgumentException("Invalid name entity identity.", "entity");
+            Check.Condition(!entity.IsValid, "entity", "Invalid name entity identity.");
             Kind = kind; Entity = entity;
         }
         public bool Equals(StableNameKeyV2 other) { return Kind == other.Kind && Entity.Equals(other.Entity); }
@@ -42,7 +42,7 @@ namespace CsmForge.Core
         public StableNameStateV2(StableNameKeyV2 key, string name)
         {
             if (name == null) name = string.Empty;
-            if (Encoding.UTF8.GetByteCount(name) > 512) throw new ArgumentException("Custom name exceeds Forge wire bounds.", "name");
+            Check.Condition(Encoding.UTF8.GetByteCount(name) > 512, "name", "Custom name exceeds Forge wire bounds.");
             Key = key; Name = name;
         }
     }
@@ -54,7 +54,7 @@ namespace CsmForge.Core
         public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
         public void Set(StableNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             if (string.IsNullOrEmpty(value.Name)) values.Remove(value.Key); else values[value.Key] = value.Name;
         }
         public void Remove(StableNameKeyV2 key) { values.Remove(key); }
@@ -85,7 +85,7 @@ namespace CsmForge.Core
         private const uint Magic = 0x324E5346u; // FSN2
         public static byte[] Encode(StableNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] text = Encoding.UTF8.GetBytes(value.Name ?? string.Empty);
             using (MemoryStream stream = new MemoryStream())
             {

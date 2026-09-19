@@ -13,6 +13,15 @@ namespace CsmForge.Runtime.Cities1
 {
     public sealed partial class CitiesMultiplayerSessionV3
     {
+        private sealed class PendingPresentation
+        {
+            public string ToolName;
+            public float X;
+            public float Y;
+            public float Z;
+            public bool Visible;
+        }
+
         private sealed class HostPeer
         {
             public Guid TransportId;
@@ -38,6 +47,7 @@ namespace CsmForge.Runtime.Cities1
         private readonly RuntimeEventLog events;
         private readonly Queue<WaterBudgetIntent> pendingBudget = new Queue<WaterBudgetIntent>();
         private readonly Queue<BuildingIntentV2> pendingBuildings = new Queue<BuildingIntentV2>();
+        private readonly Queue<string> pendingChat = new Queue<string>();
         private readonly Dictionary<Guid, HostPeer> hostPeers = new Dictionary<Guid, HostPeer>();
         private readonly Dictionary<Guid, uint> memberGenerations = new Dictionary<Guid, uint>();
         private readonly List<string> snapshotFiles = new List<string>();
@@ -47,6 +57,10 @@ namespace CsmForge.Runtime.Cities1
         private LoadIdentity load;
         private CompatibilityManifest localManifest;
         private CompatibilityPolicy hostPolicy;
+        private VerificationCadence districtVerifyCadence;
+        private VerificationCadence zoneVerifyCadence;
+        private VerificationCadence netVerifyCadence;
+        private const long GridVerifyIntervalMilliseconds = 5000;
         private LiteNetServerTransport server;
         private LiteNetClientTransport client;
         private AuthorityCoordinatorV2 authority;
@@ -59,6 +73,14 @@ namespace CsmForge.Runtime.Cities1
         private Guid hostLocalBinding;
         private MemberIdentity hostLocalMember;
         private ulong hostLocalOperation;
+        private string hostDisplayName;
+        private MultiplayerPlayerSnapshot[] playerSnapshots = new MultiplayerPlayerSnapshot[0];
+        private readonly List<MultiplayerChatSnapshot> chatSnapshots = new List<MultiplayerChatSnapshot>();
+        private readonly Dictionary<Guid, MultiplayerPresentationSnapshot> presentationSnapshots =
+            new Dictionary<Guid, MultiplayerPresentationSnapshot>();
+        private PendingPresentation pendingPresentation;
+        private ulong snapshotBytesReceived;
+        private ulong snapshotBytesTotal;
 
         private CitiesSnapshotSaveOperation snapshotSave;
         private SnapshotFileDescriptor publishedSnapshot;
@@ -82,7 +104,7 @@ namespace CsmForge.Runtime.Cities1
 
         public CitiesMultiplayerSessionV3(CitiesLifecycleCoordinator lifecycle, RuntimeEventLog events)
         {
-            if (lifecycle == null || events == null) throw new ArgumentNullException("lifecycle");
+            Check.NotNull(lifecycle, "lifecycle"); Check.NotNull(events, "events"); // WP-2: per-argument reporting
             this.lifecycle = lifecycle;
             this.events = events;
         }
@@ -96,9 +118,14 @@ namespace CsmForge.Runtime.Cities1
                     {
                         Mode = mode,
                         Detail = detail,
-                        ConnectedPeers = hostPeers.Count,
+                        ConnectedPeers = Math.Max(0, playerSnapshots.Length - 1),
                         Revision = authority != null ? authority.Revision : replica != null ? replica.Revision : 0,
-                        DevelopmentTransport = mode != MultiplayerSessionMode.Offline
+                        DevelopmentTransport = mode != MultiplayerSessionMode.Offline,
+                        SnapshotBytesReceived = snapshotBytesReceived,
+                        SnapshotBytesTotal = snapshotBytesTotal,
+                        Players = ClonePlayers(playerSnapshots),
+                        Chat = CloneChat(chatSnapshots),
+                        Presentations = ClonePresentations(presentationSnapshots)
                     };
             }
         }
@@ -137,6 +164,27 @@ namespace CsmForge.Runtime.Cities1
             return false;
         }
 
+        public bool RequestJoinFromMainMenu(IPEndPoint endpoint, string roomKey, string displayName)
+        {
+            if (lifecycle.Current.IsValid || endpoint == null || string.IsNullOrEmpty(roomKey) ||
+                string.IsNullOrEmpty(displayName)) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Offline) return false;
+                mode = MultiplayerSessionMode.ConnectingClient;
+                detail = "main-menu-client-start";
+            }
+            StartClientBootstrap(default(LoadIdentity), endpoint, roomKey, displayName);
+            return Status.Mode != MultiplayerSessionMode.Faulted;
+        }
+
+        public void PollMainMenu()
+        {
+            if (lifecycle.Current.IsValid || client == null) return;
+            try { DrainClientEvents(); }
+            catch (Exception error) { AbortStart("main-menu-poll:" + error.GetType().Name); }
+        }
+
         public bool RequestStop()
         {
             LoadIdentity identity = lifecycle.Current;
@@ -156,6 +204,7 @@ namespace CsmForge.Runtime.Cities1
             try { RuntimeServices.EntityMaps.SuspendCurrent(); } catch { }
             server = null; client = null; clientSnapshot = null; snapshotSave = null;
             authority = null; replica = null; joins = null;
+            districtVerifyCadence = null; zoneVerifyCadence = null; netVerifyCadence = null;
             ClearAllDomainReferences();
             hostPolicy = null; localManifest = null; publishedSnapshot = null;
             hostPeers.Clear(); memberGenerations.Clear(); clientManifestPages = null; clientOffer = null;
@@ -169,9 +218,17 @@ namespace CsmForge.Runtime.Cities1
                 preserveAcrossLevelLoad = false;
                 pendingBudget.Clear();
                 pendingBuildings.Clear();
+                pendingChat.Clear();
+                playerSnapshots = new MultiplayerPlayerSnapshot[0];
+                chatSnapshots.Clear();
+                presentationSnapshots.Clear();
+                pendingPresentation = null;
+                snapshotBytesReceived = 0;
+                snapshotBytesTotal = 0;
                 mode = MultiplayerSessionMode.Offline;
                 detail = "offline";
             }
+            ForgeRoomPreflight.Invalidate();
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
             load = default(LoadIdentity);
         }
@@ -200,6 +257,46 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
+        public bool TrySendChat(string text)
+        {
+            text = (text ?? string.Empty).Trim();
+            if (text.Length == 0 || text.Length > 256) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                if (pendingChat.Count >= 32) return false;
+                pendingChat.Enqueue(text);
+                return true;
+            }
+        }
+
+        public bool RequestKick(MemberIdentity member)
+        {
+            LoadIdentity identity = lifecycle.Current;
+            if (!identity.IsValid || !member.IsValid) return false;
+            lock (gate) if (mode != MultiplayerSessionMode.Hosting) return false;
+            return RuntimeServices.Scheduler.QueueSimulation(identity, delegate
+            {
+                HostPeer target = null;
+                foreach (HostPeer peer in hostPeers.Values)
+                    if (peer.Member.Equals(member)) { target = peer; break; }
+                if (target != null && server != null) server.Disconnect(target.TransportId);
+            });
+        }
+
+        public bool TryPublishPresentation(string toolName, float x, float y, float z, bool visible)
+        {
+            if (toolName == null || toolName.Length > 96 || float.IsNaN(x) || float.IsInfinity(x) ||
+                float.IsNaN(y) || float.IsInfinity(y) || float.IsNaN(z) || float.IsInfinity(z)) return false;
+            lock (gate)
+            {
+                if (mode != MultiplayerSessionMode.Hosting && mode != MultiplayerSessionMode.ClientLive) return false;
+                pendingPresentation = new PendingPresentation
+                { ToolName = toolName, X = x, Y = y, Z = z, Visible = visible };
+                return true;
+            }
+        }
+
         public void PollSimulation()
         {
             if (!load.IsValid || !lifecycle.IsCurrent(load)) return;
@@ -215,6 +312,8 @@ namespace CsmForge.Runtime.Cities1
                 if (client != null) DrainClientEvents();
                 DrainBudgetIntents();
                 DrainBuildingIntents();
+                DrainChatMessages();
+                DrainPresentation();
             }
             catch (Exception error) { FenceSession("session-poll:" + error.GetType().Name); }
         }
@@ -228,6 +327,23 @@ namespace CsmForge.Runtime.Cities1
                 else if (replica != null) RuntimeServices.Metadata.Update(load, replica.Revision, replica.CurrentRoot);
             }
             catch (Exception error) { FenceSession("session-after-tick:" + error.GetType().Name); }
+        }
+
+        /// <summary>
+        /// Expensive full-grid reconciles (district 262k cells, zone 32k blocks) run on a cadence
+        /// instead of every tick (WP-1.1). Patch-driven publishes stay immediate; any net/zone/
+        /// district authority commit forces the next poll (BroadcastBatch).
+        /// </summary>
+        internal bool DistrictVerificationDue()
+        {
+            VerificationCadence cadence = districtVerifyCadence;
+            return cadence != null && cadence.ShouldVerify(MonotonicMilliseconds());
+        }
+
+        internal bool ZoneVerificationDue()
+        {
+            VerificationCadence cadence = zoneVerifyCadence;
+            return cadence != null && cadence.ShouldVerify(MonotonicMilliseconds());
         }
 
         private void DrainBudgetIntents()
@@ -254,6 +370,119 @@ namespace CsmForge.Runtime.Cities1
                 if (mode == MultiplayerSessionMode.Hosting) SubmitHostBuilding(intent);
                 else if (mode == MultiplayerSessionMode.ClientLive) SubmitClientBuilding(intent);
             }
+        }
+
+        private void DrainChatMessages()
+        {
+            int count = 0;
+            while (count++ < 8)
+            {
+                string text;
+                lock (gate) { if (pendingChat.Count == 0) break; text = pendingChat.Dequeue(); }
+                if (mode == MultiplayerSessionMode.Hosting)
+                    PublishChat(new ChatEventV2(hostLocalMember, hostDisplayName, text));
+                else if (mode == MultiplayerSessionMode.ClientLive)
+                    SendClientFrame(MessageKindV2.ChatSubmit, SocialMessagesV2.EncodeChatSubmit(new ChatSubmitV2(text)));
+            }
+        }
+
+        private void DrainPresentation()
+        {
+            PendingPresentation pending;
+            lock (gate) { pending = pendingPresentation; pendingPresentation = null; }
+            if (pending == null) return;
+            if (mode == MultiplayerSessionMode.Hosting)
+                PublishPresentation(new PlayerPresentationV2(hostLocalMember, hostDisplayName, pending.ToolName,
+                    pending.X, pending.Y, pending.Z, pending.Visible));
+            else if (mode == MultiplayerSessionMode.ClientLive)
+                SendClientFrame(MessageKindV2.PlayerPresentation, SocialMessagesV2.EncodePresentation(
+                    new PlayerPresentationV2(clientMember, clientName, pending.ToolName,
+                        pending.X, pending.Y, pending.Z, pending.Visible)));
+        }
+
+        private void PublishPresentation(PlayerPresentationV2 value)
+        {
+            RememberPresentation(value);
+            byte[] payload = SocialMessagesV2.EncodePresentation(value);
+            List<HostPeer> dead = null;
+            foreach (HostPeer peer in hostPeers.Values)
+            {
+                if (!peer.Live) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.PlayerPresentation, payload)) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
+        }
+
+        private void RememberPresentation(PlayerPresentationV2 value)
+        {
+            bool local = value.Member.Equals(hostLocalMember) || value.Member.Equals(clientMember);
+            lock (gate) presentationSnapshots[value.Member.MemberId] = new MultiplayerPresentationSnapshot
+            {
+                Member = value.Member, DisplayName = value.DisplayName, ToolName = value.ToolName,
+                WorldX = value.WorldX, WorldY = value.WorldY, WorldZ = value.WorldZ,
+                Visible = value.Visible, IsLocal = local
+            };
+        }
+
+        private void PublishChat(ChatEventV2 value)
+        {
+            RememberChat(value);
+            byte[] payload = SocialMessagesV2.EncodeChatEvent(value);
+            List<HostPeer> dead = null;
+            foreach (HostPeer peer in hostPeers.Values)
+            {
+                if (!peer.SessionReady) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.ChatEvent, payload)) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
+        }
+
+        private void RememberChat(ChatEventV2 value)
+        {
+            lock (gate)
+            {
+                chatSnapshots.Add(new MultiplayerChatSnapshot
+                { Member = value.Member, DisplayName = value.DisplayName, Text = value.Text });
+                if (chatSnapshots.Count > 64) chatSnapshots.RemoveAt(0);
+            }
+        }
+
+        private static MultiplayerPlayerSnapshot[] ClonePlayers(MultiplayerPlayerSnapshot[] values)
+        {
+            MultiplayerPlayerSnapshot[] result = new MultiplayerPlayerSnapshot[values.Length];
+            for (int i = 0; i < values.Length; i++) result[i] = new MultiplayerPlayerSnapshot
+            {
+                Member = values[i].Member, DisplayName = values[i].DisplayName, IsHost = values[i].IsHost,
+                IsLive = values[i].IsLive, IsLocal = values[i].IsLocal
+            };
+            return result;
+        }
+
+        private static MultiplayerChatSnapshot[] CloneChat(List<MultiplayerChatSnapshot> values)
+        {
+            MultiplayerChatSnapshot[] result = new MultiplayerChatSnapshot[values.Count];
+            for (int i = 0; i < values.Count; i++) result[i] = new MultiplayerChatSnapshot
+            { Member = values[i].Member, DisplayName = values[i].DisplayName, Text = values[i].Text };
+            return result;
+        }
+
+        private static MultiplayerPresentationSnapshot[] ClonePresentations(
+            Dictionary<Guid, MultiplayerPresentationSnapshot> values)
+        {
+            MultiplayerPresentationSnapshot[] result = new MultiplayerPresentationSnapshot[values.Count];
+            int index = 0;
+            foreach (MultiplayerPresentationSnapshot value in values.Values) result[index++] =
+                new MultiplayerPresentationSnapshot
+                {
+                    Member = value.Member, DisplayName = value.DisplayName, ToolName = value.ToolName,
+                    WorldX = value.WorldX, WorldY = value.WorldY, WorldZ = value.WorldZ,
+                    Visible = value.Visible, IsLocal = value.IsLocal
+                };
+            return result;
         }
 
         private void SubmitHostBudget(WaterBudgetIntent value)
@@ -321,6 +550,31 @@ namespace CsmForge.Runtime.Cities1
                 throw new InvalidOperationException("Could not send session frame to client.");
         }
 
+        /// <summary>
+        /// Non-throwing variant for broadcast paths (WP-1.2): a peer whose transport connection is
+        /// gone is dead, not a session fault. The caller evicts peers reported as failed; the
+        /// consumed lane sequence is irrelevant because that peer is removed.
+        /// </summary>
+        private bool TrySendServerFrame(HostPeer peer, MessageKindV2 kind, byte[] payload)
+        {
+            if (server == null) return false;
+            SessionLane lane = SessionFrameV2.ExpectedLane(kind);
+            SessionFrameV2 frame = new SessionFrameV2(lane, kind, authority.Stamp, peer.TransportId,
+                peer.Sequences.Next(lane), Guid.Empty, 1, payload);
+            return server.TrySend(peer.TransportId, SessionFrameCodecV2.Encode(frame));
+        }
+
+        private void EvictDeadHostPeers(List<HostPeer> dead)
+        {
+            if (dead == null) return;
+            for (int i = 0; i < dead.Count; i++)
+            {
+                GateCounter.Record(GateCategory.Lifecycle); // D4: per-peer degradation evidence
+                events.Record(RuntimeEventCode.Error, load.Generation, "peer-send-failed:" + dead[i].TransportId);
+                RemoveHostPeer(dead[i]);
+            }
+        }
+
         private void SendClientFrame(MessageKindV2 kind, byte[] payload)
         {
             SessionLane lane = SessionFrameV2.ExpectedLane(kind);
@@ -332,9 +586,24 @@ namespace CsmForge.Runtime.Cities1
 
         private void BroadcastBatch(AuthorityBatch batch)
         {
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
-                if (peer.Live || peer.StateSubscribed)
-                    SendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch));
+            {
+                if (!peer.Live && !peer.StateSubscribed) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch))) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
+            // Net/zone/district game writes cascade into each other's grids (a new segment creates
+            // zoned blocks; a brush moves district cells), so re-verify those grids next poll
+            // instead of waiting out the cadence window (WP-1.1).
+            if (batch.DomainId == NetAuthorityDomain.Id || batch.DomainId == ZoneAuthorityDomain.Id ||
+                batch.DomainId == DistrictAuthorityDomain.Id)
+            {
+                if (districtVerifyCadence != null) districtVerifyCadence.Force();
+                if (zoneVerifyCadence != null) zoneVerifyCadence.Force();
+            }
         }
 
         private void SetSnapshotPause()
@@ -360,6 +629,7 @@ namespace CsmForge.Runtime.Cities1
 
         private void AbortStart(string reason)
         {
+            UnityEngine.Debug.LogError("[CSM-Forge] multiplayer start aborted: " + reason);
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             try { if (server != null) server.Dispose(); } catch { }
             try { if (client != null) client.Dispose(); } catch { }
@@ -367,12 +637,18 @@ namespace CsmForge.Runtime.Cities1
             server = null; client = null; authority = null; replica = null; joins = null;
             ClearAllDomainReferences();
             hostPeers.Clear();
-            lock (gate) { preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); mode = MultiplayerSessionMode.Faulted; detail = reason; }
+            lock (gate)
+            {
+                preserveAcrossLevelLoad = false; pendingBudget.Clear(); pendingBuildings.Clear(); pendingChat.Clear();
+                playerSnapshots = new MultiplayerPlayerSnapshot[0]; presentationSnapshots.Clear(); pendingPresentation = null;
+                snapshotBytesReceived = 0; snapshotBytesTotal = 0; mode = MultiplayerSessionMode.Faulted; detail = reason;
+            }
             if (load.IsValid && lifecycle.IsCurrent(load)) lifecycle.TryTransition(load, CitiesRuntimeRole.SinglePlayer);
         }
 
         private void FenceSession(string reason)
         {
+            GateCounter.Record(GateCategory.Lifecycle); // D4: fence-frequency evidence for gate pruning
             events.Record(RuntimeEventCode.Error, lifecycle.Current.Generation, reason);
             lock (gate) { preserveAcrossLevelLoad = false; mode = MultiplayerSessionMode.Faulted; detail = reason; pendingBudget.Clear(); pendingBuildings.Clear(); }
             lifecycle.Fence(reason);

@@ -24,7 +24,11 @@ namespace CsmForge.Protocol
         public HelloV2(Guid clientInstanceId, string displayName, Hash256 gameBuildHash,
             Hash256 schemaHash, ushort manifestPageCount, BootstrapAuthMode authMode)
         {
+            // S3: the character bound and the UTF-8 byte bound (the wire limit used by
+            // EncodeHello's WriteString) must both hold here, or a CJK name that passes the
+            // character check fails only at encode time, after the join has started.
             if (clientInstanceId == Guid.Empty || string.IsNullOrEmpty(displayName) || displayName.Length > 32 ||
+                Encoding.UTF8.GetByteCount(displayName) > 64 ||
                 gameBuildHash == null || schemaHash == null || manifestPageCount == 0 || manifestPageCount > 256 ||
                 !Enum.IsDefined(typeof(BootstrapAuthMode), authMode)) throw new ArgumentException("Invalid bootstrap hello.");
             ClientInstanceId = clientInstanceId; DisplayName = displayName;
@@ -51,7 +55,9 @@ namespace CsmForge.Protocol
         public string Reason { get; private set; }
         public CompatibilityResultV2(bool accepted, string reason)
         {
-            if (reason == null || reason.Length > 256) throw new ArgumentException("Invalid compatibility reason.");
+            // S3: same character-vs-byte consistency as HelloV2 (wire bound: 256 UTF-8 bytes).
+            if (reason == null || reason.Length > 256 || Encoding.UTF8.GetByteCount(reason) > 256)
+                throw new ArgumentException("Invalid compatibility reason.");
             Accepted = accepted; Reason = reason;
         }
     }
@@ -81,10 +87,10 @@ namespace CsmForge.Protocol
 
         public static ManifestPageV2[] CreateManifestPages(CompatibilityManifest manifest)
         {
-            if (manifest == null) throw new ArgumentNullException("manifest");
+            Check.NotNull(manifest, "manifest");
             ComponentFingerprint[] entries = manifest.Entries;
             int count = Math.Max(1, (entries.Length + ManifestEntriesPerPage - 1) / ManifestEntriesPerPage);
-            if (count > 256) throw new ArgumentException("Manifest needs too many pages.", "manifest");
+            Check.Condition(count > 256, "manifest", "Manifest needs too many pages.");
             ManifestPageV2[] result = new ManifestPageV2[count];
             for (int page = 0; page < count; page++)
             {
@@ -99,7 +105,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeHello(HelloV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -149,7 +155,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeManifestPage(ManifestPageV2 page)
         {
-            if (page == null) throw new ArgumentNullException("page");
+            Check.NotNull(page, "page");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -180,7 +186,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeCompatibilityResult(CompatibilityResultV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -204,7 +210,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeWelcome(SessionWelcomeV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -261,7 +267,7 @@ namespace CsmForge.Protocol
 
         private static void WriteString(BinaryWriter writer, string value, int maxBytes)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] bytes = Encoding.UTF8.GetBytes(value);
             if (bytes.Length > maxBytes) throw new ArgumentException("UTF-8 string is too long.");
             writer.Write((ushort)bytes.Length); writer.Write(bytes);

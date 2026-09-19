@@ -78,7 +78,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static TaxStateV2 Apply(LoadIdentity load, TaxStateV2 requested)
         {
-            if (requested == null || !Supported(requested.Key)) throw new ArgumentException("Unsupported tax target.", "requested");
+            Check.Condition(requested == null || !Supported(requested.Key), "requested", "Unsupported tax target.");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Tax apply belongs to a stale load.");
             EconomyManager economy = EconomyManager.instance;
             if (economy == null) throw new InvalidOperationException("EconomyManager is unavailable.");
@@ -126,7 +126,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))

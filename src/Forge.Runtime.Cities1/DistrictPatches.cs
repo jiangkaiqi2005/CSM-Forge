@@ -25,7 +25,7 @@ namespace CsmForge.Runtime.Cities1
         }
 
         public static bool Prefix(DistrictTool.Layer layer, byte districtOrPark, float brushRadius,
-            Vector3 startPosition, Vector3 endPosition, bool force, out DistrictBrushAuthorityState __state)
+            Vector3 startPosition, Vector3 endPosition, bool notOverride, out DistrictBrushAuthorityState __state)
         {
             __state = null;
             if (RuntimeScopeGuard.IsApplying) return true;
@@ -170,6 +170,36 @@ namespace CsmForge.Runtime.Cities1
             if (!resolved || !RuntimeServices.Multiplayer.TryQueueDistrictStyle(district, (ushort)___m_StyleMap[value]))
                 RuntimeServices.Lifecycle.Fence("District style could not be routed through Host authority");
             return false;
+        }
+    }
+
+
+    /// <summary>
+    /// WP-1.4b: DistrictManager.ModifyCell is the single grid-cell writer (the brush, mods and
+    /// ReleaseDistrictImplementation all land here). The postfix only flags the touched 512-cell
+    /// shard as source-dirty so the cheap reconcile re-reads it; the authoritative publish for
+    /// player brushes stays in DistrictToolApplyBrushAuthorityPatch.
+    /// </summary>
+    [HarmonyPatch(typeof(DistrictManager), "ModifyCell")]
+    internal static class DistrictModifyCellSourceDirtyPatch
+    {
+        public static void Postfix(int x, int z)
+        {
+            if (RuntimeScopeGuard.IsApplying) return;
+            if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
+            RuntimeServices.Multiplayer.MarkDistrictCellSourceDirty((uint)(z * 512 + x));
+        }
+    }
+
+    /// <summary>WP-1.4b: ReleaseDistrictImplementation clears cells across the whole map.</summary>
+    [HarmonyPatch(typeof(DistrictManager), "ReleaseDistrict")]
+    internal static class DistrictReleaseSourceDirtyPatch
+    {
+        public static void Postfix()
+        {
+            if (RuntimeScopeGuard.IsApplying) return;
+            if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
+            RuntimeServices.Multiplayer.MarkAllDistrictShardsSourceDirty();
         }
     }
 

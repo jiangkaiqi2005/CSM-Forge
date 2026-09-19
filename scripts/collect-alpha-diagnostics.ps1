@@ -27,7 +27,7 @@ function Copy-OpenFile([string]$Source, [string]$Destination) {
     }
 }
 
-$metadataFiles = @('BUILD_INFO.json','SHA256SUMS.txt','README-DEV.txt')
+$metadataFiles = @('BUILD_INFO.json','SHA256SUMS.txt','README-CANDIDATE.txt','E3-E4-TEST-RECORD.md')
 foreach ($name in $metadataFiles) {
     $source = Join-Path $rootPath $name
     if (Test-Path -LiteralPath $source -PathType Leaf) {
@@ -36,7 +36,7 @@ foreach ($name in $metadataFiles) {
 }
 
 $summary = @()
-$summary += 'CSM-Forge Alpha diagnostics'
+$summary += 'CSM-Forge candidate diagnostics'
 $summary += ('collected_utc=' + [DateTime]::UtcNow.ToString('o'))
 $summary += ('machine=' + $env:COMPUTERNAME)
 $summary += ('os=' + [Environment]::OSVersion.VersionString)

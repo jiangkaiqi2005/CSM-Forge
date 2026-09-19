@@ -50,7 +50,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(WeatherStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -84,7 +84,7 @@ namespace CsmForge.Core
 
         public static Hash256 TargetRoot(WeatherStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);

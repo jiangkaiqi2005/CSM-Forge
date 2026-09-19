@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -15,10 +16,10 @@ namespace CsmForge.Transport.LiteNet
 
         public bool Start(IPEndPoint endpoint, string key)
         {
-            if (endpoint == null) throw new ArgumentNullException("endpoint");
-            if (string.IsNullOrEmpty(key) || key.Length > 128) throw new ArgumentException("Invalid room key.", "key");
+            Check.NotNull(endpoint, "endpoint");
+            Check.Condition(string.IsNullOrEmpty(key) || key.Length > 128, "key", "Invalid room key.");
             EventBasedNetListener listener = new EventBasedNetListener();
-            NetManager manager = new NetManager(listener);
+            NetManager manager = new NetManager(listener) { AutoRecycle = true }; // WP-1.7: recycle pooled packets per receive
             listener.PeerConnectedEvent += OnConnected;
             listener.PeerDisconnectedEvent += OnDisconnected;
             listener.NetworkReceiveEvent += OnReceive;

@@ -12,8 +12,8 @@ namespace CsmForge.Protocol
 
         public IntentReceiptV2(ulong operationCounter, AuthoritySubmitDecisionV2 decision, ulong revision)
         {
-            if (operationCounter == 0) throw new ArgumentOutOfRangeException("operationCounter");
-            if (!Enum.IsDefined(typeof(AuthoritySubmitDecisionV2), decision)) throw new ArgumentOutOfRangeException("decision");
+            Check.OutOfRange(operationCounter == 0, "operationCounter");
+            Check.OutOfRange(!Enum.IsDefined(typeof(AuthoritySubmitDecisionV2), decision), "decision");
             if (decision == AuthoritySubmitDecisionV2.Committed && revision == 0)
                 throw new ArgumentException("Committed receipt requires a revision.");
             OperationCounter = operationCounter;
@@ -29,7 +29,7 @@ namespace CsmForge.Protocol
 
         public ActivationStateV2(ulong revision, Hash256 root)
         {
-            if (root == null) throw new ArgumentNullException("root");
+            Check.NotNull(root, "root");
             Revision = revision;
             Root = root;
         }
@@ -45,7 +45,7 @@ namespace CsmForge.Protocol
     {
         public static byte[] EncodeReceipt(IntentReceiptV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -66,7 +66,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeActivation(ActivationStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] bytes = new byte[40];
             Buffer.BlockCopy(BitConverter.GetBytes(value.Revision), 0, bytes, 0, 8);
             Buffer.BlockCopy(value.Root.ToArray(), 0, bytes, 8, 32);
@@ -83,7 +83,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeGapRequest(GapRequestV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return BitConverter.GetBytes(value.AfterRevision);
         }
 

@@ -21,18 +21,23 @@ namespace CsmForge.Runtime.Cities1
             {
                 MethodInfo method = methods[i];
                 ParameterInfo[] parameters = method.GetParameters();
-                if (method.Name == "DeleteSegment" && parameters.Length == 1 && parameters[0].ParameterType == typeof(ushort) &&
+                if (method.Name == "DeleteSegment" && parameters.Length == 2 &&
+                    parameters[0].ParameterType == typeof(ushort) && parameters[1].ParameterType == typeof(ushort) &&
                     typeof(IEnumerator).IsAssignableFrom(method.ReturnType)) return method;
             }
-            throw new MissingMethodException("BulldozeTool.DeleteSegment(ushort) coroutine is unavailable.");
+            throw new MissingMethodException("BulldozeTool.DeleteSegment(ushort, ushort) coroutine is unavailable.");
         }
 
-        public static bool Prefix(ushort segment, ref IEnumerator __result)
+        public static bool Prefix(ushort segment, ushort segment2, ref IEnumerator __result)
         {
             if (RuntimeScopeGuard.IsApplying || RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.ClientReplicaLive) return true;
-            EntityIdentityV2 entity;
-            bool queued = RuntimeServices.Multiplayer.TryResolveClientNetSegment(segment, out entity) &&
-                RuntimeServices.Multiplayer.TrySubmitNetIntent(NetIntentV2.DeleteSegment(entity, false));
+            EntityIdentityV2 entity, entity2 = default(EntityIdentityV2);
+            bool hasSecond = segment2 != 0 && segment2 != segment;
+            bool resolved = RuntimeServices.Multiplayer.TryResolveClientNetSegment(segment, out entity) &&
+                (!hasSecond || RuntimeServices.Multiplayer.TryResolveClientNetSegment(segment2, out entity2));
+            bool queued = resolved && RuntimeServices.Multiplayer.TrySubmitNetIntent(NetIntentV2.DeleteSegment(entity, false));
+            if (queued && hasSecond)
+                queued = RuntimeServices.Multiplayer.TrySubmitNetIntent(NetIntentV2.DeleteSegment(entity2, false));
             __result = EmptySimulationAction.Create();
             if (!queued) RuntimeServices.Lifecycle.Fence("Road segment bulldoze intent could not be queued");
             return false;

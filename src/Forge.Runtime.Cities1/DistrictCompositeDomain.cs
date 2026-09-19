@@ -8,7 +8,7 @@ namespace CsmForge.Runtime.Cities1
     {
         public static DistrictPolicySnapshotV2 Capture(Func<uint, EntityIdentityV2?> resolve)
         {
-            if (resolve == null) throw new ArgumentNullException("resolve");
+            Check.NotNull(resolve, "resolve");
             DistrictManager manager = DistrictManager.instance;
             if (manager == null) throw new InvalidOperationException("DistrictManager is unavailable.");
             District city = manager.m_districts.m_buffer[0];
@@ -42,7 +42,7 @@ namespace CsmForge.Runtime.Cities1
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load))
                 throw new InvalidOperationException("District policy apply belongs to a stale load.");
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             DistrictManager manager = DistrictManager.instance;
             if (manager == null) throw new InvalidOperationException("DistrictManager is unavailable.");
             DistrictPolicies.Policies policy = (DistrictPolicies.Policies)intent.PolicyValue;
@@ -67,7 +67,7 @@ namespace CsmForge.Runtime.Cities1
         {
             if (!RuntimeServices.Lifecycle.IsCurrent(load))
                 throw new InvalidOperationException("District policy projection belongs to a stale load.");
-            if (snapshot == null) throw new ArgumentNullException("snapshot");
+            Check.NotNull(snapshot, "snapshot");
             DistrictManager manager = DistrictManager.instance;
             if (manager == null) throw new InvalidOperationException("DistrictManager is unavailable.");
             using (RuntimeScopeGuard.EnterApply(load, DistrictAuthorityDomain.Id))
@@ -107,7 +107,7 @@ namespace CsmForge.Runtime.Cities1
 
         public DistrictCompositeAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             district = new DistrictAuthorityDomain(load);
             committedPolicies = CapturePolicies();
@@ -161,6 +161,21 @@ namespace CsmForge.Runtime.Cities1
                 district.StateRoot, committedPolicies);
         }
 
+        internal bool HasSourceDirtyShards() { return district.HasSourceDirtyShards(); }
+
+        /// <summary>WP-1.4b cheap path: reconciles only the shards the game hooks marked.</summary>
+        internal DistrictAuthorityEnvelopeV2 ObserveHostSourceDirty()
+        {
+            DistrictMutationV2 mutation = district.ObserveHostSourceDirty();
+            if (mutation == null) return null;
+            committedPolicies = CapturePolicies();
+            return new DistrictAuthorityEnvelopeV2(mutation, district.StateRoot, committedPolicies);
+        }
+
+        internal void MarkCellSourceDirty(uint cellIndex) { district.MarkCellSourceDirty(cellIndex); }
+
+        internal void MarkAllCellsSourceDirty() { district.MarkAllCellsSourceDirty(); }
+
         private DistrictPolicySnapshotV2 CapturePolicies()
         {
             return DistrictPolicyGameAccess.Capture(delegate(uint native)
@@ -192,7 +207,7 @@ namespace CsmForge.Runtime.Cities1
 
         public DistrictCompositeReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             district = new DistrictReplicaDomain(load);
             committedPolicies = CapturePolicies();
@@ -205,7 +220,7 @@ namespace CsmForge.Runtime.Cities1
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             DistrictAuthorityEnvelopeV2 envelope = DistrictPolicyEnvelopeCodecV2.DecodeEnvelope(absoluteDelta);
             byte[] childBytes = DistrictDomainCodecV2.EncodeMutation(envelope.DistrictMutation);
             district.ApplyAbsolute(childBytes, envelope.DistrictAfterRoot);

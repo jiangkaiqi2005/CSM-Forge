@@ -248,7 +248,7 @@ Client 不重新执行玩家决策工具，而安装 Host 结果：
 | 序列化 | `SerializableDataExtensionBase`, `ISerializableData` | Forge save metadata | A |
 | 经济 | `IEconomy` / `EconomyManager` | 首个参数 Authority slice | A/B |
 | 需求 | `IDemand` / demand manager | 首个只读/结果同步 | A/B |
-| 地形 | `ITerrain` / `TerrainManager` | 后续地形结果 | A/B |
+| 地形 | `TerrainTool` / `TerrainManager.RawHeights` / `ITerrainManager` | Host brush/undo；136 个 absolute height shards；Client 派生层重算 | A/B；代码门禁通过后仍须真机验证 |
 | 道路 | `NetManager`, `NetTool`, `NetInfo` | 后期 Net Authority/Projection | B/C/D |
 | 建筑 | `BuildingManager`, `BuildingTool`, `BuildingInfo` | Building slice | B/C/D |
 | 分区 | `ZoneManager` | Zone state/root | B/C |

@@ -56,9 +56,9 @@ namespace CsmForge.Runtime.Cities1
 
         public static BudgetStateV2 Apply(LoadIdentity load, BudgetStateV2 requested)
         {
-            if (requested == null || IsWaterOwned(requested.Key)) throw new ArgumentException("Budget target belongs to another domain or is invalid.", "requested");
+            Check.Condition(requested == null || IsWaterOwned(requested.Key), "requested", "Budget target belongs to another domain or is invalid.");
             BudgetStateV2 current;
-            if (!TryRead(requested.Key, out current)) throw new ArgumentException("Unsupported service budget target.", "requested");
+            Check.Condition(!TryRead(requested.Key, out current), "requested", "Unsupported service budget target.");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Budget apply belongs to a stale load.");
             EconomyManager economy = EconomyManager.instance;
             ItemClass.Service service = (ItemClass.Service)requested.Key.Service;
@@ -106,7 +106,7 @@ namespace CsmForge.Runtime.Cities1
         }
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             CitiesRuntimeRole role = RuntimeServices.Lifecycle.Role;
             if (!RuntimeServices.Lifecycle.IsCurrent(load) ||
                 (role != CitiesRuntimeRole.ClientLoading && role != CitiesRuntimeRole.ClientRecovering && role != CitiesRuntimeRole.ClientReplicaLive))

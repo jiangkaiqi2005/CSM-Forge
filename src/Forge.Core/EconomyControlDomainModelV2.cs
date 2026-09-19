@@ -72,7 +72,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeIntent(EconomyControlIntentV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -95,7 +95,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeState(EconomyControlStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] payload = value.Snapshot;
             using (MemoryStream stream = new MemoryStream())
             {

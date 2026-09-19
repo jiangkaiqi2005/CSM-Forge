@@ -18,7 +18,7 @@ namespace CsmForge.Runtime.Cities1
             {
                 clientWater, clientDemand, clientTaxes, clientBudgets, clientCash, clientEconomyControl,
                 clientAreas, clientBuildings, clientNet, clientZones, clientDistricts, clientClock,
-                clientTransport, clientNames, clientCityName, clientWeather
+                clientTransport, clientNames, clientCityName, clientWeather, clientExtensions
             };
         }
 
@@ -69,7 +69,6 @@ namespace CsmForge.Runtime.Cities1
 
             if (clientProjectionRevision != replica.Revision)
             {
-                // Diagnostic state should never lag an applied batch. Re-seed rather than changing gameplay state.
                 events.Record(RuntimeEventCode.Error, load.Generation,
                     "diagnostic-only projection audit revision lag: expected=" + clientProjectionRevision + ", actual=" + replica.Revision);
                 InitializeClientProjectionAudit();
@@ -107,6 +106,8 @@ namespace CsmForge.Runtime.Cities1
                 return EconomyCashGameAccess.Capture().Root;
             if (domain.DomainId == EconomyControlAuthorityDomain.Id)
                 return EconomyControlGameAccess.Capture().Root;
+            ExtensionStateReplicaDomain extensions = domain as ExtensionStateReplicaDomain;
+            if (extensions != null) return extensions.CaptureActualRoot();
             return domain.StateRoot;
         }
 

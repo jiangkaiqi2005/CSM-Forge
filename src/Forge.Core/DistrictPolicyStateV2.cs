@@ -15,7 +15,7 @@ namespace CsmForge.Core
         public DistrictPolicyStateV2(EntityIdentityV2 district, ulong services, ulong taxation,
             ulong cityPlanning, ulong special)
         {
-            if (!district.IsValid) throw new ArgumentException("Invalid district identity.", "district");
+            Check.Condition(!district.IsValid, "district", "Invalid district identity.");
             District = district;
             Services = services;
             Taxation = taxation;
@@ -37,8 +37,8 @@ namespace CsmForge.Core
         public DistrictPolicySnapshotV2(ulong cityServices, ulong cityTaxation, ulong cityPlanning,
             ulong citySpecial, DistrictPolicyStateV2[] values)
         {
-            if (values == null) throw new ArgumentNullException("values");
-            if (values.Length > 127) throw new ArgumentException("Too many district policy entries.", "values");
+            Check.NotNull(values, "values");
+            Check.Condition(values.Length > 127, "values", "Too many district policy entries.");
             CityServices = cityServices;
             CityTaxation = cityTaxation;
             CityPlanning = cityPlanning;
@@ -46,7 +46,7 @@ namespace CsmForge.Core
             districts = (DistrictPolicyStateV2[])values.Clone();
             Array.Sort(districts, delegate(DistrictPolicyStateV2 a, DistrictPolicyStateV2 b)
             {
-                if (a == null || b == null) throw new ArgumentException("Null district policy state.", "values");
+                Check.Condition(a == null || b == null, "values", "Null district policy state.");
                 return a.District.EntityId.CompareTo(b.District.EntityId);
             });
             ulong previous = 0;
@@ -90,9 +90,9 @@ namespace CsmForge.Core
         public DistrictAuthorityEnvelopeV2(DistrictMutationV2 districtMutation, Hash256 districtAfterRoot,
             DistrictPolicySnapshotV2 policies)
         {
-            if (districtMutation == null) throw new ArgumentNullException("districtMutation");
-            if (districtAfterRoot == null) throw new ArgumentNullException("districtAfterRoot");
-            if (policies == null) throw new ArgumentNullException("policies");
+            Check.NotNull(districtMutation, "districtMutation");
+            Check.NotNull(districtAfterRoot, "districtAfterRoot");
+            Check.NotNull(policies, "policies");
             DistrictMutation = districtMutation;
             DistrictAfterRoot = districtAfterRoot;
             Policies = policies;
@@ -103,7 +103,7 @@ namespace CsmForge.Core
     {
         public static Hash256 Combine(Hash256 districtRoot, Hash256 policyRoot)
         {
-            if (districtRoot == null || policyRoot == null) throw new ArgumentNullException("districtRoot");
+            Check.NotNull(districtRoot, "districtRoot"); Check.NotNull(policyRoot, "policyRoot"); // WP-2: per-argument reporting
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -123,7 +123,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodePolicySnapshot(DistrictPolicySnapshotV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             DistrictPolicyStateV2[] districts = value.Districts;
             using (MemoryStream stream = new MemoryStream())
             {
@@ -180,7 +180,7 @@ namespace CsmForge.Core
 
         public static byte[] EncodeEnvelope(DistrictAuthorityEnvelopeV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] district = DistrictDomainCodecV2.EncodeMutation(value.DistrictMutation);
             byte[] policies = EncodePolicySnapshot(value.Policies);
             using (MemoryStream stream = new MemoryStream())

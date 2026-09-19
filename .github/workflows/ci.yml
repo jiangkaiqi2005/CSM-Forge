@@ -98,6 +98,14 @@ jobs:
           if ($ui.Count -eq 1) { Copy-Item -LiteralPath $ui[0].FullName -Destination (Join-Path $managed 'UnityEngine.UI.dll') }
           "CS1_MANAGED=$managed" >> $env:GITHUB_ENV
           "REFERENCE_ARCHIVE_SHA256=$((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant())" >> $env:GITHUB_ENV
+      - name: Probe CS1 DLC and core simulation metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          $gameAssembly = Join-Path $env:CS1_MANAGED 'Assembly-CSharp.dll'
+          dotnet run --project tools/Forge.MetadataProbe/Forge.MetadataProbe.csproj -c Release -- $gameAssembly EventManager EventData EventAI DisasterManager DisasterData DisasterAI DistrictPark AcademicWorksData DistrictYearReportData DistrictYearReportLedger InvestmentManager InvestmentData HotelManager HotelData HotelAI HotelBuildingAI Building BuildingManager Vehicle VehicleManager Citizen CitizenInstance CitizenManager PathUnit PathManager TreeInstance TreeManager PropInstance PropManager TerrainManager TerrainArea TerrainTool "TerrainManager/SurfaceCell" WaterManager ElectricityManager NaturalResourceManager 2>&1 | Tee-Object -FilePath artifacts/cs1-dlc-metadata.txt
+          if ($LASTEXITCODE -ne 0) { throw "CS1 metadata probe failed: $LASTEXITCODE" }
       - name: Build and stage installable Forge runtime
         shell: pwsh
         run: |
@@ -133,8 +141,8 @@ jobs:
             $manifest += ('{0}  {1}' -f $fileHash.Hash.ToLowerInvariant(), $_.Name)
           }
           $manifest | Set-Content -LiteralPath (Join-Path $stage 'SHA256SUMS.txt') -Encoding ascii
-          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-ALPHA-INSTALL.ps1') -Root $stage
-          if ($LASTEXITCODE -ne 0) { throw "Staged Alpha verification failed: $LASTEXITCODE" }
+          & pwsh -NoProfile -File (Join-Path $stage 'VERIFY-INSTALL.ps1') -Root $stage
+          if ($LASTEXITCODE -ne 0) { throw "Staged candidate verification failed: $LASTEXITCODE" }
           if (Test-Path $zip) { Remove-Item -Force $zip }
           Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -CompressionLevel Optimal
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -149,5 +157,6 @@ jobs:
             ${{ runner.temp }}/forge-runtime/CSM-Forge-runtime.zip.sha256
             ${{ runner.temp }}/forge-runtime/CSM-Forge/BUILD_INFO.json
             ${{ runner.temp }}/forge-runtime/CSM-Forge/SHA256SUMS.txt
+            artifacts/cs1-dlc-metadata.txt
           if-no-files-found: error
           retention-days: 30

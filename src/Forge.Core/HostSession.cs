@@ -56,10 +56,10 @@ namespace CsmForge.Core
         public HostSession(SessionStamp stamp, IAuthorityWorld world, DiagnosticRing diagnostics)
         {
             Check.Stamp(stamp);
-            if (world == null || diagnostics == null) throw new ArgumentNullException("world");
+            Check.NotNull(world, "world"); Check.NotNull(diagnostics, "diagnostics"); // WP-2: per-argument reporting
             Stamp = stamp; this.world = world; this.diagnostics = diagnostics;
             StateHash = world.StateHash;
-            if (StateHash == null) throw new ArgumentException("World must expose its initial canonical digest.", "world");
+            Check.Condition(StateHash == null, "world", "World must expose its initial canonical digest.");
         }
 
         private void Enter()
@@ -130,7 +130,7 @@ namespace CsmForge.Core
         public SubmitResult Submit(Guid authenticatedConnection, Intent intent)
         {
             Enter();
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             busy = true;
             try { return SubmitCore(authenticatedConnection, intent); }
             finally { busy = false; }
@@ -205,7 +205,7 @@ namespace CsmForge.Core
         {
             Enter();
             if (IsFenced) throw new InvalidOperationException("A fenced host cannot publish a world snapshot.");
-            if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer identity.", "transferId");
+            Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer identity.");
             busy = true;
             try
             {

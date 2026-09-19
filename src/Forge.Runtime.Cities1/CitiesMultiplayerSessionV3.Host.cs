@@ -12,6 +12,7 @@ namespace CsmForge.Runtime.Cities1
         private void StartHostOnSimulation(LoadIdentity identity, int port, string roomKey, string displayName)
         {
             if (!lifecycle.IsCurrent(identity)) { SetOffline("stale-host-start"); return; }
+            UnityEngine.Debug.Log("[CSM-Forge] host start entered; generation=" + identity.Generation + "; port=" + port + ".");
             try
             {
                 load = identity;
@@ -21,17 +22,27 @@ namespace CsmForge.Runtime.Cities1
                 IAuthorityDomainV2[] domains = CreateHostDomains(load);
                 authority = new AuthorityCoordinatorV2(new SessionStamp(load.WorldId, load.Epoch), domains);
                 joins = new JoinCoordinator(MonotonicMilliseconds);
+                long gridVerifyNow = MonotonicMilliseconds();
+                districtVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
+                zoneVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
+                netVerifyCadence = new VerificationCadence(gridVerifyNow, GridVerifyIntervalMilliseconds);
                 hostLocalBinding = Guid.NewGuid();
                 hostLocalMember = new MemberIdentity(Guid.NewGuid(), 1);
+                hostDisplayName = displayName;
                 if (!authority.RegisterConnection(hostLocalBinding, hostLocalMember, true, 1) || !authority.SetLive(hostLocalBinding, true))
                     throw new InvalidOperationException("Could not register Host local member.");
                 server = new LiteNetServerTransport();
                 if (!server.Start(port, roomKey)) throw new InvalidOperationException("Could not start LiteNet server.");
                 if (!lifecycle.TryTransition(load, CitiesRuntimeRole.HostLive))
                     throw new InvalidOperationException("Could not enter HostLive runtime role.");
+                RefreshHostRoster();
                 lock (gate) { mode = MultiplayerSessionMode.Hosting; detail = "hosting-development-transport:" + port; }
+                UnityEngine.Debug.Log("[CSM-Forge] host started; generation=" + identity.Generation + "; port=" + port + ".");
             }
-            catch (Exception error) { AbortStart("host-start:" + error.GetType().Name); }
+            catch (Exception error)
+            {
+                AbortStart("host-start:" + error.GetType().Name + ":" + error.Message);
+            }
         }
 
         private void DrainServerEvents()
@@ -128,6 +139,8 @@ namespace CsmForge.Runtime.Cities1
                 BootstrapMessagesV2.EncodeWelcome(new SessionWelcomeV2(authority.Stamp, peer.TransportId,
                     peer.Member, 1, authority.Revision, authority.CurrentRoot)));
             peer.SessionReady = true;
+            RefreshHostRoster();
+            BroadcastRoster();
             QueueSnapshotFor(peer);
         }
 
@@ -182,6 +195,7 @@ namespace CsmForge.Runtime.Cities1
         private void PumpSnapshotTransfers()
         {
             if (snapshotSave != null) return;
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
             {
                 if (peer.SnapshotCursor == null) continue;
@@ -192,12 +206,19 @@ namespace CsmForge.Runtime.Cities1
                     peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null;
                     continue;
                 }
-                SendServerFrame(peer, MessageKindV2.SnapshotChunk, SnapshotTransferMessagesV2.EncodeChunk(chunk));
+                if (!TrySendServerFrame(peer, MessageKindV2.SnapshotChunk, SnapshotTransferMessagesV2.EncodeChunk(chunk)))
+                {
+                    // WP-1.2: a dead download peer degrades to eviction, not a fenced room.
+                    if (dead == null) dead = new List<HostPeer>();
+                    dead.Add(peer);
+                    continue;
+                }
                 if (peer.SnapshotCursor.Complete)
                 {
                     peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null;
                 }
             }
+            EvictDeadHostPeers(dead);
         }
 
         private void HandleHostSessionFrame(HostPeer peer, byte[] bytes)
@@ -219,6 +240,17 @@ namespace CsmForge.Runtime.Cities1
                     break;
                 case MessageKindV2.GapRequest:
                     TrySendJournalOrResync(peer, ControlMessagesV2.DecodeGapRequest(frame.Payload).AfterRevision);
+                    break;
+                case MessageKindV2.ChatSubmit:
+                    if (!peer.Live) throw new InvalidOperationException("Non-live peer submitted chat.");
+                    ChatSubmitV2 chat = SocialMessagesV2.DecodeChatSubmit(frame.Payload);
+                    PublishChat(new ChatEventV2(peer.Member, peer.Hello.DisplayName, chat.Text));
+                    break;
+                case MessageKindV2.PlayerPresentation:
+                    if (!peer.Live) throw new InvalidOperationException("Non-live peer submitted presentation.");
+                    PlayerPresentationV2 presence = SocialMessagesV2.DecodePresentation(frame.Payload);
+                    PublishPresentation(new PlayerPresentationV2(peer.Member, peer.Hello.DisplayName, presence.ToolName,
+                        presence.WorldX, presence.WorldY, presence.WorldZ, presence.Visible));
                     break;
                 default: throw new InvalidOperationException("Client message is not valid in the current Host path.");
             }
@@ -274,6 +306,8 @@ namespace CsmForge.Runtime.Cities1
                 !authority.SetLive(peer.TransportId, true))
                 throw new InvalidOperationException("Client activation failed.");
             peer.Live = true;
+            RefreshHostRoster();
+            BroadcastRoster();
         }
 
         private void HandleRemoteIntent(HostPeer peer, PlayerIntentV2 intent)
@@ -344,6 +378,37 @@ namespace CsmForge.Runtime.Cities1
             if (peer.SnapshotCursor != null) { peer.SnapshotCursor.Dispose(); peer.SnapshotCursor = null; }
             if (peer.Join.IsValid) joins.Cancel(peer.Join);
             authority.Disconnect(peer.TransportId);
+            lock (gate) if (peer.Member.IsValid) presentationSnapshots.Remove(peer.Member.MemberId);
+            RefreshHostRoster();
+            BroadcastRoster();
+        }
+
+        private void RefreshHostRoster()
+        {
+            List<MultiplayerPlayerSnapshot> values = new List<MultiplayerPlayerSnapshot>();
+            if (hostLocalMember.IsValid) values.Add(new MultiplayerPlayerSnapshot
+            { Member = hostLocalMember, DisplayName = hostDisplayName, IsHost = true, IsLive = true, IsLocal = true });
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.Member.IsValid && peer.Hello != null) values.Add(new MultiplayerPlayerSnapshot
+                { Member = peer.Member, DisplayName = peer.Hello.DisplayName, IsHost = false, IsLive = peer.Live, IsLocal = false });
+            lock (gate) playerSnapshots = values.ToArray();
+        }
+
+        private void BroadcastRoster()
+        {
+            List<SessionPlayerV2> values = new List<SessionPlayerV2>();
+            if (hostLocalMember.IsValid) values.Add(new SessionPlayerV2(hostLocalMember, hostDisplayName,
+                SessionPlayerRoleV2.Host, SessionPlayerPhaseV2.Live));
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.Member.IsValid && peer.Hello != null) values.Add(new SessionPlayerV2(peer.Member, peer.Hello.DisplayName,
+                    SessionPlayerRoleV2.Client, peer.Live ? SessionPlayerPhaseV2.Live : SessionPlayerPhaseV2.Joining));
+            if (values.Count == 0) return;
+            byte[] payload = SocialMessagesV2.EncodeRoster(new RosterSnapshotV2(values.ToArray()));
+            // Tolerant on purpose (WP-1.2): BroadcastRoster also runs inside RemoveHostPeer, so a
+            // failed roster send must not evict recursively — the dead peer is dropped by its own
+            // failed-send path or transport disconnect event.
+            foreach (HostPeer peer in hostPeers.Values)
+                if (peer.SessionReady) TrySendServerFrame(peer, MessageKindV2.RosterSnapshot, payload);
         }
 
         private void ExpireHostJoins()

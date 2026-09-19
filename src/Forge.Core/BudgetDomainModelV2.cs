@@ -33,7 +33,7 @@ namespace CsmForge.Core
         public int Budget { get; private set; }
         public BudgetStateV2(BudgetKeyV2 key, int budget)
         {
-            if (budget < 0 || budget > 255) throw new ArgumentOutOfRangeException("budget");
+            Check.OutOfRange(budget < 0 || budget > 255, "budget");
             Key = key; Budget = budget;
         }
     }
@@ -43,7 +43,7 @@ namespace CsmForge.Core
         public BudgetStateV2 Requested { get; private set; }
         public BudgetIntentV2(BudgetStateV2 requested)
         {
-            if (requested == null) throw new ArgumentNullException("requested");
+            Check.NotNull(requested, "requested");
             Requested = requested;
         }
     }
@@ -56,7 +56,7 @@ namespace CsmForge.Core
         public Hash256 Root { get { return Hash256.Compute(EncodeCanonical()); } }
         public void Upsert(BudgetStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             values[value.Key] = value;
         }
         public bool TryGet(BudgetKeyV2 key, out BudgetStateV2 value) { return values.TryGetValue(key, out value); }
@@ -81,7 +81,7 @@ namespace CsmForge.Core
         private const int Bytes = 10;
         public static byte[] Encode(BudgetStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream); writer.Write(value.Key.Service); writer.Write(value.Key.SubService);

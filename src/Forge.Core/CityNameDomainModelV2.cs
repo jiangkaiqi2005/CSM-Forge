@@ -12,7 +12,7 @@ namespace CsmForge.Core
         public CityNameStateV2(string name)
         {
             if (name == null) name = string.Empty;
-            if (Encoding.UTF8.GetByteCount(name) > 512) throw new ArgumentException("City name exceeds Forge wire bounds.", "name");
+            Check.Condition(Encoding.UTF8.GetByteCount(name) > 512, "name", "City name exceeds Forge wire bounds.");
             Name = name;
         }
     }
@@ -23,7 +23,7 @@ namespace CsmForge.Core
 
         public static byte[] Encode(CityNameStateV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] text = Encoding.UTF8.GetBytes(value.Name);
             using (MemoryStream stream = new MemoryStream())
             {

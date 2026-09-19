@@ -67,7 +67,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static EconomyControlStateV2 Install(LoadIdentity load, EconomyControlStateV2 state)
         {
-            if (state == null) throw new ArgumentNullException("state");
+            Check.NotNull(state, "state");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Economy control apply belongs to a stale load.");
             EconomyManager manager = RequireManager();
             byte[] bytes = state.Snapshot;
@@ -104,7 +104,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static EconomyControlStateV2 Execute(LoadIdentity load, EconomyControlIntentV2 intent)
         {
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Economy control intent belongs to a stale load.");
             EconomyManager manager = RequireManager();
             EconomyManager.Loan[] loans = (EconomyManager.Loan[])LoansField.GetValue(manager);
@@ -265,7 +265,7 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyControlAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committedRoot = EconomyControlGameAccess.Capture().Root;
         }
@@ -288,7 +288,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal void MarkObservedCommitted(Hash256 root)
         {
-            if (root == null) throw new ArgumentNullException("root");
+            Check.NotNull(root, "root");
             committedRoot = root;
         }
     }
@@ -302,14 +302,14 @@ namespace CsmForge.Runtime.Cities1
 
         public EconomyControlReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load;
             committed = EconomyControlGameAccess.Capture();
         }
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             EconomyControlStateV2 requested = EconomyControlCodecV2.DecodeState(absoluteDelta);
             EconomyControlStateV2 actual = EconomyControlGameAccess.Install(load, requested);
             committed = actual;

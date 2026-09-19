@@ -159,6 +159,23 @@ namespace CsmForge.Runtime.Cities1
             return mode == MultiplayerSessionMode.Hosting && hostDistricts != null ? hostDistricts.StateRoot : null;
         }
 
+        internal void PublishObservedHostDistrictSourceDirtyShards()
+        {
+            if (mode != MultiplayerSessionMode.Hosting || hostDistricts == null || authority == null || snapshotSave != null) return;
+            Hash256 before = hostDistricts.StateRoot;
+            DistrictAuthorityEnvelopeV2 envelope = hostDistricts.ObserveHostSourceDirty();
+            if (envelope == null) return;
+            Hash256 after = hostDistricts.StateRoot;
+            AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, DistrictAuthorityDomain.Id,
+                before, after, DistrictPolicyEnvelopeCodecV2.EncodeEnvelope(envelope));
+            if (batch == null || authority.IsFenced)
+            {
+                FenceSession("observed-district-shard-change-could-not-commit");
+                return;
+            }
+            BroadcastBatch(batch);
+        }
+
         internal void PublishObservedHostDistrict(Hash256 beforeRoot)
         {
             if (beforeRoot == null || mode != MultiplayerSessionMode.Hosting || hostDistricts == null ||

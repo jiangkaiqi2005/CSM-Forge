@@ -128,7 +128,7 @@ namespace CsmForge.Protocol
     {
         public static byte[] EncodeSnapshotOffer(SnapshotOfferV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             using (MemoryStream stream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(stream);
@@ -161,7 +161,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeWorldInstalled(WorldInstalledV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return EncodeJoinRevisionRoot(value.JoinId, value.JoinGeneration, value.Revision, value.Root);
         }
 
@@ -174,7 +174,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeReplayBarrier(ReplayBarrierV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return EncodeJoinMarker(value.JoinId, value.JoinGeneration, value.BarrierId, value.Revision, value.Root, 0);
         }
 
@@ -188,7 +188,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeBarrierAck(BarrierAckV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return EncodeJoinMarker(value.JoinId, value.JoinGeneration, value.BarrierId, value.Revision, value.Root, 0);
         }
 
@@ -202,7 +202,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeActivationGrant(ActivationGrantV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             return EncodeJoinMarker(value.JoinId, value.JoinGeneration, value.GrantId, value.Revision,
                 value.Root, value.PermissionVersion);
         }
@@ -216,7 +216,7 @@ namespace CsmForge.Protocol
 
         public static byte[] EncodeActivated(ActivatedV2 value)
         {
-            if (value == null) throw new ArgumentNullException("value");
+            Check.NotNull(value, "value");
             byte[] result = new byte[44];
             Buffer.BlockCopy(value.JoinId.ToByteArray(), 0, result, 0, 16);
             Buffer.BlockCopy(BitConverter.GetBytes(value.JoinGeneration), 0, result, 16, 4);

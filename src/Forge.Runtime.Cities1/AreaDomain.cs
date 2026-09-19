@@ -18,7 +18,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static AreaStateV2 Unlock(LoadIdentity load, AreaUnlockIntentV2 intent)
         {
-            if (intent == null) throw new ArgumentNullException("intent");
+            Check.NotNull(intent, "intent");
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Area unlock belongs to a stale load.");
             GameAreaManager manager = GameAreaManager.instance;
             if (manager == null) throw new InvalidOperationException("GameAreaManager is unavailable.");
@@ -33,7 +33,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static AreaStateV2 Install(LoadIdentity load, AreaStateV2 target)
         {
-            if (target == null) throw new ArgumentNullException("target");
+            Check.NotNull(target, "target");
             AreaStateV2 current = Capture();
             if ((current.UnlockedMask & ~target.UnlockedMask) != 0)
                 throw new InvalidOperationException("Replica has an extra unlocked area and requires a snapshot rebaseline.");
@@ -59,7 +59,7 @@ namespace CsmForge.Runtime.Cities1
 
         public AreaAuthorityDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committedRoot = StateRoot;
         }
 
@@ -90,13 +90,13 @@ namespace CsmForge.Runtime.Cities1
 
         public AreaReplicaDomain(LoadIdentity load)
         {
-            if (!load.IsValid) throw new ArgumentException("Invalid load identity.", "load");
+            Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             this.load = load; committed = AreaGameAccess.Capture();
         }
 
         public void ApplyAbsolute(byte[] absoluteDelta, Hash256 expectedAfterRoot)
         {
-            if (expectedAfterRoot == null) throw new ArgumentNullException("expectedAfterRoot");
+            Check.NotNull(expectedAfterRoot, "expectedAfterRoot");
             AreaStateV2 requested = AreaDomainCodecV2.DecodeState(absoluteDelta);
             committed = AreaGameAccess.Install(load, requested);
             if (!StateRoot.Equals(expectedAfterRoot)) throw new InvalidOperationException("Area replica root mismatch.");

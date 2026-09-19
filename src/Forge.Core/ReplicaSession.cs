@@ -28,8 +28,8 @@ namespace CsmForge.Core
         public ReplicaSession(SessionStamp stamp, Guid hostConnection, IReplicaWorld world, DiagnosticRing diagnostics)
         {
             Check.Stamp(stamp);
-            if (hostConnection == Guid.Empty) throw new ArgumentException("Missing authenticated host.", "hostConnection");
-            if (world == null || diagnostics == null) throw new ArgumentNullException("world");
+            Check.Condition(hostConnection == Guid.Empty, "hostConnection", "Missing authenticated host.");
+            Check.NotNull(world, "world"); Check.NotNull(diagnostics, "diagnostics"); // WP-2: per-argument reporting
             Stamp = stamp; this.hostConnection = hostConnection; this.world = world; this.diagnostics = diagnostics;
             Phase = ReplicaPhase.NeedsSnapshot;
         }
@@ -81,7 +81,7 @@ namespace CsmForge.Core
         public ReplicaDecision Receive(Guid authenticatedSource, Commit commit)
         {
             Enter();
-            if (commit == null) throw new ArgumentNullException("commit");
+            Check.NotNull(commit, "commit");
             if (authenticatedSource != hostConnection) return ReplicaDecision.WrongSource;
             if (!commit.Stamp.Equals(Stamp)) return ReplicaDecision.WrongSession;
             if (Phase == ReplicaPhase.Disconnected) return ReplicaDecision.Disconnected;

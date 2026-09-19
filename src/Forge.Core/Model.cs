@@ -32,11 +32,16 @@ namespace CsmForge.Core
         public override int GetHashCode() { return WorldId.GetHashCode() ^ Epoch.GetHashCode(); }
     }
 
-    internal static class Check
+    /// <summary>
+    /// Shared guard helpers (D2): every call preserves the exact exception type the inline check
+    /// used to throw, so converting a call site changes no observable behavior. Public because
+    /// Protocol and Runtime constructor validation converts to the same helpers.
+    /// </summary>
+    public static class Check
     {
         public static byte[] Copy(byte[] bytes, int maximum, bool allowEmpty)
         {
-            if (bytes == null) throw new ArgumentNullException("bytes");
+            Check.NotNull(bytes, "bytes");
             if (bytes.Length > maximum || (!allowEmpty && bytes.Length == 0))
                 throw new ArgumentException("Payload length is outside the permitted bounds.", "bytes");
             return (byte[])bytes.Clone();
@@ -44,7 +49,40 @@ namespace CsmForge.Core
 
         public static void Stamp(SessionStamp stamp)
         {
-            if (!stamp.IsValid) throw new ArgumentException("Uninitialized session stamp.", "stamp");
+            Check.Condition(!stamp.IsValid, "stamp", "Uninitialized session stamp.");
+        }
+
+        public static void NotNull(object value, string name)
+        {
+            if (value == null) throw new ArgumentNullException(name);
+        }
+
+        /// <summary>WP-2: pass the VIOLATION condition - the guard throws when it is true.</summary>
+        public static void Condition(bool violation, string name, string message)
+        {
+            if (violation) throw new ArgumentException(message, name);
+        }
+
+        public static void InRange(long value, long minimum, long maximum, string name)
+        {
+            if (value < minimum || value > maximum) throw new ArgumentOutOfRangeException(name);
+        }
+
+        /// <summary>WP-2: pass the VIOLATION condition - throws ArgumentOutOfRangeException(name).</summary>
+        public static void OutOfRange(bool violation, string name)
+        {
+            if (violation) throw new ArgumentOutOfRangeException(name);
+        }
+
+        public static void CanonicalId(string value, int maximumLength, string name, string message)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length > maximumLength) throw new ArgumentException(message, name);
+            for (int i = 0; i < value.Length; i++)
+            {
+                char ch = value[i];
+                if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '.' || ch == ':' || ch == '-' || ch == '_'))
+                    throw new ArgumentException(message, name);
+            }
         }
     }
 
@@ -60,7 +98,7 @@ namespace CsmForge.Core
         public Intent(SessionStamp stamp, ulong requestId, ulong expectedRevision, byte[] bytes)
         {
             Check.Stamp(stamp);
-            if (requestId == 0) throw new ArgumentOutOfRangeException("requestId");
+            Check.OutOfRange(requestId == 0, "requestId");
             Stamp = stamp;
             RequestId = requestId;
             ExpectedRevision = expectedRevision;
@@ -97,7 +135,7 @@ namespace CsmForge.Core
             Check.Stamp(stamp);
             if (revision == 0 || requestId == 0 || origin == Guid.Empty)
                 throw new ArgumentException("Commit identity is incomplete.");
-            if (beforeHash == null || afterHash == null) throw new ArgumentNullException("beforeHash");
+            Check.NotNull(beforeHash, "beforeHash"); Check.NotNull(afterHash, "afterHash"); // WP-2: per-argument reporting
             Stamp = stamp;
             Revision = revision;
             Origin = origin;
@@ -133,7 +171,7 @@ namespace CsmForge.Core
 
         public WorldImage(byte[] data, Hash256 contentHash, Hash256 stateHash)
         {
-            if (contentHash == null || stateHash == null) throw new ArgumentNullException("contentHash");
+            Check.NotNull(contentHash, "contentHash"); Check.NotNull(stateHash, "stateHash"); // WP-2: per-argument reporting
             bytes = Check.Copy(data, Limits.SnapshotBytes, false);
             ContentHash = contentHash;
             StateHash = stateHash;
@@ -152,8 +190,8 @@ namespace CsmForge.Core
         public WorldSnapshot(SessionStamp stamp, ulong revision, Guid transferId, WorldImage image)
         {
             Check.Stamp(stamp);
-            if (transferId == Guid.Empty) throw new ArgumentException("Missing transfer identity.", "transferId");
-            if (image == null) throw new ArgumentNullException("image");
+            Check.Condition(transferId == Guid.Empty, "transferId", "Missing transfer identity.");
+            Check.NotNull(image, "image");
             Stamp = stamp;
             Revision = revision;
             TransferId = transferId;

@@ -23,6 +23,12 @@ namespace CsmForge.Runtime.Cities1
             return 0u;
         }
 
+        internal EntityMapEntryV2[] SnapshotBuildingMappings(bool hostSide)
+        {
+            BuildingDomainBase domain = hostSide ? (BuildingDomainBase)hostBuildings : clientBuildings;
+            return domain == null ? new EntityMapEntryV2[0] : domain.SnapshotMappings();
+        }
+
         internal bool TryResolveStableNameIdentity(StableNameTargetKindV2 kind, uint nativeId,
             bool hostSide, out EntityIdentityV2 identity)
         {
@@ -64,6 +70,10 @@ namespace CsmForge.Runtime.Cities1
         {
             nativeId = 0;
             if (!identity.IsValid) return false;
+            if (kind == StableNameTargetKindV2.Building)
+                return hostSide
+                    ? hostBuildings != null && hostBuildings.TryResolveNative(identity, out nativeId)
+                    : clientBuildings != null && clientBuildings.TryResolveNative(identity, out nativeId);
             uint upper = StableNameNativeUpperBound(kind);
             for (uint candidate = 1; candidate < upper; candidate++)
             {

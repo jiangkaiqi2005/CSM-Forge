@@ -1,3 +1,4 @@
+using CsmForge.Core;
 using System;
 
 namespace CsmForge.Runtime.Cities1
@@ -9,7 +10,7 @@ namespace CsmForge.Runtime.Cities1
 
         internal RuntimeScope(Action release)
         {
-            if (release == null) throw new ArgumentNullException("release");
+            Check.NotNull(release, "release");
             this.release = release;
         }
 
@@ -77,7 +78,7 @@ namespace CsmForge.Runtime.Cities1
 
         public static void EndOfSimulationTick(CitiesLifecycleCoordinator lifecycle, RuntimeEventLog events)
         {
-            if (lifecycle == null || events == null) throw new ArgumentNullException("lifecycle");
+            Check.NotNull(lifecycle, "lifecycle"); Check.NotNull(events, "events"); // WP-2: per-argument reporting
             if (applyDepth == 0 && captureDepth == 0) return;
             uint generation = activeGeneration;
             applyDepth = 0;

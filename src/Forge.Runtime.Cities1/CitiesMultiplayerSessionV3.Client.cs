@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using CsmForge.Checkpoints;
@@ -12,7 +13,12 @@ namespace CsmForge.Runtime.Cities1
     {
         private void StartClientOnSimulation(LoadIdentity identity, IPEndPoint endpoint, string roomKey, string displayName)
         {
-            if (!lifecycle.IsCurrent(identity)) { SetOffline("stale-client-start"); return; }
+            StartClientBootstrap(identity, endpoint, roomKey, displayName);
+        }
+
+        private void StartClientBootstrap(LoadIdentity identity, IPEndPoint endpoint, string roomKey, string displayName)
+        {
+            if (identity.IsValid && !lifecycle.IsCurrent(identity)) { SetOffline("stale-client-start"); return; }
             try
             {
                 load = identity;
@@ -21,7 +27,7 @@ namespace CsmForge.Runtime.Cities1
                 clientManifestPages = BootstrapMessagesV2.CreateManifestPages(localManifest);
                 client = new LiteNetClientTransport();
                 if (!client.Start(endpoint, roomKey)) throw new InvalidOperationException("Could not start LiteNet client.");
-                if (!lifecycle.TryTransition(load, CitiesRuntimeRole.ClientLoading))
+                if (identity.IsValid && !lifecycle.TryTransition(load, CitiesRuntimeRole.ClientLoading))
                     throw new InvalidOperationException("Could not enter ClientLoading runtime role.");
                 lock (gate) { mode = MultiplayerSessionMode.ConnectingClient; detail = "connecting-development-transport"; }
             }
@@ -98,6 +104,9 @@ namespace CsmForge.Runtime.Cities1
                     HandleTransportIntentReceipt(receipt);
                     lock (gate) detail = "intent-" + receipt.OperationCounter + ":" + receipt.Decision;
                     break;
+                case MessageKindV2.RosterSnapshot: HandleRoster(SocialMessagesV2.DecodeRoster(frame.Payload)); break;
+                case MessageKindV2.ChatEvent: RememberChat(SocialMessagesV2.DecodeChatEvent(frame.Payload)); break;
+                case MessageKindV2.PlayerPresentation: RememberPresentation(SocialMessagesV2.DecodePresentation(frame.Payload)); break;
                 default: throw new InvalidOperationException("Host message is not valid in the current Client path.");
             }
         }
@@ -116,7 +125,11 @@ namespace CsmForge.Runtime.Cities1
             string path = Path.Combine(Path.GetTempPath(), "csm-forge-snapshot-" + offer.TransferId.ToString("N") + ".crp");
             clientOffer = offer;
             clientSnapshot = new SnapshotReceiveFile(offer, path);
-            lock (gate) { mode = MultiplayerSessionMode.ClientCatchingUp; detail = "downloading-snapshot"; }
+            lock (gate)
+            {
+                mode = MultiplayerSessionMode.ClientCatchingUp; detail = "downloading-snapshot";
+                snapshotBytesReceived = 0; snapshotBytesTotal = offer.ContentBytes;
+            }
         }
 
         private void HandleSnapshotChunk(SnapshotChunkV2 chunk)
@@ -124,12 +137,13 @@ namespace CsmForge.Runtime.Cities1
             if (clientSnapshot == null || clientOffer == null)
                 throw new InvalidOperationException("Snapshot chunk arrived without an active offer.");
             SnapshotProgressV2 progress = clientSnapshot.Accept(chunk);
+            lock (gate) snapshotBytesReceived = progress.NextOffset;
             SendClientFrame(MessageKindV2.SnapshotProgress, SnapshotTransferMessagesV2.EncodeProgress(progress));
             if (!clientSnapshot.Complete) return;
 
             byte[] world = clientSnapshot.ReadAllVerifiedBytes();
             lock (gate) { preserveAcrossLevelLoad = true; detail = "loading-host-snapshot"; }
-            lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
+            if (load.IsValid) lifecycle.TryTransition(load, CitiesRuntimeRole.ClientRecovering);
             RuntimeServices.WorldLoader.Start(world, CompleteSnapshotLoad, delegate(Exception error)
             {
                 lock (gate) preserveAcrossLevelLoad = false;
@@ -137,6 +151,29 @@ namespace CsmForge.Runtime.Cities1
             });
             clientSnapshot.Dispose();
             clientSnapshot = null;
+        }
+
+        private void HandleRoster(RosterSnapshotV2 roster)
+        {
+            SessionPlayerV2[] source = roster.Players;
+            MultiplayerPlayerSnapshot[] values = new MultiplayerPlayerSnapshot[source.Length];
+            for (int i = 0; i < source.Length; i++) values[i] = new MultiplayerPlayerSnapshot
+            {
+                Member = source[i].Member,
+                DisplayName = source[i].DisplayName,
+                IsHost = source[i].Role == SessionPlayerRoleV2.Host,
+                IsLive = source[i].Phase == SessionPlayerPhaseV2.Live,
+                IsLocal = source[i].Member.Equals(clientMember)
+            };
+            HashSet<Guid> active = new HashSet<Guid>();
+            for (int i = 0; i < source.Length; i++) active.Add(source[i].Member.MemberId);
+            lock (gate)
+            {
+                playerSnapshots = values;
+                List<Guid> stale = new List<Guid>();
+                foreach (Guid member in presentationSnapshots.Keys) if (!active.Contains(member)) stale.Add(member);
+                for (int i = 0; i < stale.Count; i++) presentationSnapshots.Remove(stale[i]);
+            }
         }
 
         private void CompleteSnapshotLoad(LoadIdentity identity)

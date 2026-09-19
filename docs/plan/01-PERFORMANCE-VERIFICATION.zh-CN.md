@@ -59,19 +59,30 @@
   E3/E4（注意：`[CSM-Forge][PERF]` 计时器存在于安装版构建但不在本分支源码中，
   属构建溯源断链 S 项，需先回移才能出对比数据）。
 
-### WP-1.2 P1 分级响应（"卡死感"的另一半）
+### WP-1.2 P1 分级响应（"卡死感"的另一半）—— 已实现，待真机验收
 
 - `SendServerFrame`（`CitiesMultiplayerSessionV3.cs:506-513`）对 `server.TrySend` 失败抛异常；
   广播路径 `BroadcastBatch`（Host.cs:524-529）、`PublishChat`（V3.cs:399-404）、
   `PublishPresentation`（V3.cs:380-386）、`BroadcastRoster`（Host.cs:385-397）遍历全体 peer，
   任意一个刚断线的 peer 都会抛异常 → `FenceSession` → `WorldFenced` → 全房解散。
-- **改动**：发送失败 = 记录诊断 + 移除该 peer，不隔离世界；移除路径自身的
-  `BroadcastRoster` 必须容忍发送失败（循环内 try，不重入异常处理器）。
+- **已实现**：
+  - 新增 `TrySendServerFrame`（非抛出变体）+ `EvictDeadHostPeers`；
+    `BroadcastBatch`/`PublishChat`/`PublishPresentation`/`PumpSnapshotTransfers` 改为
+    "收集失败 peer → 循环结束后逐个 `RemoveHostPeer`"（避免字典遍历中变更）；
+  - `BroadcastRoster` 容错但**不驱逐**——它会在 `RemoveHostPeer` 内部运行，递归驱逐
+    会造成重入，死 peer 由自己的失败路径或传输断连事件回收；
+  - 单 peer 的 bootstrap/回执发送保持抛出语义：它们在 `DrainServerEvents` 的
+    per-peer try 内，异常本就降级为"断开该 peer"。
 - UI 线程直接调用 `StopImmediately`（`ForgeMultiplayerUi.cs:408/710/830`、
   `ForgeMod.cs` OnLevelUnloading 路径）与模拟线程竞态：改走
   `RuntimeServices.Scheduler.QueueSimulation`（`RequestStop` 已示范该纪律）。
-- **验收**：新增确定性故障回归测试（"向已断开 peer 广播不触发围栏"）；
-  手动场景：客户端 kill -9 后房主继续运行。
+- **已实现**：三处 UI 调用点改为 `RequestStop()`（失败时回退直呼）；主菜单场景
+  （无城市身份）由 `RequestStop` 内部直呼——与旧行为一致且同线程安全。
+  `ForgeHostGamePanel.Update` 补充"mode 变为 Offline 时重跑预检"，
+  适配异步停止后面板已打开的时序。`ForgeMod` 的卸载钩子保持直呼不变——
+  卸载期模拟 tick 停止，队列化可能导致停止动作永不执行；其线程语义另立工作包分析。
+- **验收**：net35 构建 0 警告 0 错误、190/190 测试（会话层无游戏无关测试框架，
+  新增确定性回归需真机场景：客户端 kill -9 后房主继续运行，聊天/批次不炸房）。
 
 ### WP-1.3 区划网格止血（独立小步）
 

@@ -402,8 +402,15 @@ namespace CsmForge.Runtime.Cities1
         {
             RememberPresentation(value);
             byte[] payload = SocialMessagesV2.EncodePresentation(value);
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
-                if (peer.Live) SendServerFrame(peer, MessageKindV2.PlayerPresentation, payload);
+            {
+                if (!peer.Live) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.PlayerPresentation, payload)) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
         }
 
         private void RememberPresentation(PlayerPresentationV2 value)
@@ -420,8 +427,16 @@ namespace CsmForge.Runtime.Cities1
         private void PublishChat(ChatEventV2 value)
         {
             RememberChat(value);
+            byte[] payload = SocialMessagesV2.EncodeChatEvent(value);
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
-                if (peer.SessionReady) SendServerFrame(peer, MessageKindV2.ChatEvent, SocialMessagesV2.EncodeChatEvent(value));
+            {
+                if (!peer.SessionReady) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.ChatEvent, payload)) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
         }
 
         private void RememberChat(ChatEventV2 value)
@@ -533,6 +548,30 @@ namespace CsmForge.Runtime.Cities1
                 throw new InvalidOperationException("Could not send session frame to client.");
         }
 
+        /// <summary>
+        /// Non-throwing variant for broadcast paths (WP-1.2): a peer whose transport connection is
+        /// gone is dead, not a session fault. The caller evicts peers reported as failed; the
+        /// consumed lane sequence is irrelevant because that peer is removed.
+        /// </summary>
+        private bool TrySendServerFrame(HostPeer peer, MessageKindV2 kind, byte[] payload)
+        {
+            if (server == null) return false;
+            SessionLane lane = SessionFrameV2.ExpectedLane(kind);
+            SessionFrameV2 frame = new SessionFrameV2(lane, kind, authority.Stamp, peer.TransportId,
+                peer.Sequences.Next(lane), Guid.Empty, 1, payload);
+            return server.TrySend(peer.TransportId, SessionFrameCodecV2.Encode(frame));
+        }
+
+        private void EvictDeadHostPeers(List<HostPeer> dead)
+        {
+            if (dead == null) return;
+            for (int i = 0; i < dead.Count; i++)
+            {
+                events.Record(RuntimeEventCode.Error, load.Generation, "peer-send-failed:" + dead[i].TransportId);
+                RemoveHostPeer(dead[i]);
+            }
+        }
+
         private void SendClientFrame(MessageKindV2 kind, byte[] payload)
         {
             SessionLane lane = SessionFrameV2.ExpectedLane(kind);
@@ -544,9 +583,15 @@ namespace CsmForge.Runtime.Cities1
 
         private void BroadcastBatch(AuthorityBatch batch)
         {
+            List<HostPeer> dead = null;
             foreach (HostPeer peer in hostPeers.Values)
-                if (peer.Live || peer.StateSubscribed)
-                    SendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch));
+            {
+                if (!peer.Live && !peer.StateSubscribed) continue;
+                if (TrySendServerFrame(peer, MessageKindV2.AuthorityBatch, SessionMessagesV2.EncodeBatch(batch))) continue;
+                if (dead == null) dead = new List<HostPeer>();
+                dead.Add(peer);
+            }
+            EvictDeadHostPeers(dead);
             // Net/zone/district game writes cascade into each other's grids (a new segment creates
             // zoned blocks; a brush moves district cells), so re-verify those grids next poll
             // instead of waiting out the cadence window (WP-1.1).

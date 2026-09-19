@@ -405,7 +405,11 @@ namespace CsmForge.Runtime.Cities1
             hostHelp.height = 62; hostHelp.autoHeight = false;
             Button("返回主菜单", 370, delegate
             {
-                RuntimeServices.Multiplayer.StopImmediately(); ForgeMultiplayerUi.Dismiss(this);
+                // WP-1.2: never tear the session down from the UI thread; queue to the simulation
+                // thread when a city identity exists (RequestStop falls back to a direct stop at
+                // the main menu, where UI and the menu pump share one thread).
+                if (!RuntimeServices.Multiplayer.RequestStop()) RuntimeServices.Multiplayer.StopImmediately();
+                ForgeMultiplayerUi.Dismiss(this);
             });
             base.Start();
             if (!string.IsNullOrEmpty(deferredSteamInvite)) ApplySteamInvite(deferredSteamInvite);
@@ -463,6 +467,7 @@ namespace CsmForge.Runtime.Cities1
         private ForgeRoomPreflightReport preflight;
         private string feedback;
         private uint observedPatchStatusRevision;
+        private MultiplayerSessionMode observedMode;
 
         public override void Start()
         {
@@ -487,6 +492,13 @@ namespace CsmForge.Runtime.Cities1
                 uint patchStatusRevision = RuntimeServices.Patches.StatusRevision;
                 if (patchStatusRevision != observedPatchStatusRevision) RefreshPreflight();
                 MultiplayerStatusSnapshot value = RuntimeServices.Multiplayer.Status;
+                // WP-1.2: teardown is queued now, so the Offline transition can land after this
+                // panel opened; re-run the preflight when it does.
+                if (value.Mode != observedMode)
+                {
+                    observedMode = value.Mode;
+                    if (value.Mode == MultiplayerSessionMode.Offline) RefreshPreflight();
+                }
                 createButton.isEnabled = value.Mode == MultiplayerSessionMode.Offline &&
                     preflight != null && preflight.CanHost;
                 if (value.Mode != MultiplayerSessionMode.Offline || string.IsNullOrEmpty(feedback))
@@ -707,7 +719,10 @@ namespace CsmForge.Runtime.Cities1
             cancel.pressedBgSprite = "ButtonMenuPressed"; cancel.relativePosition = new Vector3(width / 2f - 170, height / 2f + 35);
             cancel.eventClick += delegate
             {
-                RuntimeServices.Multiplayer.StopImmediately(); ForgeMultiplayerUi.Dismiss(this);
+                // WP-1.2: serialized with the simulation thread so a cancel during snapshot
+                // download cannot dispose the receive file mid-chunk.
+                if (!RuntimeServices.Multiplayer.RequestStop()) RuntimeServices.Multiplayer.StopImmediately();
+                ForgeMultiplayerUi.Dismiss(this);
             };
             base.Start();
         }
@@ -827,7 +842,8 @@ namespace CsmForge.Runtime.Cities1
         {
             if (RuntimeServices.Lifecycle.Role == CitiesRuntimeRole.WorldFenced) return;
             bool hasWorld = RuntimeServices.Lifecycle.Current.IsValid;
-            RuntimeServices.Multiplayer.StopImmediately();
+            // WP-1.2: teardown belongs on the simulation thread when a city identity exists.
+            if (!RuntimeServices.Multiplayer.RequestStop()) RuntimeServices.Multiplayer.StopImmediately();
             if (hasWorld) ForgeMultiplayerUi.ReplacePanel<ForgeHostGamePanel>();
             else ForgeMultiplayerUi.OpenMainJoinWithPendingInvite();
         }

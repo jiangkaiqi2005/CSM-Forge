@@ -67,12 +67,12 @@ namespace CsmForge.Runtime.Cities1
 
     internal static class GameAnarchyBridge
     {
-        private const string AssemblyName = ModCompatibilityCatalog.GameAnarchy.AssemblyName;
-        private static readonly Version SupportedVersion = new Version(ModCompatibilityCatalog.GameAnarchy.SupportedVersion);
-        private static readonly string SettingsTypeName = ModCompatibilityCatalog.GameAnarchy.SettingsTypeName;
-        private static readonly string[] LocalOnly = ModCompatibilityCatalog.GameAnarchy.LocalOnlySettings;
+        private static readonly string AssemblyName = ModCompatibilityCatalog.Default.GameAnarchy.AssemblyName;
+        private static readonly Version SupportedVersion = new Version(ModCompatibilityCatalog.Default.GameAnarchy.SupportedVersion);
+        private static readonly string SettingsTypeName = ModCompatibilityCatalog.Default.GameAnarchy.SettingsTypeName;
+        private static readonly string[] LocalOnly = ModCompatibilityCatalog.Default.GameAnarchy.LocalOnlySettings;
         private static readonly string[] MoneyMutationMethods = { "OnPreSimulationFrame", "ChargeInterest", "AutoAddMoney", "SetStartMoney", "AddMoneyManually", "SubstrateMoneyManually", "ModifyMoney", "AddLoanAmount" };
-        private static readonly string[] UnsupportedBooleanSettings = ModCompatibilityCatalog.GameAnarchy.UnsupportedBooleanSettings;
+        private static readonly string[] UnsupportedBooleanSettings = ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings;
         [ThreadStatic] private static bool applying;
         private static bool patched;
         private static Assembly compatibleAssembly;
@@ -85,7 +85,7 @@ namespace CsmForge.Runtime.Cities1
         {
             type = ResolveType(SettingsTypeName); instance = null;
             if (type == null) return false;
-            string[] holders = ModCompatibilityCatalog.GameAnarchy.HolderTypeNames;
+            string[] holders = ModCompatibilityCatalog.Default.GameAnarchy.HolderTypeNames;
             for (int i = 0; i < holders.Length; i++)
             {
                 Type holder = type.Assembly.GetType(holders[i], false);
@@ -131,7 +131,7 @@ namespace CsmForge.Runtime.Cities1
                     violations.Add(UnsupportedBooleanSettings[i]);
             if (RequiredValue(properties, values, "CurrentUnlockMode") != 0L || RequiredValue(properties, values, "CurrentMilestoneLevel") != 0L)
                 violations.Add("CurrentUnlockMode/CurrentMilestoneLevel (milestone/unlock overrides)");
-            if (RequiredValue(properties, values, "OilDepletionRate") != ModCompatibilityCatalog.GameAnarchy.FixedOilDepletionRate || RequiredValue(properties, values, "OreDepletionRate") != ModCompatibilityCatalog.GameAnarchy.FixedOreDepletionRate)
+            if (RequiredValue(properties, values, "OilDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate || RequiredValue(properties, values, "OreDepletionRate") != ModCompatibilityCatalog.Default.GameAnarchy.FixedOreDepletionRate)
                 violations.Add("OilDepletionRate/OreDepletionRate (both rates must be 100)");
             if (RequiredValue(properties, values, "BuildingSpreadFireProbability") != 0L ||
                 RequiredValue(properties, values, "TreeSpreadFireProbability") != 0L)
@@ -265,8 +265,8 @@ namespace CsmForge.Runtime.Cities1
                 Type milestones = assemblies[i].GetType("GameAnarchy.Extension.MilestonesExtension", false);
                 Type fire = assemblies[i].GetType("GameAnarchy.Managers.FireControlManager", false);
                 // The audited-type names above are pinned in ModCompatibilityCatalog (D-gate).
-                for (int r = 0; r < ModCompatibilityCatalog.GameAnarchy.RequiredTypeNames.Length; r++)
-                    if (assemblies[i].GetType(ModCompatibilityCatalog.GameAnarchy.RequiredTypeNames[r], false) == null) { economy = null; break; }
+                for (int r = 0; r < ModCompatibilityCatalog.Default.GameAnarchy.RequiredTypeNames.Length; r++)
+                    if (assemblies[i].GetType(ModCompatibilityCatalog.Default.GameAnarchy.RequiredTypeNames[r], false) == null) { economy = null; break; }
                 if (settings == null || economy == null || city == null || resources == null || milestones == null || fire == null) continue;
                 try
                 {

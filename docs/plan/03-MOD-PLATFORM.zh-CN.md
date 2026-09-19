@@ -53,9 +53,20 @@
 - **验收**：对本机已装 mod 集跑分类器，与手工判定对比输出差异报告；
   分类结果进入兼容清单并可被 S2 的报错文本引用。
 
-### WP-3.2 兼容目录数据化（发版解耦）
+### WP-3.2 兼容目录数据化（发版解耦）—— 第一步（Catalog 集中）与解析层已实现；外置加载待接线
 
-- **现状**：`KnownModBridgeRegistry` 静态数组、版本锁、选项黑名单、local-only 属性表全部编译进 DLL。
+- **第一步（已完成，feat/wp-3.2-compat-catalog）**：散落四处的硬编码数据集中为
+  `Forge.Core/ModCompatibilityCatalog`（内容由 ModCompatibilityCatalogTests 钉死），
+  五个消费方全部改读。
+- **第二步（已实现解析层，feat/wp-3.2-json-document）**：
+  - `Forge.Core/MiniJson`：有界严格 JSON 解析器（net35/net8，深度/长度上限先于分配检查，
+    `JsonParseException` 带偏移），`JsonNode` 保留对象键序、整数保 long 精度；
+  - `ModCompatibilityDocument`：不可变文档 + `TryParseJson`（schema 全字段必填、
+    边界校验，任一字段缺失/非法即整体拒绝——坏文件永远不会放宽接受范围）；
+  - `ModCompatibilityCatalog.Default` = 内置文档（即原钉死数据），消费方统一读 Default；
+  - `ModCompatibilityCatalog.TryParseDocument` 供外置加载器使用。
+- **待做（下一步）**：运行时目录加载接线（`compat/mods/*.json` 读取路径 + `Default` 替换）
+  与通用设置适配器（GA 桥 SharedProperties 抽象）。
 - **设计**：随包分发 `compat/mods/*.json`，schema 草案：
 
 ```json

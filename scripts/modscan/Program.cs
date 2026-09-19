@@ -15,7 +15,7 @@ namespace ModScan
     /// </summary>
     public static class Program
     {
-        private static readonly string[] HardcodedClientOnlyModTypes = ModCompatibilityCatalog.ClientOnlyModTypes;
+        private static readonly string[] HardcodedClientOnlyModTypes = ModCompatibilityCatalog.Default.ClientOnlyModTypes;
 
         public static int Main(string[] args)
         {

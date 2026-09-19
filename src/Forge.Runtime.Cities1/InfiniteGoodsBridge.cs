@@ -61,7 +61,7 @@ namespace CsmForge.Runtime.Cities1
             "CargoServicePointGenericIndustryCoal", "CargoServicePointGenericIndustryFood",
             "CargoServicePointGenericIndustryLumber", "Debug"
         };
-        private static readonly string[] UnsupportedServicePointSettings = ModCompatibilityCatalog.InfiniteGoods.UnsupportedServicePointSettings;
+        private static readonly string[] UnsupportedServicePointSettings = ModCompatibilityCatalog.Default.InfiniteGoods.UnsupportedServicePointSettings;
         private static byte[] clientShadow;
         private static bool patched;
         private static Assembly compatibleAssembly;

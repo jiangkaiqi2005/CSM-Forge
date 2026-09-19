@@ -108,13 +108,13 @@ namespace CsmForge.Runtime.Cities1
                     default: return "mod";
                 }
             }
-            if (typeName == ModCompatibilityCatalog.DependencyModType) return "dependency-mod";
-            if (typeName == ModCompatibilityCatalog.BlockedModType) return "blocked-mod";
+            if (typeName == ModCompatibilityCatalog.Default.DependencyModType) return "dependency-mod";
+            if (typeName == ModCompatibilityCatalog.Default.BlockedModType) return "blocked-mod";
             if (typeName == "GameAnarchy.Mod" && !GameAnarchyBridge.IsAvailable) return "blocked-mod";
             if (typeName == "InfiniteGoodsMod.ModIdentity" && !InfiniteGoodsBridge.IsAvailable) return "blocked-mod";
             if (IsAuditedCslModernMap(typeName, assembly)) return "client-mod";
-            for (int i = 0; i < ModCompatibilityCatalog.ClientOnlyModTypes.Length; i++)
-                if (typeName == ModCompatibilityCatalog.ClientOnlyModTypes[i]) return "client-mod";
+            for (int i = 0; i < ModCompatibilityCatalog.Default.ClientOnlyModTypes.Length; i++)
+                if (typeName == ModCompatibilityCatalog.Default.ClientOnlyModTypes[i]) return "client-mod";
             // WP-3.1: heuristic auto-classification. A mod whose visible type surface never
             // names a simulation manager/tool is treated as client-only; explicit declarations
             // and the audited lists above always win, and ambiguous assemblies fail closed to

@@ -41,11 +41,11 @@ namespace CsmForge.Runtime.Cities1
         private static bool demandControllerPatched;
         private static readonly KnownModBridgeDescriptor[] Bridges =
         {
-            new KnownModBridgeDescriptor(ModCompatibilityCatalog.DemandControllerUserModType, RegisterDemandController, InstallDemandController, ResetDemandController),
-            new KnownModBridgeDescriptor(ModCompatibilityCatalog.GameAnarchyUserModType, RegisterGameAnarchy, GameAnarchyBridge.InstallOptionalPatches, GameAnarchyBridge.ResetPatchState),
-            new KnownModBridgeDescriptor(ModCompatibilityCatalog.InfiniteGoodsUserModType, RegisterInfiniteGoods, InfiniteGoodsBridge.InstallOptionalPatches, InfiniteGoodsBridge.ResetPatchState),
-            new KnownModBridgeDescriptor(ModCompatibilityCatalog.EightyOne2UserModType, RegisterEightyOne, EightyOne2Bridge.InstallOptionalPatches, EightyOne2Bridge.ResetPatchState),
-            new KnownModBridgeDescriptor(ModCompatibilityCatalog.NetworkMultitoolUserModType, null, NetworkMultitoolBridge.InstallOptionalPatches, NetworkMultitoolBridge.ResetPatchState)
+            new KnownModBridgeDescriptor(ModCompatibilityCatalog.Default.DemandControllerUserModType, RegisterDemandController, InstallDemandController, ResetDemandController),
+            new KnownModBridgeDescriptor(ModCompatibilityCatalog.Default.GameAnarchyUserModType, RegisterGameAnarchy, GameAnarchyBridge.InstallOptionalPatches, GameAnarchyBridge.ResetPatchState),
+            new KnownModBridgeDescriptor(ModCompatibilityCatalog.Default.InfiniteGoodsUserModType, RegisterInfiniteGoods, InfiniteGoodsBridge.InstallOptionalPatches, InfiniteGoodsBridge.ResetPatchState),
+            new KnownModBridgeDescriptor(ModCompatibilityCatalog.Default.EightyOne2UserModType, RegisterEightyOne, EightyOne2Bridge.InstallOptionalPatches, EightyOne2Bridge.ResetPatchState),
+            new KnownModBridgeDescriptor(ModCompatibilityCatalog.Default.NetworkMultitoolUserModType, null, NetworkMultitoolBridge.InstallOptionalPatches, NetworkMultitoolBridge.ResetPatchState)
         };
 
         internal static void RegisterAvailable()

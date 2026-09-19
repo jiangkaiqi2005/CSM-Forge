@@ -70,7 +70,11 @@ namespace CsmForge.Runtime.Cities1
         private const string AssemblyName = "GameAnarchy";
         private static readonly Version SupportedVersion = new Version(1, 3, 1, 0);
         private const string SettingsTypeName = "GameAnarchy.ModSettings.ModSetting";
-        private static readonly string[] LocalOnly = { "AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset", "OptionsPanelCategoriesUpdated" };
+        private static readonly string[] LocalOnly =
+        {
+            "AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset",
+            "OptionsPanelCategoriesUpdated", "ToolButtonPresent", "ToolButtonPositionX", "ToolButtonPositionY"
+        };
         private static readonly string[] MoneyMutationMethods = { "OnPreSimulationFrame", "ChargeInterest", "AutoAddMoney", "SetStartMoney", "AddMoneyManually", "SubstrateMoneyManually", "ModifyMoney", "AddLoanAmount" };
         private static readonly string[] UnsupportedBooleanSettings =
         {
@@ -186,7 +190,7 @@ namespace CsmForge.Runtime.Cities1
             for (int i = 0; i < properties.Length; i++)
             {
                 MethodInfo setter = properties[i].GetSetMethod(true);
-                if (setter != null) harmony.Patch(setter, settingPrefix);
+                if (setter != null) harmony.Patch(DeclaredMethod(setter), settingPrefix);
             }
             Type economy = ResolveType("GameAnarchy.Managers.ModEconomyManager");
             if (economy != null)
@@ -207,6 +211,16 @@ namespace CsmForge.Runtime.Cities1
         }
 
         internal static void ResetPatchState() { patched = false; applying = false; compatibleAssembly = null; }
+
+        private static MethodInfo DeclaredMethod(MethodInfo method)
+        {
+            if (method == null || method.DeclaringType == null) return method;
+            ParameterInfo[] parameters = method.GetParameters();
+            Type[] types = new Type[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++) types[i] = parameters[i].ParameterType;
+            return method.DeclaringType.GetMethod(method.Name, BindingFlags.Instance | BindingFlags.Static |
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly, null, types, null) ?? method;
+        }
 
         private static bool SettingWritePrefix() { return applying || !IsClientReplicaRole(); }
         private static bool HostOnlyMutationPrefix() { return !IsClientReplicaRole(); }

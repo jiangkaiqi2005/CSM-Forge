@@ -18,7 +18,10 @@ class FixedSimulationModBridgeContractTests(unittest.TestCase):
             "GetFireProbability", "UnsupportedManualFirePrefix",
         ]:
             self.assertIn(marker, source)
-        for marker in ["AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset"]:
+        for marker in [
+            "AchievementSystemEnabled", "SkipIntroEnabled", "OptionsPanelCategoriesHorizontalOffset",
+            "ToolButtonPresent", "ToolButtonPositionX", "ToolButtonPositionY",
+        ]:
             self.assertIn(marker, source)
         self.assertNotIn("CommandReplay", source)
 
@@ -50,6 +53,17 @@ class FixedSimulationModBridgeContractTests(unittest.TestCase):
             "EightyOne2BridgeAdapter", "InstallOptionalPatches", "ResetOptionalPatchState",
         ]:
             self.assertIn(marker, source)
+
+    def test_disabled_known_mod_assemblies_do_not_activate_bridges(self) -> None:
+        registry = (RUNTIME / "KnownModBridgeRegistry.cs").read_text(encoding="utf-8-sig")
+        bridge = (RUNTIME / "GameAnarchyBridge.cs").read_text(encoding="utf-8-sig")
+        for type_name in [
+            "DemandController.DemandController", "GameAnarchy.Mod", "InfiniteGoodsMod.ModIdentity",
+            "EightyOne2.Mod", "NetworkMultitool.Mod",
+        ]:
+            self.assertIn(f'IsEnabled("{type_name}")', registry)
+        self.assertIn("plugin.isEnabled", registry)
+        self.assertIn("DeclaredMethod(setter)", bridge)
 
 
 if __name__ == "__main__":

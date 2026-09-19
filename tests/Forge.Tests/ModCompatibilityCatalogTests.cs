@@ -80,6 +80,11 @@ namespace CsmForge.Tests
     ""fixedOreDepletionRate"": 100,
     ""fixedSpreadFireProbability"": 0
   },
+  ""mods"": [
+    { ""userModType"": ""CitiesHarmony.Mod"", ""category"": ""dependency"" },
+    { ""userModType"": ""GameAnarchy.Mod"", ""category"": ""synchronized"", ""settingsTypeName"": ""GameAnarchy.ModSettings.ModSetting"",
+      ""holderTypeNames"": [""GameAnarchy.Patches.BuildingAIPatch""], ""localOnlySettings"": [], ""blockedBooleanSettings"": [] }
+  ],
   ""infiniteGoods"": { ""unsupportedServicePointSettings"": [""PedestrianServicePointGoods""] }
 }";
 
@@ -93,6 +98,13 @@ namespace CsmForge.Tests
             Assert.True(Array.IndexOf(document.GameAnarchy.UnsupportedBooleanSettings, "RemoveNoisePollution") >= 0);
             Assert.Equal(1, document.InfiniteGoods.UnsupportedServicePointSettings.Length);
             Assert.Equal(5, document.KnownSynchronizedModTypes.Length);
+            ModEntryData entry;
+            Assert.True(document.TryGetModEntry("GameAnarchy.Mod", out entry));
+            Assert.Equal("synchronized", entry.Category);
+            Assert.Equal("GameAnarchy.Patches.BuildingAIPatch", entry.HolderTypeNames[0]);
+            Assert.True(document.TryGetModEntry("CitiesHarmony.Mod", out entry));
+            Assert.Equal("dependency", entry.Category);
+            Assert.True(!document.TryGetModEntry("Some.Unknown.Mod", out entry));
         }
 
         [Case] public static void MalformedJsonFailsClosed()
@@ -116,6 +128,40 @@ namespace CsmForge.Tests
             Assert.Equal(9, ModCompatibilityCatalog.Default.ClientOnlyModTypes.Length);
             Assert.True(Array.IndexOf(ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings, "RemoveNoisePollution") >= 0);
             Assert.Equal("GameAnarchy.ModSettings.ModSetting", ModCompatibilityCatalog.Default.GameAnarchy.SettingsTypeName);
+        }
+
+
+        [Case] public static void GenericSynchronizedEntryRequiresSettingsTypeName()
+        {
+            string json = "{\"dependencyModType\": \"CitiesHarmony.Mod\", \"blockedModType\": \"x\", " +
+                "\"demandControllerUserModType\": \"a\", \"gameAnarchyUserModType\": \"b\", " +
+                "\"infiniteGoodsUserModType\": \"c\", \"eightyOne2UserModType\": \"d\", " +
+                "\"networkMultitoolUserModType\": \"e\", " +
+                "\"gameAnarchy\": { \"assemblyName\": \"GameAnarchy\", \"supportedVersion\": \"1.3.1.0\", " +
+                "\"settingsTypeName\": \"s\", \"holderTypeNames\": [\"h\"], \"requiredTypeNames\": [\"r\"], " +
+                "\"localOnlySettings\": [\"l\"], \"unsupportedBooleanSettings\": [\"u\"], " +
+                "\"fixedOilDepletionRate\": 100, \"fixedOreDepletionRate\": 100, \"fixedSpreadFireProbability\": 0 }, " +
+                "\"infiniteGoods\": { \"unsupportedServicePointSettings\": [] }, " +
+                "\"mods\": [ { \"userModType\": \"My.Generic.Mod\", \"category\": \"synchronized\" } ] }";
+            ModCompatibilityDocument document;
+            Assert.True(!ModCompatibilityCatalog.TryParseDocument(json, out document)); // no settingsTypeName
+        }
+
+        [Case] public static void InvalidCategoryFailsClosed()
+        {
+            string json = "{\"dependencyModType\": \"CitiesHarmony.Mod\", \"blockedModType\": \"x\", " +
+                "\"demandControllerUserModType\": \"a\", \"gameAnarchyUserModType\": \"b\", " +
+                "\"infiniteGoodsUserModType\": \"c\", \"eightyOne2UserModType\": \"d\", " +
+                "\"networkMultitoolUserModType\": \"e\", " +
+                "\"gameAnarchy\": { \"assemblyName\": \"GameAnarchy\", \"supportedVersion\": \"1.3.1.0\", " +
+                "\"settingsTypeName\": \"s\", \"holderTypeNames\": [\"h\"], \"requiredTypeNames\": [\"r\"], " +
+                "\"localOnlySettings\": [\"l\"], \"unsupportedBooleanSettings\": [\"u\"], " +
+                "\"fixedOilDepletionRate\": 100, \"fixedOreDepletionRate\": 100, \"fixedSpreadFireProbability\": 0 }, " +
+                "\"infiniteGoods\": { \"unsupportedServicePointSettings\": [] }, " +
+                "\"mods\": [ { \"userModType\": \"My.Generic.Mod\", \"category\": \"magical\" } ] }";
+            ModCompatibilityDocument document;
+            Assert.True(!ModCompatibilityCatalog.TryParseDocument(json, out document));
+            Assert.True(document == null);
         }
     }
 }

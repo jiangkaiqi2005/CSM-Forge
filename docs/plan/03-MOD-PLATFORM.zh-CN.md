@@ -65,8 +65,17 @@
     边界校验，任一字段缺失/非法即整体拒绝——坏文件永远不会放宽接受范围）；
   - `ModCompatibilityCatalog.Default` = 内置文档（即原钉死数据），消费方统一读 Default；
   - `ModCompatibilityCatalog.TryParseDocument` 供外置加载器使用。
-- **待做（下一步）**：运行时目录加载接线（`compat/mods/*.json` 读取路径 + `Default` 替换）
-  与通用设置适配器（GA 桥 SharedProperties 抽象）。
+- **运行时目录加载接线（已完成，feat/wp-3.2c-registry-manifest-wiring）**：
+  `ForgeMod.OnEnabled` 调用 `ModCompatibilityCatalog.TryInitializeFromDirectory`（mod DLL
+  同目录 `compat/*.json`，按文件名序取第一个严格通过者整体替换 `Default`，失败回落内置集）；
+  `CompatibilityCollector.ModCategory` 增加 manifest 条目分支（client-only/dependency 直接
+  分类；**synchronized 条目若运行时解析失败则 blocked——fail closed，绝不静默不同步**）。
+- **通用设置适配器（已完成，feat/wp-3.2-loader-and-settings-codec + 本轮）**：
+  `GenericSettingsStateAdapter`（IForgeStateAdapterV1）从 manifest 条目构造，holder 约定
+  （`holderFieldName`，默认 `_modSetting`）解析设置实例，捕获/应用走 SettingsSurfaceCodec，
+  AdapterId = `bridge.generic.<canonical>`；`KnownModBridgeRegistry.RegisterAvailable` 在
+  手写桥之后自动注册所有非手写桥的 manifest synchronized 条目（已解析者）。
+- **待做（下一步）**：泛型类型参数与 Harmony 目标的更深层扫描；JSON 外置文件的实际分发。
 - **设计**：随包分发 `compat/mods/*.json`，schema 草案：
 
 ```json

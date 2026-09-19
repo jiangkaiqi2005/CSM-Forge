@@ -19,6 +19,9 @@ class AlphaTestabilityContractTests(unittest.TestCase):
         self.assertIn("COLLECT-DIAGNOSTICS.ps1", build)
         self.assertIn("E3-E4-TEST-RECORD.md", build)
         self.assertIn("README-CANDIDATE.txt", build)
+        self.assertIn("BUILD_INFO.json", build)
+        self.assertIn("source_commit=$sourceCommit", build)
+        self.assertIn("gameplay_validation='NOT RUN BY CI'", build)
         self.assertLess(build.index("README-CANDIDATE.txt"), build.rindex("SHA256SUMS.txt"))
 
     def test_install_verifier_rejects_original_csm_coexistence(self):

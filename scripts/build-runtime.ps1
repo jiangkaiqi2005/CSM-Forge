@@ -170,6 +170,29 @@ foreach ($scriptName in @('VERIFY-INSTALL.ps1','COLLECT-DIAGNOSTICS.ps1')) {
 Copy-Item -LiteralPath (Join-Path $repo 'docs/E3-E4-TEST-RECORD-TEMPLATE.zh-CN.md') `
     -Destination (Join-Path $stage 'E3-E4-TEST-RECORD.md')
 
+$sourceCommit = (& git -C $repo rev-parse HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'Could not resolve the package source commit.'
+}
+$sourceRef = (& git -C $repo branch --show-current).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the package source ref.' }
+$dlls = @(Get-ChildItem -LiteralPath $stage -File -Filter '*.dll' | Sort-Object Name | ForEach-Object {
+    [ordered]@{
+        name = $_.Name
+        bytes = $_.Length
+        sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+})
+[ordered]@{
+    repository='jiangkaiqi2005/CSM-Forge'
+    source_commit=$sourceCommit
+    source_ref=$sourceRef
+    built_at_utc=[DateTime]::UtcNow.ToString('o')
+    target_framework='net35'
+    gameplay_validation='NOT RUN BY CI'
+    dlls=$dlls
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage 'BUILD_INFO.json') -Encoding UTF8
+
 $manifest = @()
 Get-ChildItem -LiteralPath $stage -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | Sort-Object Name | ForEach-Object {
     $hash = Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256

@@ -33,10 +33,26 @@ namespace CsmForge.Runtime.Cities1
 
         public static ZoneStateV2 Capture(ushort blockId, NetDomainBase net)
         {
+            ZoneStateV2 state;
+            if (!TryCapture(blockId, net, out state)) throw new InvalidOperationException("Zone block has no stable Forge key.");
+            return state;
+        }
+
+        /// <summary>
+        /// Non-throwing capture. WP-P1: CaptureSparse used to call Capture inside try/catch as
+        /// control flow, so every non-created block - the vast majority of ZoneManager's
+        /// 32,768 slots - threw and was caught, building an exception object plus stack trace
+        /// for each. That was ~27,000 exceptions per reconcile, forced several times a second.
+        /// Same semantics, no exceptions on the normal path.
+        /// </summary>
+        public static bool TryCapture(ushort blockId, NetDomainBase net, out ZoneStateV2 state)
+        {
+            state = null;
             ZoneBlockKeyV2 key;
-            if (!TryKey(blockId, net, out key)) throw new InvalidOperationException("Zone block has no stable Forge key.");
+            if (!TryKey(blockId, net, out key)) return false;
             ZoneBlock block = ZoneManager.instance.m_blocks.m_buffer[blockId];
-            return new ZoneStateV2(key, block.m_zone1, block.m_zone2);
+            state = new ZoneStateV2(key, block.m_zone1, block.m_zone2);
+            return true;
         }
 
         public static bool TryFindBlock(ZoneBlockKeyV2 key, NetDomainBase net, out ushort blockId)
@@ -62,8 +78,7 @@ namespace CsmForge.Runtime.Cities1
             for (int i = 1; i < blocks.Length && i <= ushort.MaxValue; i++)
             {
                 ZoneStateV2 state;
-                try { state = Capture((ushort)i, net); }
-                catch (InvalidOperationException) { continue; }
+                if (!TryCapture((ushort)i, net, out state)) continue;
                 if (state.IsEmpty) continue;
                 if (result.ContainsKey(state.Key)) throw new InvalidOperationException("Duplicate non-empty zoning key detected.");
                 result.Add(state.Key, state);

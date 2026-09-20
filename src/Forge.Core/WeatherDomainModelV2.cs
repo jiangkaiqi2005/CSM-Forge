@@ -33,6 +33,14 @@ namespace CsmForge.Core
             CurrentTemperature = currentTemperature; TargetTemperature = targetTemperature;
         }
 
+        /// <summary>WP-P2: value equality over the six target fields the root covers.</summary>
+        public bool EquivalentTargets(WeatherStateV2 other)
+        {
+            return other != null && TargetCloud == other.TargetCloud && TargetFog == other.TargetFog &&
+                TargetNorthernLights == other.TargetNorthernLights && TargetRain == other.TargetRain &&
+                TargetRainbow == other.TargetRainbow && TargetTemperature == other.TargetTemperature;
+        }
+
         public Hash256 TargetRoot { get { return WeatherDomainCodecV2.TargetRoot(this); } }
 
         private static void CheckFinite(float value)

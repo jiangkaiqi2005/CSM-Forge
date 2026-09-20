@@ -62,6 +62,15 @@ namespace CsmForge.Core
                 throw new ArgumentException("Invalid economy control snapshot.", "bytes");
             snapshot = (byte[])bytes.Clone();
         }
+
+        /// <summary>WP-P2: byte-wise comparison so the poll hashes only on real change.</summary>
+        public bool Equivalent(EconomyControlStateV2 other)
+        {
+            if (other == null || other.snapshot.Length != snapshot.Length) return false;
+            for (int i = 0; i < snapshot.Length; i++)
+                if (snapshot[i] != other.snapshot[i]) return false;
+            return true;
+        }
     }
 
     public static class EconomyControlCodecV2

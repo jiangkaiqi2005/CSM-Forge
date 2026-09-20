@@ -13,6 +13,12 @@ namespace CsmForge.Core
             RawCash = rawCash;
         }
 
+        /// <summary>WP-P2: a single scalar; compare directly instead of hashing per tick.</summary>
+        public bool Equivalent(EconomyCashStateV2 other)
+        {
+            return other != null && RawCash == other.RawCash;
+        }
+
         public Hash256 Root
         {
             get { return Hash256.Compute(EconomyCashCodecV2.Encode(this)); }

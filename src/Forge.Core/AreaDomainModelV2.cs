@@ -29,6 +29,13 @@ namespace CsmForge.Core
             Resolution = resolution; MaskLow = maskLow; MaskHigh = maskHigh;
         }
 
+        /// <summary>WP-P2: compare resolution and both mask words; the poll hashes only on change.</summary>
+        public bool Equivalent(AreaStateV2 other)
+        {
+            return other != null && Resolution == other.Resolution &&
+                MaskLow == other.MaskLow && MaskHigh == other.MaskHigh;
+        }
+
         public bool IsUnlocked(int x, int z)
         {
             if (x < 0 || x >= Resolution || z < 0 || z >= Resolution) return false;

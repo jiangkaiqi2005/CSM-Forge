@@ -18,18 +18,41 @@ namespace CsmForge.Core
             bytes = (byte[])value.Clone();
         }
 
+        /// <summary>
+        /// Adopts a digest this class just computed: the array is freshly allocated by the hash
+        /// provider and never shared with the caller, so the defensive clone is redundant.
+        /// </summary>
+        private Hash256(byte[] ownedDigest, bool adopt)
+        {
+            bytes = ownedDigest;
+        }
+
+        /// <summary>
+        /// WP-P5: per-thread hash provider. Hash256.Compute sits under every domain root read and
+        /// every payload hash, and SHA256.Create() allocated a provider (plus its internal state
+        /// buffers) on each call. The Core contract is owner-thread, and each thread gets its own
+        /// instance, so reusing it is safe. HashAlgorithm.ComputeHash re-initializes itself, so a
+        /// reused provider carries no state between digests.
+        /// </summary>
+        [ThreadStatic] private static SHA256 provider;
+
+        private static SHA256 Provider()
+        {
+            SHA256 value = provider;
+            if (value == null) { value = SHA256.Create(); provider = value; }
+            return value;
+        }
+
         public static Hash256 Compute(byte[] value)
         {
             Check.NotNull(value, "value");
-            using (SHA256 hash = SHA256.Create())
-                return new Hash256(hash.ComputeHash(value));
+            return new Hash256(Provider().ComputeHash(value), true);
         }
 
         public static Hash256 Compute(Stream stream)
         {
             Check.NotNull(stream, "stream");
-            using (SHA256 hash = SHA256.Create())
-                return new Hash256(hash.ComputeHash(stream));
+            return new Hash256(Provider().ComputeHash(stream), true);
         }
 
         public byte[] ToArray() { return (byte[])bytes.Clone(); }

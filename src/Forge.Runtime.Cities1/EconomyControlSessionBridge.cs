@@ -8,6 +8,7 @@ namespace CsmForge.Runtime.Cities1
         private EconomyControlAuthorityDomain hostEconomyControl;
         private EconomyControlReplicaDomain clientEconomyControl;
         private Hash256 committedEconomyControlRoot;
+        private EconomyControlStateV2 committedEconomyControlState;
 
         internal bool TryQueueEconomyControl(EconomyControlIntentV2 value)
         {
@@ -52,10 +53,13 @@ namespace CsmForge.Runtime.Cities1
         {
             if (mode != MultiplayerSessionMode.Hosting || hostEconomyControl == null || authority == null || snapshotSave != null)
                 return;
+            // WP-P2: compare the captured snapshot bytes; hash only when it actually changed.
             EconomyControlStateV2 actual = EconomyControlGameAccess.Capture();
-            Hash256 after = actual.Root;
             Hash256 before = hostEconomyControl.CommittedRoot;
             committedEconomyControlRoot = before;
+            if (committedEconomyControlState != null && committedEconomyControlState.Equivalent(actual)) return;
+            committedEconomyControlState = actual;
+            Hash256 after = actual.Root;
             if (before.Equals(after)) return;
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation,
                 EconomyControlAuthorityDomain.Id, before, after,

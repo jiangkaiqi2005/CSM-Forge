@@ -7,19 +7,23 @@ namespace CsmForge.Runtime.Cities1
         private EconomyCashAuthorityDomain hostCash;
         private EconomyCashReplicaDomain clientCash;
         private Hash256 committedCashRoot;
+        private EconomyCashStateV2 committedCashState;
 
         internal void PollObservedHostCash()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostCash == null || authority == null || snapshotSave != null)
                 return;
+            // WP-P2: one scalar - compare the value, hash only on change.
             EconomyCashStateV2 actual = EconomyCashGameAccess.Capture();
-            Hash256 after = actual.Root;
-            if (committedCashRoot == null)
+            if (committedCashState == null)
             {
-                committedCashRoot = after;
+                committedCashState = actual;
+                committedCashRoot = actual.Root;
                 return;
             }
-            if (committedCashRoot.Equals(after)) return;
+            if (committedCashState.Equivalent(actual)) return;
+            Hash256 after = actual.Root;
+            committedCashState = actual;
 
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation,
                 EconomyCashAuthorityDomain.Id, committedCashRoot, after, EconomyCashCodecV2.Encode(actual));

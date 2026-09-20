@@ -50,6 +50,13 @@ namespace CsmForge.Runtime.Cities1
             committedCashRoot = null;
             committedEconomyControlRoot = null;
             committedWeatherRoot = null;
+            // WP-P2 value-comparison caches: without these a new session would compare against
+            // the previous city's values and could miss its first publish.
+            committedDemandState = null;
+            committedCashState = null;
+            committedEconomyControlState = null;
+            committedWeatherState = null;
+            committedAreaState = null;
         }
     }
 }

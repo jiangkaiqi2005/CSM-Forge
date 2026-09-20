@@ -20,6 +20,13 @@ namespace CsmForge.Runtime.Cities1
             Check.OutOfRange(value < 0 || value > 100, "demand");
         }
 
+        /// <summary>WP-P2: value equality lets the poll skip computing a root when nothing changed.</summary>
+        public bool Equivalent(DemandStateV2 other)
+        {
+            return other != null && Residential == other.Residential &&
+                Commercial == other.Commercial && Workplace == other.Workplace;
+        }
+
         public Hash256 Root
         {
             get { return Hash256.Compute(new byte[] { (byte)Residential, (byte)Commercial, (byte)Workplace }); }

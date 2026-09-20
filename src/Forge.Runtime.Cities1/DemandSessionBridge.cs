@@ -7,28 +7,33 @@ namespace CsmForge.Runtime.Cities1
         private DemandAuthorityDomain hostDemand;
         private DemandReplicaDomain clientDemand;
         private Hash256 committedDemandRoot;
+        private DemandStateV2 committedDemandState;
 
         internal void PollObservedHostDemand()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostDemand == null || authority == null || snapshotSave != null)
                 return;
-            Hash256 after = hostDemand.StateRoot;
-            if (committedDemandRoot == null)
+            // WP-P2: three scalars - compare values instead of hashing every tick. The root is
+            // computed only when the values actually changed.
+            DemandStateV2 actual = DemandGameAccess.Capture();
+            if (committedDemandState == null)
             {
-                committedDemandRoot = after;
+                committedDemandState = actual;
+                committedDemandRoot = actual.Root;
                 return;
             }
-            if (committedDemandRoot.Equals(after)) return;
+            if (committedDemandState.Equivalent(actual)) return;
+            Hash256 after = actual.Root;
+            committedDemandState = actual;
 
-            DemandStateV2 state = DemandGameAccess.Capture();
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation,
-                DemandAuthorityDomain.Id, committedDemandRoot, state.Root, DemandCodecV2.Encode(state));
+                DemandAuthorityDomain.Id, committedDemandRoot, after, DemandCodecV2.Encode(actual));
             if (batch == null || authority.IsFenced)
             {
                 FenceSession("observed-demand-change-could-not-commit");
                 return;
             }
-            committedDemandRoot = state.Root;
+            committedDemandRoot = after;
             BroadcastBatch(batch);
         }
     }

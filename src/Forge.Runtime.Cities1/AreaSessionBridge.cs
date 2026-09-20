@@ -7,6 +7,7 @@ namespace CsmForge.Runtime.Cities1
     {
         private AreaAuthorityDomain hostAreas;
         private AreaReplicaDomain clientAreas;
+        private AreaStateV2 committedAreaState;
 
         internal bool TryQueueAreaUnlock(int x, int z)
         {
@@ -49,8 +50,11 @@ namespace CsmForge.Runtime.Cities1
         internal void PollObservedHostAreas()
         {
             if (mode != MultiplayerSessionMode.Hosting || hostAreas == null || authority == null || snapshotSave != null) return;
+            // WP-P2: compare the small mask instead of hashing every tick.
             AreaStateV2 actual = AreaGameAccess.Capture();
             Hash256 before = hostAreas.CommittedRoot;
+            if (committedAreaState != null && committedAreaState.Equivalent(actual)) return;
+            committedAreaState = actual;
             if (before.Equals(actual.Root)) return;
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, AreaAuthorityDomain.Id,
                 before, actual.Root, AreaDomainCodecV2.EncodeState(actual));

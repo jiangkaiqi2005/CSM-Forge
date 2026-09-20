@@ -216,6 +216,7 @@ namespace CsmForge.Runtime.Cities1
         protected readonly LoadIdentity Load;
         protected readonly EntityIdMapV2 Ids = new EntityIdMapV2();
         protected readonly Dictionary<ulong, TransportLineStateV2> Committed = new Dictionary<ulong, TransportLineStateV2>();
+        private Hash256 cachedRoot;
 
         protected TransportLineDomainBase(LoadIdentity load)
         {
@@ -227,8 +228,14 @@ namespace CsmForge.Runtime.Cities1
 
         public bool TryResolveEntity(ushort nativeId, out EntityIdentityV2 entity) { return Ids.TryGetIdentity(nativeId, out entity); }
 
+        /// <summary>
+        /// WP-1.5: the committed root is memoized. PollObservedHostTransportLines reads StateRoot
+        /// twice per simulation tick, and this used to rebuild the whole index (capturing every
+        /// line) on each read. RefreshCommitted - the single mutation point - invalidates it.
+        /// </summary>
         protected Hash256 CaptureRoot()
         {
+            if (cachedRoot != null) return cachedRoot;
             TransportLineStateIndexV2 index = new TransportLineStateIndexV2();
             EntityMapEntryV2[] entries = Ids.SnapshotEntries();
             for (int i = 0; i < entries.Length; i++)
@@ -237,11 +244,13 @@ namespace CsmForge.Runtime.Cities1
                 if (native == 0 || native > ushort.MaxValue) throw new InvalidOperationException("Transport line native id is invalid.");
                 index.Seed(TransportLineGameAccess.Capture(entries[i].Identity, (ushort)native));
             }
-            return index.Root;
+            cachedRoot = index.Root;
+            return cachedRoot;
         }
 
         protected void RefreshCommitted()
         {
+            cachedRoot = null;
             Committed.Clear(); EntityMapEntryV2[] entries = Ids.SnapshotEntries();
             for (int i = 0; i < entries.Length; i++)
             {

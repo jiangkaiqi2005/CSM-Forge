@@ -58,6 +58,8 @@ namespace CsmForge.Core
         private readonly HashSet<ulong> retired = new HashSet<ulong>();
         private ulong nextEntityId;
 
+        private EntityMapEntryV2[] cachedEntries;
+
         public int Count { get { return byEntity.Count; } }
         public ulong HighestIssuedId { get { return nextEntityId; } }
 
@@ -70,6 +72,7 @@ namespace CsmForge.Core
             Entry entry = new Entry { Identity = identity, NativeId = nativeId };
             byEntity.Add(identity.EntityId, entry);
             byNative.Add(nativeId, entry);
+            cachedEntries = null;
             return identity;
         }
 
@@ -90,6 +93,7 @@ namespace CsmForge.Core
             byEntity.Add(identity.EntityId, entry);
             byNative.Add(nativeId, entry);
             if (identity.EntityId > nextEntityId) nextEntityId = identity.EntityId;
+            cachedEntries = null;
         }
 
         public bool TryGetNative(EntityIdentityV2 identity, out uint nativeId)
@@ -119,13 +123,26 @@ namespace CsmForge.Core
             byEntity.Remove(identity.EntityId);
             byNative.Remove(entry.NativeId);
             retired.Add(identity.EntityId);
+            cachedEntries = null;
             return true;
         }
 
         public bool IsRetired(ulong entityId) { return entityId != 0 && retired.Contains(entityId); }
 
+        /// <summary>
+        /// Canonically ordered (by entity id) mapping snapshot. WP-1.5: the result is cached and
+        /// invalidated by every mutation. Polling paths call this every simulation tick over
+        /// buffers as large as 49,152 buildings, so rebuilding it per call meant an O(n log n)
+        /// sort plus two allocations per tick - the dominant host-side frame cost.
+        ///
+        /// The returned array is shared: callers must treat it as read-only (no code mutates it;
+        /// the cursor-based polls only read entries and length). A mutation nulls the cache and
+        /// the next call builds a fresh array, so a caller holding an older reference is never
+        /// affected - which is what the reconcile loops rely on.
+        /// </summary>
         public EntityMapEntryV2[] SnapshotEntries()
         {
+            if (cachedEntries != null) return cachedEntries;
             List<ulong> ids = new List<ulong>(byEntity.Keys);
             ids.Sort();
             EntityMapEntryV2[] result = new EntityMapEntryV2[ids.Count];
@@ -134,6 +151,7 @@ namespace CsmForge.Core
                 Entry entry = byEntity[ids[i]];
                 result[i] = new EntityMapEntryV2(entry.Identity, entry.NativeId);
             }
+            cachedEntries = result;
             return result;
         }
 
@@ -143,6 +161,7 @@ namespace CsmForge.Core
             byEntity.Clear();
             byNative.Clear();
             retired.Clear();
+            cachedEntries = null;
             nextEntityId = 0;
             foreach (EntityMapEntryV2 value in entries)
             {
@@ -159,6 +178,7 @@ namespace CsmForge.Core
             byEntity.Clear();
             byNative.Clear();
             retired.Clear();
+            cachedEntries = null;
             nextEntityId = 0;
         }
     }

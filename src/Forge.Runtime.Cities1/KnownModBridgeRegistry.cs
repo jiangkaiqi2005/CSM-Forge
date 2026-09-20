@@ -83,7 +83,13 @@ namespace CsmForge.Runtime.Cities1
             }
         }
 
-        /// <summary>WP-3.2b: these synchronized mods are owned by hand-written bridges.</summary>
+        /// <summary>
+        /// WP-3.2b: these synchronized mods are owned by hand-written bridges, so they must not
+        /// be routed through the generic settings adapter (which resolves nothing for them).
+        /// </summary>
+        internal static bool IsHandwrittenSynchronized(string userModType)
+        { return IsHandwrittenBridge(userModType); }
+
         private static bool IsHandwrittenBridge(string userModType)
         {
             ModCompatibilityDocument document = ModCompatibilityCatalog.Default;

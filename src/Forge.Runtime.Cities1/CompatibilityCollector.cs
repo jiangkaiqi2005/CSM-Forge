@@ -120,7 +120,12 @@ namespace CsmForge.Runtime.Cities1
                 if (manifestEntry.Category == "blocked") return "blocked-mod";
                 if (manifestEntry.Category == "dependency") return "dependency-mod";
                 if (manifestEntry.Category == "client-only") return "client-mod";
-                if (manifestEntry.Category == "synchronized")
+                // Hand-written bridges own their mods and register their adapters themselves;
+                // only manifest-only (generic) entries depend on runtime surface resolution.
+                // Regression note: routing handwritten mods through the generic check blocked
+                // all five of them (their entries exist but no generic adapter is registered).
+                if (manifestEntry.Category == "synchronized" &&
+                    !KnownModBridgeRegistry.IsHandwrittenSynchronized(typeName))
                     return GenericSettingsStateAdapter.IsResolvedFor(typeName) ? "sync-mod" : "blocked-mod";
             }
             if (IsAuditedCslModernMap(typeName, assembly)) return "client-mod";

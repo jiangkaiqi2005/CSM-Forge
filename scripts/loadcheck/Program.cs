@@ -102,7 +102,9 @@ namespace LoadCheck
                 " attributes=" + totalAttributes + " failures=" + failures);
             Console.WriteLine();
             int executeFailures = Execute.Run(modDir);
-            return (failures == 0 && executeFailures == 0) ? 0 : 1;
+            Console.WriteLine();
+            int classifyFailures = Classify.Run(modDir);
+            return (failures == 0 && executeFailures == 0 && classifyFailures == 0) ? 0 : 1;
         }
 
         /// <summary>Touch every signature and attribute so the runtime must resolve it.</summary>

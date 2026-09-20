@@ -143,6 +143,13 @@ namespace CsmForge.Runtime.Cities1
         /// </summary>
         internal static string LocalIpv4()
         {
+            // Route probe first: ask the OS which local address it would use for an outbound
+            // route (UDP connect sends nothing). This is the only method that works under the
+            // game's Mono 2.0 runtime, where IPInterfaceProperties.GatewayAddresses comes back
+            // empty - the earlier GatewayAddresses-only fix silently degraded to the DNS probe
+            // and still reported the gateway-less VPN address (2.0.0.1).
+            string routed = RouteProbeIpv4();
+            if (routed != null) return routed;
             try
             {
                 NetworkInterface[] interfaces = NetworkInterface.GetAllNetworkInterfaces();
@@ -167,6 +174,25 @@ namespace CsmForge.Runtime.Cities1
             }
             catch { }
             return "127.0.0.1";
+        }
+
+        /// <summary>Mono-safe: returns the address the OS would route through, or null.</summary>
+        private static string RouteProbeIpv4()
+        {
+            try
+            {
+                using (System.Net.Sockets.Socket socket = new System.Net.Sockets.Socket(
+                    System.Net.Sockets.AddressFamily.InterNetwork,
+                    System.Net.Sockets.SocketType.Dgram, System.Net.Sockets.ProtocolType.Udp))
+                {
+                    socket.Connect(new IPEndPoint(IPAddress.Parse("8.8.8.8"), 65530));
+                    IPEndPoint local = socket.LocalEndPoint as IPEndPoint;
+                    if (local != null && local.Address != null && !IPAddress.IsLoopback(local.Address) &&
+                        !IsLinkLocalIpv4(local.Address)) return local.Address.ToString();
+                }
+            }
+            catch { }
+            return null;
         }
 
         private static bool HasIpv4Gateway(IPInterfaceProperties properties)

@@ -163,5 +163,45 @@ namespace CsmForge.Tests
             Assert.True(root.Equals(index.Root));
             Assert.Equal(1, index.CellCount);
         }
+
+        [Case] public static void ExpandedGridCapacityIsSupportedEndToEnd()
+        {
+            // Regression (in-game host-start failure): 81 Tiles 2 replaces the district grid
+            // with 900x900 = 810,000 cells and transpiles DistrictManager's stride from 512 to
+            // 900. The vanilla-capacity index rejected cell indices >= 262,144 with
+            // ArgumentOutOfRangeException("cellIndex") the moment a room was created.
+            const int Expanded = 900 * 900; // 810,000
+            DistrictShardedCellIndex index = new DistrictShardedCellIndex(Expanded);
+            Assert.Equal(Expanded, index.TotalCells);
+            Assert.Equal(1583, index.ShardCount);          // ceil(810000 / 512)
+            Assert.Equal(512, index.CellsInShard(0));
+            Assert.Equal(16, index.CellsInShard(1582));     // 810000 - 1582*512 = 16 (tail shard)
+
+            // The old boundary that used to throw.
+            EntityIdentityV2 id = new EntityIdentityV2(7, 1);
+            index.ApplyCell(262143, Cell(262143, 255, id));
+            index.ApplyCell(262144, Cell(262144, 255, id));
+            index.ApplyCell(809999, Cell(809999, 255, id)); // last valid cell
+            Assert.Equal(3, index.CellCount);
+            Assert.Equal(511, index.ShardOf(262143));
+            Assert.Equal(512, index.ShardOf(262144));
+            Assert.Equal(1582, index.ShardOf(809999));
+            Assert.True(index.AggregateRoot.Equals(index.RecomputeFullAggregateRoot()));
+        }
+
+        [Case] public static void VanillaDefaultCapacityIsUnchanged()
+        {
+            DistrictShardedCellIndex index = new DistrictShardedCellIndex();
+            Assert.Equal(262144, index.TotalCells);
+            Assert.Equal(512, index.ShardCount);
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { index.ShardOf(262144); });
+        }
+
+        [Case] public static void CapacityBoundsAreEnforced()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { new DistrictShardedCellIndex(0); });
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { new DistrictShardedCellIndex(-1); });
+            Assert.Throws<ArgumentOutOfRangeException>(delegate { new DistrictShardedCellIndex(1024 * 1024 + 1); });
+        }
     }
 }

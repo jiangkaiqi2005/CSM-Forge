@@ -5,10 +5,15 @@ using System.IO;
 namespace CsmForge.Core
 {
     /// <summary>
-    /// WP-1.4: sharded mirror of the 262,144-cell district grid. Cells are organized into
-    /// 512 shards of 512 slots (TreePropStateAdapters shard precedent); every shard owns a
-    /// cached canonical root and the aggregate root is the hash over all shard roots, so a
-    /// cell change only re-encodes one shard instead of the whole city.
+    /// WP-1.4: sharded mirror of the district grid. Cells are grouped into shards of 512 slots
+    /// (TreePropStateAdapters shard precedent); every shard owns a cached canonical root and the
+    /// aggregate root is the hash over all shard roots, so a cell change only re-encodes one
+    /// shard instead of the whole city.
+    ///
+    /// The capacity is NOT a constant: vanilla CS1 allocates 512x512 cells, but grid-expanding
+    /// mods replace the array (81 Tiles 2 allocates 900x900 and transpiles DistrictManager's
+    /// index arithmetic so the stride becomes 900). The runtime therefore passes the live grid
+    /// length; host and client agree because they derive it from the same load.
     ///
     /// Two independent dirty concepts:
     /// - hash-dirty (private): the shard root must be recomputed before the aggregate is read;
@@ -21,48 +26,75 @@ namespace CsmForge.Core
     /// </summary>
     public sealed class DistrictShardedCellIndex
     {
-        public const int ShardCount = 512;
-        public const int CellsPerShard = 512; // 512 * 512 = 262,144 grid cells
+        public const int CellsPerShard = 512;
+        /// <summary>Vanilla CS1 district grid (512x512). Grid-expanding mods replace it.</summary>
+        public const int VanillaCellCount = 512 * 512;
+        /// <summary>Bounds guard: 900x900 (81 Tiles 2) is 810,000; a 1024x1024 ceiling is ample.</summary>
+        public const int MaximumCellCount = 1024 * 1024;
         private const uint ShardMagic = 0x32444746u; // FGD2, per-shard cell section
         private const uint AggregateMagic = 0x33415344u; // DSA3, shard-root aggregate
 
-        private readonly SortedDictionary<uint, DistrictCellStateV2>[] shards = new SortedDictionary<uint, DistrictCellStateV2>[ShardCount];
-        private readonly Hash256[] shardRoots = new Hash256[ShardCount];
-        private readonly bool[] sourceDirty = new bool[ShardCount];
+        private readonly int totalCells;
+        private readonly int shardCount;
+        private readonly SortedDictionary<uint, DistrictCellStateV2>[] shards;
+        private readonly Hash256[] shardRoots;
+        private readonly bool[] sourceDirty;
         private Hash256 aggregate;
         private bool aggregateDirty = true;
         private int cellCount;
 
-        public DistrictShardedCellIndex()
+        /// <summary>Vanilla capacity; the runtime passes the live grid length instead.</summary>
+        public DistrictShardedCellIndex() : this(VanillaCellCount) { }
+
+        public DistrictShardedCellIndex(int totalCells)
         {
-            for (int shard = 0; shard < ShardCount; shard++) shards[shard] = new SortedDictionary<uint, DistrictCellStateV2>();
+            Check.OutOfRange(totalCells < 1 || totalCells > MaximumCellCount, "totalCells");
+            this.totalCells = totalCells;
+            shardCount = (totalCells + CellsPerShard - 1) / CellsPerShard;
+            shards = new SortedDictionary<uint, DistrictCellStateV2>[shardCount];
+            shardRoots = new Hash256[shardCount];
+            sourceDirty = new bool[shardCount];
+            for (int shard = 0; shard < shardCount; shard++)
+                shards[shard] = new SortedDictionary<uint, DistrictCellStateV2>();
         }
 
         public int CellCount { get { return cellCount; } }
+        /// <summary>Live grid capacity this index mirrors (vanilla 262,144; 81 Tiles 2 810,000).</summary>
+        public int TotalCells { get { return totalCells; } }
+        public int ShardCount { get { return shardCount; } }
 
         public int ShardOf(uint cellIndex)
         {
-            Check.OutOfRange(cellIndex >= ShardCount * CellsPerShard, "cellIndex");
+            Check.OutOfRange(cellIndex >= (uint)totalCells, "cellIndex");
             return (int)(cellIndex / CellsPerShard);
+        }
+
+        /// <summary>Number of cells in a shard, clamped to the tail shard's real extent.</summary>
+        public int CellsInShard(int shard)
+        {
+            Check.OutOfRange(shard < 0 || shard >= shardCount, "shard");
+            long start = (long)shard * CellsPerShard;
+            long remaining = totalCells - start;
+            return remaining >= CellsPerShard ? CellsPerShard : (int)remaining;
         }
 
         public bool IsSourceDirty(int shard) { return sourceDirty[shard]; }
 
         public bool HasSourceDirtyShards()
         {
-            for (int shard = 0; shard < ShardCount; shard++)
+            for (int shard = 0; shard < shardCount; shard++)
                 if (sourceDirty[shard]) return true;
             return false;
         }
 
         public void MarkAllSourceDirty()
         {
-            for (int shard = 0; shard < ShardCount; shard++) sourceDirty[shard] = true;
+            for (int shard = 0; shard < shardCount; shard++) sourceDirty[shard] = true;
         }
 
         public void MarkSourceDirty(int shard)
         {
-            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
+            Check.OutOfRange(shard < 0 || shard >= shardCount, "shard");
             sourceDirty[shard] = true;
         }
 
@@ -93,13 +125,13 @@ namespace CsmForge.Core
             {
                 if (aggregateDirty)
                 {
-                    Hash256[] roots = new Hash256[ShardCount];
-                    for (int shard = 0; shard < ShardCount; shard++) roots[shard] = ShardRoot(shard);
+                    Hash256[] roots = new Hash256[shardCount];
+                    for (int shard = 0; shard < shardCount; shard++) roots[shard] = ShardRoot(shard);
                     using (MemoryStream stream = new MemoryStream())
                     {
                         BinaryWriter writer = new BinaryWriter(stream);
                         writer.Write(AggregateMagic);
-                        for (int shard = 0; shard < ShardCount; shard++) writer.Write(roots[shard].ToArray());
+                        for (int shard = 0; shard < shardCount; shard++) writer.Write(roots[shard].ToArray());
                         writer.Flush(); aggregate = Hash256.Compute(stream.ToArray());
                     }
                     aggregateDirty = false;
@@ -115,7 +147,7 @@ namespace CsmForge.Core
             {
                 BinaryWriter writer = new BinaryWriter(stream);
                 writer.Write(AggregateMagic);
-                for (int shard = 0; shard < ShardCount; shard++) writer.Write(ComputeShardRoot(shard).ToArray());
+                for (int shard = 0; shard < shardCount; shard++) writer.Write(ComputeShardRoot(shard).ToArray());
                 writer.Flush(); return Hash256.Compute(stream.ToArray());
             }
         }
@@ -127,7 +159,7 @@ namespace CsmForge.Core
         /// </summary>
         public DistrictCellStateV2[] ReconcileShard(int shard, IDictionary<uint, DistrictCellStateV2> sourceCells)
         {
-            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
+            Check.OutOfRange(shard < 0 || shard >= shardCount, "shard");
             if (sourceCells == null) throw new ArgumentNullException("sourceCells");
             List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
             List<uint> removals = new List<uint>();
@@ -154,7 +186,7 @@ namespace CsmForge.Core
         {
             if (source == null) throw new ArgumentNullException("source");
             List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
-            for (int shard = 0; shard < ShardCount; shard++)
+            for (int shard = 0; shard < shardCount; shard++)
             {
                 if (!sourceDirty[shard]) continue;
                 changed.AddRange(ReconcileShard(shard, source(shard)));
@@ -167,7 +199,7 @@ namespace CsmForge.Core
         {
             if (source == null) throw new ArgumentNullException("source");
             List<DistrictCellStateV2> changed = new List<DistrictCellStateV2>();
-            for (int shard = 0; shard < ShardCount; shard++) changed.AddRange(ReconcileShard(shard, source(shard)));
+            for (int shard = 0; shard < shardCount; shard++) changed.AddRange(ReconcileShard(shard, source(shard)));
             return changed;
         }
 
@@ -176,14 +208,14 @@ namespace CsmForge.Core
         {
             get
             {
-                for (int shard = 0; shard < ShardCount; shard++)
+                for (int shard = 0; shard < shardCount; shard++)
                     foreach (KeyValuePair<uint, DistrictCellStateV2> pair in shards[shard]) yield return pair.Value;
             }
         }
 
         public Hash256 ShardRoot(int shard)
         {
-            Check.OutOfRange(shard < 0 || shard >= ShardCount, "shard");
+            Check.OutOfRange(shard < 0 || shard >= shardCount, "shard");
             if (shardRoots[shard] == null) shardRoots[shard] = ComputeShardRoot(shard);
             return shardRoots[shard];
         }

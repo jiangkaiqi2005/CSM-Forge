@@ -187,7 +187,10 @@ namespace CsmForge.Runtime.Cities1
         {
             if (RuntimeScopeGuard.IsApplying) return;
             if (RuntimeServices.Lifecycle.Role != CitiesRuntimeRole.HostLive) return;
-            RuntimeServices.Multiplayer.MarkDistrictCellSourceDirty((uint)(z * 512 + x));
+            // Stride comes from the live grid (900 with 81 Tiles 2), never the vanilla 512.
+            uint index;
+            if (!DistrictGameAccess.TryCellIndex(x, z, out index)) return;
+            RuntimeServices.Multiplayer.MarkDistrictCellSourceDirty(index);
         }
     }
 

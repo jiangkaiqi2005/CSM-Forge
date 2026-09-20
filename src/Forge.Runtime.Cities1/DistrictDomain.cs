@@ -32,6 +32,39 @@ namespace CsmForge.Runtime.Cities1
             return identity;
         }
 
+        /// <summary>
+        /// Live district-grid length. Grid-expanding mods replace the array (81 Tiles 2:
+        /// 512x512 -> 900x900), so nothing may assume the vanilla 262,144.
+        /// </summary>
+        public static int GridCellCount()
+        {
+            DistrictManager manager = DistrictManager.instance;
+            if (manager == null || manager.m_districtGrid == null)
+                throw new InvalidOperationException("DistrictManager grid is unavailable.");
+            return manager.m_districtGrid.Length;
+        }
+
+        /// <summary>
+        /// Cell index for a grid coordinate. The stride is the grid's own width, not the vanilla
+        /// 512: 81 Tiles 2 transpiles DistrictManager's index arithmetic from 512 to 900, so
+        /// hardcoding 512 would address the wrong cell (and exceed the mirror on big cells).
+        /// </summary>
+        public static bool TryCellIndex(int x, int z, out uint index)
+        {
+            index = 0;
+            if (x < 0 || z < 0) return false;
+            DistrictManager manager = DistrictManager.instance;
+            if (manager == null || manager.m_districtGrid == null) return false;
+            int length = manager.m_districtGrid.Length;
+            int width = (int)Math.Sqrt(length);
+            if (width < 1 || width * width != length) return false; // non-square layout: fall back to full verify
+            if (x >= width || z >= width) return false;
+            long value = (long)z * width + x;
+            if (value < 0 || value >= length) return false;
+            index = (uint)value;
+            return true;
+        }
+
         public static DistrictCellStateV2 CaptureCell(uint index, EntityIdMapV2 ids)
         {
             DistrictManager manager = DistrictManager.instance;
@@ -141,12 +174,13 @@ namespace CsmForge.Runtime.Cities1
         protected const ushort DistrictMapSaveId = 300;
         protected readonly LoadIdentity Load;
         protected readonly EntityIdMapV2 Ids = new EntityIdMapV2();
-        protected readonly DistrictStateIndexV2 Committed = new DistrictStateIndexV2();
+        protected readonly DistrictStateIndexV2 Committed;
 
         protected DistrictDomainBase(LoadIdentity load)
         {
             Check.Condition(!load.IsValid, "load", "Invalid load identity.");
             Load = load; RuntimeServices.EntityMaps.AttachDomain(DistrictMapSaveId, Ids);
+            Committed = new DistrictStateIndexV2(DistrictGameAccess.GridCellCount());
             SeedMappings(); SeedCommitted();
         }
 
@@ -312,9 +346,10 @@ namespace CsmForge.Runtime.Cities1
 
         private IDictionary<uint, DistrictCellStateV2> CaptureShardSource(int shard)
         {
-            Dictionary<uint, DistrictCellStateV2> cells = new Dictionary<uint, DistrictCellStateV2>(DistrictShardedCellIndex.CellsPerShard);
+            int span = Committed.CellsInShardFor(shard);
+            Dictionary<uint, DistrictCellStateV2> cells = new Dictionary<uint, DistrictCellStateV2>(span);
             uint start = (uint)(shard * DistrictShardedCellIndex.CellsPerShard);
-            for (uint offset = 0; offset < DistrictShardedCellIndex.CellsPerShard; offset++)
+            for (uint offset = 0; offset < (uint)span; offset++)
             {
                 uint index = start + offset;
                 DistrictCellStateV2 cell = DistrictGameAccess.CaptureCell(index, Ids);

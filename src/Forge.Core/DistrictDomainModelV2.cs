@@ -145,7 +145,21 @@ namespace CsmForge.Core
     public sealed class DistrictStateIndexV2
     {
         private readonly SortedDictionary<ulong, DistrictEntityStateV2> entities = new SortedDictionary<ulong, DistrictEntityStateV2>();
-        private readonly DistrictShardedCellIndex cells = new DistrictShardedCellIndex(); // WP-1.4: sharded, incremental roots
+        private readonly DistrictShardedCellIndex cells; // WP-1.4: sharded, incremental roots
+
+        /// <summary>Vanilla grid capacity; the runtime passes the live grid length instead.</summary>
+        public DistrictStateIndexV2() : this(DistrictShardedCellIndex.VanillaCellCount) { }
+
+        public DistrictStateIndexV2(int totalCells)
+        {
+            cells = new DistrictShardedCellIndex(totalCells);
+        }
+
+        /// <summary>Live district-grid capacity this index mirrors (grid-size mods change it).</summary>
+        public int TotalCells { get { return cells.TotalCells; } }
+        public int ShardCellCount { get { return cells.ShardCount; } }
+        /// <summary>Cells in a shard, clamped to the tail shard's real extent.</summary>
+        public int CellsInShardFor(int shard) { return cells.CellsInShard(shard); }
         public int EntityCount { get { return entities.Count; } }
         public int CellCount { get { return cells.CellCount; } }
 

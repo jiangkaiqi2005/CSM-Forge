@@ -23,27 +23,50 @@ namespace CsmForge.Runtime.Cities1
     {
         private const uint Magic = 0x31475046u; // FPG1
         private const uint BrushMagic = 0x31425046u; // FPB1
-        private const int GridResolution = 512;
         private const int RowsPerShard = 8;
-        private const int CellsPerShard = GridResolution * RowsPerShard;
-        private const int Shards = GridResolution / RowsPerShard;
         private const string ParkIdentityNamespace = "builtin.districtpark";
+
+        /// <summary>
+        /// Live park-grid width. Vanilla CS1 allocates 512x512, but grid-expanding mods replace
+        /// the array (81 Tiles 2: 900x900 = 810,000), and the district analogue of this mistake
+        /// aborted host creation outright. Width is derived from the array length on every
+        /// access; shard count and per-shard extent follow from it.
+        /// </summary>
+        private static int ResolveResolution()
+        {
+            DistrictManager manager = DistrictManager.instance;
+            if (manager == null || manager.m_parkGrid == null)
+                throw new InvalidOperationException("CS1 park grid is unavailable or has an unexpected shape.");
+            long length = manager.m_parkGrid.Length;
+            int width = (int)Math.Sqrt(length);
+            if (width < 1 || (long)width * width != length)
+                throw new InvalidOperationException("CS1 park grid is unavailable or has an unexpected shape.");
+            return width;
+        }
+
+        /// <summary>Rows in a shard, clamped so the tail shard never runs past the grid.</summary>
+        private static int RowsInShard(int shardIndex, int resolution)
+        {
+            int remaining = resolution - shardIndex * RowsPerShard;
+            return remaining >= RowsPerShard ? RowsPerShard : remaining;
+        }
 
         public string AdapterId { get { return "builtin.parkgrid"; } }
         public uint SchemaVersion { get { return 1; } }
-        public int ShardCount { get { return Shards; } }
+        public int ShardCount { get { return (ResolveResolution() + RowsPerShard - 1) / RowsPerShard; } }
 
         public byte[] CaptureShard(IForgeAdapterContextV1 context, int shardIndex)
         {
             ValidateShard(shardIndex);
             DistrictManager manager = DistrictManager.instance;
-            if (manager == null || manager.m_parkGrid == null || manager.m_parkGrid.Length != GridResolution * GridResolution)
+            int resolution = ResolveResolution();
+            if (manager.m_parkGrid.Length != resolution * resolution)
                 throw new InvalidOperationException("CS1 park grid is unavailable or has an unexpected shape.");
 
             EntityIdMapV2 parkIds = ExtensionIdentityServices.Maps.GetOrAttach(ParkIdentityNamespace);
             SortedDictionary<ulong, ParkDescriptor> dictionary = new SortedDictionary<ulong, ParkDescriptor>();
-            int start = shardIndex * RowsPerShard * GridResolution;
-            int end = start + CellsPerShard;
+            int start = shardIndex * RowsPerShard * resolution;
+            int end = start + RowsInShard(shardIndex, resolution) * resolution;
             for (int index = start; index < end; index++)
             {
                 DistrictManager.Cell cell = manager.m_parkGrid[index];
@@ -95,7 +118,8 @@ namespace CsmForge.Runtime.Cities1
             ValidateShard(shardIndex);
             if (state.Length > Limits.FramePayloadBytes) throw new InvalidDataException("Park-grid shard is too large.");
             DistrictManager manager = DistrictManager.instance;
-            if (manager == null || manager.m_parkGrid == null || manager.m_parkGrid.Length != GridResolution * GridResolution)
+            int resolution = ResolveResolution();
+            if (manager.m_parkGrid.Length != resolution * resolution)
                 throw new InvalidOperationException("CS1 park grid is unavailable or has an unexpected shape.");
             EntityIdMapV2 parkIds = ExtensionIdentityServices.Maps.GetOrAttach(ParkIdentityNamespace);
 
@@ -136,8 +160,8 @@ namespace CsmForge.Runtime.Cities1
                     nativeByCode[i] = native;
                 }
 
-                int start = shardIndex * RowsPerShard * GridResolution;
-                int end = start + CellsPerShard;
+                int start = shardIndex * RowsPerShard * resolution;
+                int end = start + RowsInShard(shardIndex, resolution) * resolution;
                 for (int index = start; index < end; index++)
                 {
                     DistrictManager.Cell cell = manager.m_parkGrid[index];
@@ -150,7 +174,7 @@ namespace CsmForge.Runtime.Cities1
                 if (stream.Position != stream.Length) throw new InvalidDataException("Trailing park-grid shard bytes.");
                 int minZ = shardIndex * RowsPerShard;
                 int maxZ = minZ + RowsPerShard - 1;
-                manager.AreaModified(0, minZ, GridResolution - 1, maxZ, false);
+                manager.AreaModified(0, minZ, resolution - 1, maxZ, false);
                 manager.NamesModified();
             }
         }
@@ -324,7 +348,8 @@ namespace CsmForge.Runtime.Cities1
 
         private static void ValidateShard(int shardIndex)
         {
-            Check.OutOfRange(shardIndex < 0 || shardIndex >= Shards, "shardIndex");
+            int shardCount = (ResolveResolution() + RowsPerShard - 1) / RowsPerShard;
+            Check.OutOfRange(shardIndex < 0 || shardIndex >= shardCount, "shardIndex");
         }
 
         private sealed class ParkDescriptor

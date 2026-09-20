@@ -2,17 +2,6 @@ using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
-    public enum MultiplayerSessionMode
-    {
-        Offline,
-        StartingHost,
-        Hosting,
-        ConnectingClient,
-        ClientCatchingUp,
-        ClientLive,
-        Faulted
-    }
-
     public sealed class MultiplayerStatusSnapshot
     {
         public MultiplayerSessionMode Mode { get; internal set; }

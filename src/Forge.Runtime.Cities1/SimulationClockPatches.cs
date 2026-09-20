@@ -1,4 +1,5 @@
 using HarmonyLib;
+using CsmForge.Core;
 
 namespace CsmForge.Runtime.Cities1
 {
@@ -8,14 +9,11 @@ namespace CsmForge.Runtime.Cities1
         public static bool Prefix(bool value)
         {
             if (RuntimeScopeGuard.IsApplying && RuntimeScopeGuard.ActiveDomain == SimulationClockAuthorityDomain.Id) return true;
-            MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
-            if (mode == MultiplayerSessionMode.Offline || mode == MultiplayerSessionMode.StartingHost || mode == MultiplayerSessionMode.ConnectingClient)
-                return true;
-            if (mode == MultiplayerSessionMode.Hosting || mode == MultiplayerSessionMode.ClientLive)
-            {
-                int speed = SimulationManager.instance != null ? SimulationManager.instance.SelectedSimulationSpeed : 1;
-                RuntimeServices.Multiplayer.TryQueueSimulationClock(value, speed);
-            }
+            if (!SimulationClockRouting.RoutesToHost(RuntimeServices.Multiplayer.Status.Mode)) return true;
+            int speed = SimulationManager.instance != null ? SimulationManager.instance.SelectedSimulationSpeed : 1;
+            // If the request cannot be queued, fall through to the vanilla setter rather than
+            // dropping the player's input on the floor.
+            if (!RuntimeServices.Multiplayer.TryQueueSimulationClock(value, speed)) return true;
             return false;
         }
     }
@@ -26,16 +24,10 @@ namespace CsmForge.Runtime.Cities1
         public static bool Prefix(int value)
         {
             if (RuntimeScopeGuard.IsApplying && RuntimeScopeGuard.ActiveDomain == SimulationClockAuthorityDomain.Id) return true;
-            MultiplayerSessionMode mode = RuntimeServices.Multiplayer.Status.Mode;
-            if (mode == MultiplayerSessionMode.Offline || mode == MultiplayerSessionMode.StartingHost || mode == MultiplayerSessionMode.ConnectingClient)
-                return true;
             if (value < 0 || value > 3) return false;
-            if (mode == MultiplayerSessionMode.Hosting || mode == MultiplayerSessionMode.ClientLive)
-            {
-                bool paused = SimulationManager.instance != null && SimulationManager.instance.SimulationPaused;
-                if (paused) paused = false;
-                RuntimeServices.Multiplayer.TryQueueSimulationClock(paused, value);
-            }
+            if (!SimulationClockRouting.RoutesToHost(RuntimeServices.Multiplayer.Status.Mode)) return true;
+            bool paused = SimulationManager.instance != null && SimulationManager.instance.SimulationPaused;
+            if (!RuntimeServices.Multiplayer.TryQueueSimulationClock(paused, value)) return true;
             return false;
         }
     }

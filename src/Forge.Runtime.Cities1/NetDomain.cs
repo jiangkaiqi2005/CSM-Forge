@@ -399,12 +399,25 @@ namespace CsmForge.Runtime.Cities1
             finally { economy.Dispose(); }
         }
 
+        /// <summary>
+        /// Diffs the live graph against the committed snapshot and returns the mutation, or null
+        /// when the graph is unchanged.
+        ///
+        /// Bug fix: this used to short-circuit on "CaptureWorld().Root == Committed.Root". But
+        /// CaptureWorld walks the identity maps, which only contain ALREADY-mapped entities - a
+        /// road the player just placed has no Forge identity yet, so it was invisible to that
+        /// comparison. The roots matched, the method returned null, and PublishObservedHostNet
+        /// then saw construction cost with "no graph change" and fenced the session. Reconcile
+        /// is the step that discovers unmapped live entities (it scans the native buffers), so it
+        /// must run before "no change" can be concluded; its construction count is the honest
+        /// answer.
+        /// </summary>
         internal NetMutationV2 ObserveHostChanges(int constructionCost, int refund)
         {
             NetWorldSnapshotV2 before = Committed;
-            NetWorldSnapshotV2 actual = CaptureWorld();
-            if (before.Root.Equals(actual.Root)) return null;
-            return Reconcile(before, constructionCost, refund);
+            NetMutationV2 mutation = Reconcile(before, constructionCost, refund);
+            if (mutation == null || mutation.ConstructionCount == 0) return null;
+            return mutation;
         }
     }
 

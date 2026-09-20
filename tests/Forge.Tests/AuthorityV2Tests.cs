@@ -142,5 +142,56 @@ namespace CsmForge.Tests
             Assert.Equal(AuthoritySubmitDecisionV2.ReadConflict, result.Decision);
             Assert.Equal((ulong)0, host.Revision);
         }
+
+        [Case] public static void RootNeutralObservedPublishIsANoOpNotAFailure()
+        {
+            // Regression for the in-game fence on a routine road edit ("observed-net-change-
+            // could-not-commit"). PublishObserved returns null BOTH when it refuses (a real
+            // bridge failure) and when the observed before/after roots are equal (nothing to
+            // publish, by design). A caller that treats every null as a failure fences the room
+            // on a no-op. This pins the coordinator's half of the contract: equal roots -> null,
+            // no fence, session still usable.
+            SessionStamp stamp = new SessionStamp(Guid.NewGuid(), 3);
+            ValueAuthorityDomain domain = new ValueAuthorityDomain();
+            AuthorityCoordinatorV2 host = new AuthorityCoordinatorV2(stamp, new IAuthorityDomainV2[] { domain });
+            Guid binding = Guid.NewGuid();
+            Assert.True(host.RegisterConnection(binding, new MemberIdentity(Guid.NewGuid(), 1), true, 1));
+            Assert.True(host.SetLive(binding, true));
+
+            // advance the committed root to H(42) with a real publish first
+            Hash256 baseline = domain.StateRoot;      // H(0), what the coordinator committed
+            domain.Observe(42);
+            Hash256 root = domain.StateRoot;
+            Assert.True(host.PublishObserved(AuthorityOriginKind.Simulation, 7, baseline, root, new byte[] { 1 }) != null);
+
+            // now the no-op case: baseline == observed after-root
+            AuthorityBatch batch = host.PublishObserved(AuthorityOriginKind.Simulation, 7, root, root, new byte[] { 2 });
+            Assert.True(batch == null);      // nothing to publish
+            Assert.True(!host.IsFenced);     // and emphatically not a failure
+
+            // The session keeps working afterwards: a real change still publishes.
+            domain.Observe(43);
+            AuthorityBatch real = host.PublishObserved(AuthorityOriginKind.Simulation, 7, root, domain.StateRoot, new byte[] { 3 });
+            Assert.True(real != null);
+            Assert.True(!host.IsFenced);
+        }
+
+        [Case] public static void PublishRejectsAStaleBaselineAndFences()
+        {
+            // The counterpart: a baseline that does not match the committed root IS a real bridge
+            // failure and must fence rather than silently publish a divergent world.
+            SessionStamp stamp = new SessionStamp(Guid.NewGuid(), 4);
+            ValueAuthorityDomain domain = new ValueAuthorityDomain();
+            AuthorityCoordinatorV2 host = new AuthorityCoordinatorV2(stamp, new IAuthorityDomainV2[] { domain });
+            Guid binding = Guid.NewGuid();
+            host.RegisterConnection(binding, new MemberIdentity(Guid.NewGuid(), 1), true, 1);
+            host.SetLive(binding, true);
+
+            domain.Observe(10);
+            Hash256 wrongBaseline = Hash256.Compute(new byte[] { 99 });
+            AuthorityBatch batch = host.PublishObserved(AuthorityOriginKind.Simulation, 7, wrongBaseline, domain.StateRoot, new byte[] { 3 });
+            Assert.True(batch == null);
+            Assert.True(host.IsFenced);
+        }
     }
 }

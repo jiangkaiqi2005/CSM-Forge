@@ -164,16 +164,33 @@ namespace CsmForge.Runtime.Cities1
             NetMutationV2 mutation = hostNet.ObserveHostChanges(constructionCost, refund);
             if (mutation == null)
             {
+                // No graph change at all. Spending construction budget without changing the graph
+                // is a genuine inconsistency (the tool charged money and produced nothing).
                 if (constructionCost != 0 || refund != 0)
                     FenceSession("net-economy-side-effect-without-graph-change");
                 return;
             }
             Hash256 afterRoot = hostNet.StateRoot;
+            if (beforeRoot.Equals(afterRoot))
+            {
+                // A mutation whose encoded graph state is identical (e.g. identity churn that
+                // re-encodes to the same content): PublishObserved returns null for this BY DESIGN
+                // ("nothing to publish"). Treating that null as a failure used to fence the whole
+                // room on a routine road edit. It is a no-op, and the authority's committed root
+                // still equals this baseline, so no drift is introduced.
+                events.Record(RuntimeEventCode.Error, load.Generation,
+                    "net-root-neutral-mutation-ignored; construction=" + constructionCost + "; refund=" + refund);
+                return;
+            }
             AuthorityBatch batch = authority.PublishObserved(AuthorityOriginKind.Simulation, NetAuthorityDomain.Id,
                 beforeRoot, afterRoot, NetDomainCodecV2.EncodeMutation(mutation));
-            if (batch == null || authority.IsFenced)
+            if (batch == null)
             {
-                FenceSession("observed-net-change-could-not-commit");
+                if (authority.IsFenced) return; // already fenced; the first fence recorded the cause
+                // Roots differ but the coordinator refused the batch: a real bridge failure.
+                // Record both roots so the next occurrence is diagnosable without a re-run.
+                FenceSession("observed-net-change-could-not-commit:" +
+                    "before=" + ShortHash(beforeRoot) + ":after=" + ShortHash(afterRoot));
                 return;
             }
             BroadcastBatch(batch);

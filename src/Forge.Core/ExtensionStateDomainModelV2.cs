@@ -8,10 +8,26 @@ namespace CsmForge.Core
     public sealed class ExtensionStateEntryV2
     {
         private readonly byte[] payload;
+        private Hash256 payloadRoot;
         public string AdapterId { get; private set; }
         public string Key { get; private set; }
         public byte[] Payload { get { return (byte[])payload.Clone(); } }
-        public Hash256 PayloadRoot { get { return Hash256.Compute(payload); } }
+
+        /// <summary>
+        /// Memoized payload digest. WP-P8: the aggregate root is recomputed on every detected
+        /// change and, with ~1,885 entries, hashing every payload each time made that call cost
+        /// hundreds of milliseconds (measured 600ms, spiking frames to ~590ms = 1.7fps). Entries
+        /// are immutable, so the digest is computed once per entry and reused; the aggregate's
+        /// bytes are unchanged, so no root/schema migration is implied.
+        /// </summary>
+        public Hash256 PayloadRoot
+        {
+            get
+            {
+                if (payloadRoot == null) payloadRoot = Hash256.Compute(payload);
+                return payloadRoot;
+            }
+        }
 
         public ExtensionStateEntryV2(string adapterId, string key, byte[] bytes)
         {
@@ -49,12 +65,15 @@ namespace CsmForge.Core
 
         internal static ExtensionStateEntryV2[] Normalize(IEnumerable<ExtensionStateEntryV2> values)
         {
+            // WP-P8: reuse the immutable entry instances. The previous copy re-cloned every
+            // payload (twice - once via .Payload, once in the constructor) and threw away the
+            // memoized digest on every root computation.
             List<ExtensionStateEntryV2> collected = new List<ExtensionStateEntryV2>();
             foreach (ExtensionStateEntryV2 value in values)
             {
                 if (value == null || collected.Count >= ExtensionStateCodecV2.MaximumEntries)
                     throw new ArgumentException("Invalid or excessive extension state entries.", "values");
-                collected.Add(new ExtensionStateEntryV2(value.AdapterId, value.Key, value.Payload));
+                collected.Add(value);
             }
             collected.Sort(delegate(ExtensionStateEntryV2 a, ExtensionStateEntryV2 b)
             {
@@ -79,9 +98,8 @@ namespace CsmForge.Core
                 {
                     WriteRootToken(writer, normalized[i].AdapterId);
                     WriteRootToken(writer, normalized[i].Key);
-                    byte[] payload = normalized[i].UnsafePayload;
-                    writer.Write(payload.Length);
-                    writer.Write(Hash256.Compute(payload).ToArray());
+                    writer.Write(normalized[i].UnsafePayload.Length);
+                    writer.Write(normalized[i].PayloadRoot.ToArray()); // memoized; identical bytes
                 }
                 writer.Flush();
                 stream.Position = 0;

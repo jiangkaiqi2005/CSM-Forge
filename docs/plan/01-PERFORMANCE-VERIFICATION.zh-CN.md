@@ -149,6 +149,32 @@
 **结论**：WP-1.5 的编码/哈希线程化暂缓，先由 E3/E4 真机数据决定。
 该决定记录为设计事实，不是未完成项。
 
+### WP-1.4d 网格容量不得假设为原版尺寸（真机回归修复）
+
+**真机症状**：创建房间即中止——
+`host-start:ArgumentOutOfRangeException: Argument is out of range. Parameter name: cellIndex`。
+
+**根因（反编译已安装 mod 集确认）**：81 Tiles 2 把 `DistrictManager.m_districtGrid`
+从 `new Cell[262144]`（512×512）替换为 `new Cell[810000]`（900×900），并用 transpiler
+把管理器索引算式里的常量 512 改成 900（`if (instruction.LoadsConstant(512L))
+instruction.operand = 900;`）。而 WP-1.4a 的分片索引硬编码 512×512=262,144、WP-1.4b 的
+`ModifyCell` 钩子写死 `z*512+x`——真实索引一超过 262,143 就被边界检查拒绝。
+
+**修复**：
+- `DistrictShardedCellIndex` 接收实际容量（保留原版默认值；上限 1024×1024），
+  分片数、末片长度、索引边界全部由容量推导；
+- `DistrictStateIndexV2`/`DistrictDomainBase` 从 `DistrictGameAccess.GridCellCount()`
+  取运行时真实网格长度初始化；
+- `DistrictGameAccess.TryCellIndex` 用 `sqrt(gridLength)` 推导步长（900 自动正确；
+  非方形布局回退全量校验）替代写死的 512；
+- 分片捕获按末片真实长度裁剪。
+
+**回归**：810,000 容量端到端（含原先抛异常的 262,144 边界）、原版默认不变、容量边界。
+
+**设计教训（适用于所有分片/网格代码）**：任何"游戏数据结构尺寸"都不得写成编译期常量。
+CS1 上有多类 mod 会替换数组或改写索引算式（81 Tiles 2 改区划网格；同类还有地图/路网扩展类），
+容量必须从运行时对象读取，或至少提供容量参数。已加入检查清单。
+
 ### WP-1.4c 路网根缓存语义 + 节拍全量兜底（第三片）—— 已实现，待真机验收
 
 - **语义变更**：`NetDomainBase.CurrentRoot` 由"每次读取全量 `CaptureWorld()`"改为

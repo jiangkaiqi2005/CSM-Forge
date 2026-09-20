@@ -70,6 +70,12 @@
 `feat/ultimate-dlc-mod-framework` @ `71b677f`（三次 `--no-ff` 合并：`fc17958` 波次一、
 `8d170cb` 目录加载+通用编解码器、`71b677f` 门禁第三轮+多 mod manifest，均已推送）；
 `build-runtime.ps1` 已从 `71b677f` 重新打包，BUILD_INFO 溯源指向可达提交。
+**真机运维前提（验收前必做）**：已知 mod 若开着 Forge 不支持的选项，开房会被正确拒绝
+（fail-closed）。截至 2026-09-20 实测需关闭的：Game Anarchy 的 29 项作弊开关 +
+石油/矿石枯竭率须为 100 + 解锁模式须为 0（配置：`ModsSettings/GameAnarchy/GameAnarchyModSetting.json`）；
+Infinite Goods 的 10 项服务点无限传输（配置：游戏根目录 `InfiniteGoodsConfig.xml`）。
+两处改动均已在本机备份为 `*.forge-backup-<时间戳>`。
+
 **E3/E4 真机验收为当前唯一待办（需人工执行）**：安装 `dist/runtime/CSM-Forge-runtime.zip`
 （71b677f 构建）后按 docs/TESTING 场景跑 1 Host + 1/2 Client、画区/修路/聊天、
 客户端 kill -9、节拍窗口 PERF 对比，并把结果写回 E3-E4-TEST-RECORD。

@@ -47,6 +47,8 @@ namespace CsmForge.Tests
             // The aggregated rejection message the host UI shows is built from this list.
             Assert.True(Array.IndexOf(ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings, "RemoveNoisePollution") >= 0);
             Assert.True(Array.IndexOf(ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings, "RemoveAirportBuildingFire") >= 0);
+            // 实机加载检查校正：黑名单实际 29 项（文档曾误记 28）
+            Assert.Equal(29, ModCompatibilityCatalog.Default.GameAnarchy.UnsupportedBooleanSettings.Length);
             Assert.Equal(100L, ModCompatibilityCatalog.Default.GameAnarchy.FixedOilDepletionRate);
             Assert.Equal(100L, ModCompatibilityCatalog.Default.GameAnarchy.FixedOreDepletionRate);
             Assert.Equal(0L, ModCompatibilityCatalog.Default.GameAnarchy.FixedSpreadFireProbability);

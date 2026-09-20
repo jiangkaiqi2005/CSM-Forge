@@ -13,7 +13,7 @@
   `GameAnarchy.Patches.BuildingAIPatch._modSetting`），版本精确锁死（GA 1.3.1.0）；
 - client-only 名单硬编码 9 个类型名（`CompatibilityCollector.cs:20-25`），
   加上 `ModCategory` 里的一串字符串特判（`:118-124`）；
-- GA 的 28 个不支持选项名单硬编码在 `GameAnarchyBridge.cs:79-89`；
+- GA 的 29 个不支持选项名单硬编码在 `GameAnarchyBridge.cs:79-89`（实机加载检查校正：原记 28 项）；
 - 未分类 mod 的默认命运：二进制指纹两端完全一致才允许加入，**状态不同步**。
 
 结论：新增一个 mod 的支持 = 改 Forge 源码 + 锁版本 + 发版。这是桥接密集的极致。

@@ -7,7 +7,6 @@ namespace CsmForge.Runtime.Cities1
 {
     internal static class DistrictGameAccess
     {
-        public const int GridResolution = 512;
 
         public static bool Live(byte nativeId)
         {
@@ -36,6 +35,25 @@ namespace CsmForge.Runtime.Cities1
         /// Live district-grid length. Grid-expanding mods replace the array (81 Tiles 2:
         /// 512x512 -> 900x900), so nothing may assume the vanilla 262,144.
         /// </summary>
+        /// <summary>Live grid width (512 vanilla, 900 with 81 Tiles 2); throws if non-square.</summary>
+        public static int GridWidth()
+        {
+            int length = GridCellCount();
+            int width = (int)Math.Sqrt(length);
+            if (width < 1 || (long)width * width != length)
+                throw new InvalidOperationException("District grid is not square.");
+            return width;
+        }
+
+        /// <summary>Grid coordinates of a cell index, using the live width (never the vanilla 512).</summary>
+        public static void Coordinates(uint index, out int x, out int z)
+        {
+            int width = GridWidth();
+            if (index >= (uint)(width * width)) throw new ArgumentOutOfRangeException("index");
+            x = (int)(index % (uint)width);
+            z = (int)(index / (uint)width);
+        }
+
         public static int GridCellCount()
         {
             DistrictManager manager = DistrictManager.instance;
@@ -138,10 +156,14 @@ namespace CsmForge.Runtime.Cities1
         public static void RefreshArea(DistrictCellStateV2[] cells)
         {
             if (cells == null || cells.Length == 0) return;
-            int minX = GridResolution, minZ = GridResolution, maxX = -1, maxZ = -1;
+            // Coordinates must use the live width: with a 900-wide grid the vanilla 512 constant
+            // produced wrong x/z and refreshed the wrong screen region.
+            int width = GridWidth();
+            Check.OutOfRange(width < 1, "width");
+            int minX = width, minZ = width, maxX = -1, maxZ = -1;
             for (int i = 0; i < cells.Length; i++)
             {
-                int x = (int)(cells[i].Index % GridResolution); int z = (int)(cells[i].Index / GridResolution);
+                int x, z; Coordinates(cells[i].Index, out x, out z);
                 if (x < minX) minX = x; if (x > maxX) maxX = x; if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
             }
             if (maxX >= minX && maxZ >= minZ)

@@ -5,15 +5,34 @@ namespace CsmForge.Runtime.Cities1
 {
     internal static class AreaGameAccess
     {
+        /// <summary>
+        /// Live unlockable-area grid width. Vanilla is 5 (m_areaGrid = 25), but 81 Tiles 2
+        /// allocates m_areaGrid = 81 and transpiles UnlockArea's stride from 5 to 9. Deriving the
+        /// width from the array keeps both the captured mask and the unlock index correct; the
+        /// hardcoded 5 rejected every outer area and fenced the session.
+        /// </summary>
+        public static int Resolution()
+        {
+            GameAreaManager manager = GameAreaManager.instance;
+            if (manager == null || manager.m_areaGrid == null)
+                throw new InvalidOperationException("GameAreaManager is unavailable.");
+            long length = manager.m_areaGrid.Length;
+            int width = (int)Math.Sqrt(length);
+            if (width < 1 || (long)width * width != length || width > AreaStateV2.MaximumResolution)
+                throw new InvalidOperationException("GameAreaManager grid has an unexpected shape.");
+            return width;
+        }
+
         public static AreaStateV2 Capture()
         {
             GameAreaManager manager = GameAreaManager.instance;
             if (manager == null) throw new InvalidOperationException("GameAreaManager is unavailable.");
-            uint mask = 0;
-            for (int z = 0; z < 5; z++)
-                for (int x = 0; x < 5; x++)
-                    if (manager.IsUnlocked(x, z)) mask |= 1u << (z * 5 + x);
-            return new AreaStateV2(mask);
+            int resolution = Resolution();
+            ulong low = 0, high = 0;
+            for (int z = 0; z < resolution; z++)
+                for (int x = 0; x < resolution; x++)
+                    if (manager.IsUnlocked(x, z)) AreaStateV2.SetBit(ref low, ref high, z * resolution + x);
+            return new AreaStateV2(resolution, low, high);
         }
 
         public static AreaStateV2 Unlock(LoadIdentity load, AreaUnlockIntentV2 intent)
@@ -22,8 +41,11 @@ namespace CsmForge.Runtime.Cities1
             if (!RuntimeServices.Lifecycle.IsCurrent(load)) throw new InvalidOperationException("Area unlock belongs to a stale load.");
             GameAreaManager manager = GameAreaManager.instance;
             if (manager == null) throw new InvalidOperationException("GameAreaManager is unavailable.");
+            int resolution = Resolution();
+            if (intent.X >= resolution || intent.Z >= resolution)
+                throw new InvalidOperationException("Area unlock targets a cell outside the live grid.");
             if (manager.IsUnlocked(intent.X, intent.Z)) return Capture();
-            int index = intent.Z * 5 + intent.X;
+            int index = intent.Z * resolution + intent.X;
             bool result;
             using (RuntimeScopeGuard.EnterApply(load, AreaAuthorityDomain.Id)) result = manager.UnlockArea(index);
             if (!result || !manager.IsUnlocked(intent.X, intent.Z))
@@ -35,14 +57,21 @@ namespace CsmForge.Runtime.Cities1
         {
             Check.NotNull(target, "target");
             AreaStateV2 current = Capture();
-            if ((current.UnlockedMask & ~target.UnlockedMask) != 0)
-                throw new InvalidOperationException("Replica has an extra unlocked area and requires a snapshot rebaseline.");
-            for (int z = 0; z < 5; z++)
-                for (int x = 0; x < 5; x++)
+            if (current.Resolution != target.Resolution)
+                throw new InvalidOperationException("Area resolution mismatch; a snapshot rebaseline is required.");
+            // current must not hold any area the target lacks
+            for (int z = 0; z < current.Resolution; z++)
+                for (int x = 0; x < current.Resolution; x++)
+                    if (current.IsUnlocked(x, z) && !target.IsUnlocked(x, z))
+                        throw new InvalidOperationException("Replica has an extra unlocked area and requires a snapshot rebaseline.");
+            for (int z = 0; z < target.Resolution; z++)
+                for (int x = 0; x < target.Resolution; x++)
                     if (target.IsUnlocked(x, z) && !current.IsUnlocked(x, z))
                         Unlock(load, new AreaUnlockIntentV2(x, z));
             AreaStateV2 actual = Capture();
-            if (actual.UnlockedMask != target.UnlockedMask)
+            // Compare by root: resolution and both mask words participate, so a size mismatch
+            // cannot pass as "equal".
+            if (!actual.Root.Equals(target.Root))
                 throw new InvalidOperationException("Area projection mismatch.");
             return actual;
         }

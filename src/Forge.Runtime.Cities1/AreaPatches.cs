@@ -17,9 +17,15 @@ namespace CsmForge.Runtime.Cities1
                 __result = false;
                 return false;
             }
-            int x = index % 5;
-            int z = index / 5;
-            bool accepted = index >= 0 && index < 25 && RuntimeServices.Multiplayer.TryQueueAreaUnlock(x, z);
+            // Stride comes from the live area grid: 5 vanilla, 9 with 81 Tiles 2. The hardcoded
+            // 5 read the wrong cell and rejected indices >= 25, which fenced the whole session.
+            int resolution;
+            try { resolution = AreaGameAccess.Resolution(); }
+            catch { RuntimeServices.Lifecycle.Fence("Area grid shape is unavailable"); __result = false; return false; }
+            int x = index % resolution;
+            int z = index / resolution;
+            bool inRange = index >= 0 && x < resolution && z < resolution;
+            bool accepted = inRange && RuntimeServices.Multiplayer.TryQueueAreaUnlock(x, z);
             if (!accepted) RuntimeServices.Lifecycle.Fence("Area unlock could not be routed through Host authority");
             __result = accepted;
             return false;
